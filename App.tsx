@@ -12,6 +12,7 @@ import { Applications } from './pages/Applications';
 import { UploadExcel } from './pages/UploadExcel';
 import { Profile } from './pages/Profile';
 import { StaffList } from './pages/StaffList';
+import { Guidebook } from './pages/Guidebook';
 import { Toaster, toast } from 'react-hot-toast';
 
 function App() {
@@ -220,6 +221,9 @@ function App() {
                 user={currentUser} 
                 onUpdateUser={handleUpdateUser} 
             />
+        )}
+        {currentView === 'guidebook' && (
+            <Guidebook />
         )}
         {currentView === 'addCompany' && (
              <Companies 

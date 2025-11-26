@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog, Book } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 
 interface LayoutProps {
@@ -57,6 +57,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           )}
           
           <NavItem view="applications" label="Permohonan" icon={FileText} />
+          
+          <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+             Rujukan
+          </div>
+          <NavItem view="guidebook" label="Buku Panduan" icon={Book} />
           
           {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
              <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
