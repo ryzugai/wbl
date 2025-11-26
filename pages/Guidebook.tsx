@@ -1,25 +1,25 @@
 import React from 'react';
 import { Printer, Book, ChevronRight } from 'lucide-react';
 
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+const SectionTitle = ({ children }: { children?: React.ReactNode }) => (
   <h3 className="text-xl font-bold text-blue-900 mb-4 mt-8 uppercase border-b-2 border-blue-100 pb-2 print:break-after-avoid">
     {children}
   </h3>
 );
 
-const SubSectionTitle = ({ children }: { children: React.ReactNode }) => (
+const SubSectionTitle = ({ children }: { children?: React.ReactNode }) => (
   <h4 className="text-lg font-bold text-slate-800 mb-3 mt-6 print:break-after-avoid">
     {children}
   </h4>
 );
 
-const Paragraph = ({ children }: { children: React.ReactNode }) => (
+const Paragraph = ({ children }: { children?: React.ReactNode }) => (
   <p className="mb-4 text-justify leading-relaxed text-slate-700">
     {children}
   </p>
 );
 
-const ListItem = ({ children }: { children: React.ReactNode }) => (
+const ListItem = ({ children }: { children?: React.ReactNode }) => (
   <li className="mb-2 text-justify text-slate-700 leading-relaxed pl-2">
     <span className="mr-2">•</span> {children}
   </li>
