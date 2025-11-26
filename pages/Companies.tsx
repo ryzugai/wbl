@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle } from 'lucide-react';
+import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 
@@ -10,14 +10,16 @@ interface CompaniesProps {
   applications: Application[];
   currentUser: User;
   onAddCompany: (c: Omit<Company, 'id'>) => Promise<void>;
+  onUpdateCompany: (c: Company) => Promise<void>;
   onDeleteCompany: (id: string) => Promise<void>;
   onApply: (company: Company) => Promise<void>;
 }
 
-export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onDeleteCompany, onApply }) => {
+export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // Confirmation Modal State
   const [confirmingCompany, setConfirmingCompany] = useState<Company | null>(null);
@@ -30,6 +32,9 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       company_state: 'Melaka',
       has_mou: false
   });
+
+  // Edit Company Form State
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   // Calculate Student Stats
   const myApplications = applications.filter(a => a.created_by === currentUser.username);
@@ -83,6 +88,20 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       });
       setIsAddModalOpen(false);
       setNewCompany({ company_state: 'Melaka', has_mou: false });
+  };
+
+  const handleEditClick = (company: Company) => {
+      setEditingCompany({ ...company });
+      setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingCompany) return;
+      
+      await onUpdateCompany(editingCompany);
+      setIsEditModalOpen(false);
+      setEditingCompany(null);
   };
 
   const handleConfirmApply = async () => {
@@ -277,13 +296,22 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                         {renderApplyButton(company)}
                         
                          {currentUser.role === UserRole.COORDINATOR && (
-                            <button 
-                                onClick={() => { if(confirm('Padam syarikat?')) onDeleteCompany(company.id); }}
-                                className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 border border-red-100 transition-colors"
-                                title="Padam Syarikat"
-                            >
-                                <Trash2 size={16} />
-                            </button>
+                            <>
+                              <button 
+                                  onClick={() => handleEditClick(company)}
+                                  className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 border border-blue-100 transition-colors"
+                                  title="Kemaskini Syarikat"
+                              >
+                                  <Edit size={16} />
+                              </button>
+                              <button 
+                                  onClick={() => { if(confirm('Padam syarikat?')) onDeleteCompany(company.id); }}
+                                  className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 border border-red-100 transition-colors"
+                                  title="Padam Syarikat"
+                              >
+                                  <Trash2 size={16} />
+                              </button>
+                            </>
                         )}
                         {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && company.has_mou && (
                             <button 
@@ -357,6 +385,65 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
               </div>
               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4">Simpan</button>
           </form>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Kemaskini Syarikat">
+          {editingCompany && (
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nama Syarikat</label>
+                    <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_name} onChange={e => setEditingCompany({...editingCompany, company_name: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Negeri</label>
+                        <select className="w-full p-2 border rounded" value={editingCompany.company_state} onChange={e => setEditingCompany({...editingCompany, company_state: e.target.value})}>
+                            {MALAYSIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Daerah</label>
+                        <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_district} onChange={e => setEditingCompany({...editingCompany, company_district: e.target.value})} />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Alamat Penuh</label>
+                    <textarea required className="w-full p-2 border rounded" rows={2} value={editingCompany.company_address} onChange={e => setEditingCompany({...editingCompany, company_address: e.target.value})} />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Industri</label>
+                    <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_industry} onChange={e => setEditingCompany({...editingCompany, company_industry: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Pegawai Dihubungi</label>
+                        <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_contact_person} onChange={e => setEditingCompany({...editingCompany, company_contact_person: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
+                        <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_contact_phone} onChange={e => setEditingCompany({...editingCompany, company_contact_phone: e.target.value})} />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input required type="email" className="w-full p-2 border rounded" value={editingCompany.company_contact_email} onChange={e => setEditingCompany({...editingCompany, company_contact_email: e.target.value})} />
+                </div>
+                <div className="flex items-center gap-4 pt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" className="h-4 w-4 text-blue-600" checked={editingCompany.has_mou} onChange={e => setEditingCompany({...editingCompany, has_mou: e.target.checked})} />
+                        <span className="text-sm font-medium">Ada MoU / LOI?</span>
+                    </label>
+                    {editingCompany.has_mou && (
+                        <select className="p-1 border rounded text-sm" value={editingCompany.mou_type} onChange={e => setEditingCompany({...editingCompany, mou_type: e.target.value as any})}>
+                            <option value="MoU">MoU</option>
+                            <option value="LOI">LOI</option>
+                        </select>
+                    )}
+                </div>
+                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4">Simpan Perubahan</button>
+              </form>
+          )}
       </Modal>
 
       {/* Confirmation Modal for Application */}

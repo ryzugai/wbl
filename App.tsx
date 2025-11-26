@@ -75,6 +75,16 @@ function App() {
       }
   };
 
+  const handleUpdateCompany = async (company: Company) => {
+      try {
+          await StorageService.updateCompany(company);
+          refreshData();
+          toast.success('Maklumat syarikat dikemaskini');
+      } catch (e) {
+          toast.error('Gagal mengemaskini syarikat');
+      }
+  };
+
   const handleDeleteCompany = async (id: string) => {
       await StorageService.deleteCompany(id);
       refreshData();
@@ -192,6 +202,7 @@ function App() {
                 applications={applications}
                 currentUser={currentUser} 
                 onAddCompany={handleAddCompany}
+                onUpdateCompany={handleUpdateCompany}
                 onDeleteCompany={handleDeleteCompany}
                 onApply={handleApplyInternship}
             />
@@ -231,6 +242,7 @@ function App() {
                 applications={applications}
                 currentUser={currentUser} 
                 onAddCompany={handleAddCompany}
+                onUpdateCompany={handleUpdateCompany}
                 onDeleteCompany={handleDeleteCompany}
                 onApply={handleApplyInternship}
             />
