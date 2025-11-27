@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole, Application } from '../types';
-import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, PlusCircle, MinusCircle, UserPlus } from 'lucide-react';
+import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, PlusCircle, MinusCircle, UserPlus, Users } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { Modal } from '../components/Modal';
 
@@ -22,13 +22,22 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
   const lecturers = users.filter(u => u.role === UserRole.LECTURER);
   const industryStaff = users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR);
 
-  // Filter logic for modal
+  // Filter logic for Lecturers (Explicit Assignment)
   const getSupervisees = (lecturerId: string) => {
       return applications.filter(app => app.faculty_supervisor_id === lecturerId && app.application_status === 'Diluluskan');
   };
 
   const getUnassignedStudents = () => {
       return applications.filter(app => !app.faculty_supervisor_id && app.application_status === 'Diluluskan');
+  };
+
+  // Filter logic for Industry (Implicit Assignment by Company)
+  const getIndustrySupervisees = (companyName: string | undefined) => {
+      if (!companyName) return [];
+      return applications.filter(app => 
+          app.company_name === companyName && 
+          app.application_status === 'Diluluskan'
+      );
   };
 
   const handleManageSupervision = (lecturer: User) => {
@@ -95,7 +104,7 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                 {activeTab === 'lecturers' ? (
                   <>
                     <th className="p-4 font-semibold text-sm text-slate-600">ID Staf</th>
-                    <th className="p-4 font-semibold text-sm text-slate-600 text-center">Pelajar Seliaan</th>
+                    <th className="p-4 font-semibold text-sm text-slate-600">Pelajar Seliaan</th>
                     {currentUser?.role === UserRole.COORDINATOR && (
                         <th className="p-4 font-semibold text-sm text-slate-600 text-center">Tindakan</th>
                     )}
@@ -103,6 +112,7 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                 ) : (
                   <>
                     <th className="p-4 font-semibold text-sm text-slate-600">Syarikat & Jawatan</th>
+                    <th className="p-4 font-semibold text-sm text-slate-600">Pelajar Seliaan (Auto)</th>
                     <th className="p-4 font-semibold text-sm text-slate-600">Peranan</th>
                   </>
                 )}
@@ -111,16 +121,16 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
             <tbody className="divide-y divide-slate-100">
               {(activeTab === 'lecturers' ? lecturers : industryStaff).length === 0 && (
                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500">Tiada rekod dijumpai.</td>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">Tiada rekod dijumpai.</td>
                  </tr>
               )}
               {(activeTab === 'lecturers' ? lecturers : industryStaff).map(user => (
                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4">
+                  <td className="p-4 align-top">
                     <div className="font-medium text-slate-900">{user.name}</div>
                     <div className="text-xs text-slate-500">Username: {user.username}</div>
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 align-top">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 text-sm text-slate-600">
                         <Mail size={14} className="text-orange-500" />
@@ -135,19 +145,31 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                   
                   {activeTab === 'lecturers' ? (
                     <>
-                        <td className="p-4">
-                        <div className="flex items-center gap-2 text-sm text-slate-700 font-mono bg-slate-100 px-2 py-1 rounded w-fit">
-                            <CreditCard size={14} />
-                            {user.staff_id || '-'}
-                        </div>
+                        <td className="p-4 align-top">
+                            <div className="flex items-center gap-2 text-sm text-slate-700 font-mono bg-slate-100 px-2 py-1 rounded w-fit">
+                                <CreditCard size={14} />
+                                {user.staff_id || '-'}
+                            </div>
                         </td>
-                        <td className="p-4 text-center">
-                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
-                                {getSupervisees(user.id).length}
-                            </span>
+                        <td className="p-4 align-top">
+                            {getSupervisees(user.id).length > 0 ? (
+                                <div className="flex flex-col gap-1">
+                                    {getSupervisees(user.id).map(app => (
+                                        <div key={app.id} className="inline-flex items-center gap-2 px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded border border-blue-100">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                            {app.student_name}
+                                        </div>
+                                    ))}
+                                    <div className="mt-1 text-xs text-slate-400 font-medium">
+                                        Total: {getSupervisees(user.id).length}
+                                    </div>
+                                </div>
+                            ) : (
+                                <span className="text-xs text-slate-400 italic">Tiada pelajar</span>
+                            )}
                         </td>
                         {currentUser?.role === UserRole.COORDINATOR && (
-                            <td className="p-4 text-center">
+                            <td className="p-4 align-top text-center">
                                 <button 
                                     onClick={() => handleManageSupervision(user)}
                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded border border-blue-200 transition-colors text-sm font-medium"
@@ -159,7 +181,7 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                     </>
                   ) : (
                     <>
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="font-medium text-slate-800 flex items-center gap-2">
                            <Building2 size={16} className="text-blue-500" />
                            {user.company_affiliation}
@@ -169,7 +191,21 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                            {user.company_position}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 align-top">
+                          {getIndustrySupervisees(user.company_affiliation).length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                  {getIndustrySupervisees(user.company_affiliation).map(app => (
+                                      <div key={app.id} className="inline-flex items-center gap-2 px-2 py-1 bg-green-50 text-green-700 text-xs rounded border border-green-100">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                          {app.student_name}
+                                      </div>
+                                  ))}
+                              </div>
+                          ) : (
+                              <span className="text-xs text-slate-400 italic">Tiada pelajar diluluskan</span>
+                          )}
+                      </td>
+                      <td className="p-4 align-top">
                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
                            user.role === UserRole.TRAINER ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'
                         }`}>
