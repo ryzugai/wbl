@@ -1,3 +1,4 @@
+
 import { User, Company, Application } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 
@@ -139,5 +140,25 @@ export const StorageService = {
     apps[index] = updatedApp;
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
     return updatedApp;
+  },
+
+  // NEW: Full System Backup/Restore
+  getFullSystemBackup: () => {
+    return {
+      users: JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
+      companies: JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
+      applications: JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
+      timestamp: new Date().toISOString(),
+      version: '1.0'
+    };
+  },
+
+  restoreFullSystem: (data: any) => {
+    if (!data.users || !data.companies || !data.applications) {
+      throw new Error('Format fail sandaran tidak sah.');
+    }
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
+    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
+    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));
   }
 };

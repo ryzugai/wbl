@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog, Book } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog, Book, Database } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 
 interface LayoutProps {
@@ -74,7 +74,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
            )}
 
            {currentUser.role === UserRole.COORDINATOR && (
-             <NavItem view="uploadExcel" label="Upload Excel" icon={FileSpreadsheet} />
+             <>
+               <NavItem view="uploadExcel" label="Upload Excel" icon={FileSpreadsheet} />
+               <NavItem view="systemData" label="Sistem & Data" icon={Database} />
+             </>
            )}
         </div>
 

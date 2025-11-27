@@ -13,6 +13,7 @@ import { UploadExcel } from './pages/UploadExcel';
 import { Profile } from './pages/Profile';
 import { StaffList } from './pages/StaffList';
 import { Guidebook } from './pages/Guidebook';
+import { SystemData } from './pages/SystemData';
 import { Toaster, toast } from 'react-hot-toast';
 
 function App() {
@@ -190,23 +191,25 @@ function App() {
     <>
       <Toaster position="top-right" />
       <Layout 
-        currentUser={currentUser} 
-        currentView={currentView} 
-        onNavigate={setCurrentView} 
+        currentUser={currentUser}
+        currentView={currentView}
+        onNavigate={setCurrentView}
         onLogout={handleLogout}
       >
         {currentView === 'dashboard' && <Dashboard applications={applications} companies={companies} />}
-        {currentView === 'companies' && (
+        
+        {(currentView === 'companies' || currentView === 'addCompany') && (
             <Companies 
                 companies={companies} 
                 applications={applications}
-                currentUser={currentUser} 
+                currentUser={currentUser}
                 onAddCompany={handleAddCompany}
                 onUpdateCompany={handleUpdateCompany}
                 onDeleteCompany={handleDeleteCompany}
                 onApply={handleApplyInternship}
             />
         )}
+
         {currentView === 'students' && (
             <Students 
                 users={users} 
@@ -215,44 +218,26 @@ function App() {
                 onUpdateApplication={handleUpdateApplication}
             />
         )}
-        {currentView === 'staff' && (
-            <StaffList users={users} />
-        )}
+
         {currentView === 'applications' && (
             <Applications 
-                applications={applications} 
-                currentUser={currentUser} 
+                currentUser={currentUser}
+                applications={applications}
                 users={users}
                 companies={companies}
                 onUpdateApplication={handleUpdateApplication}
             />
         )}
-        {currentView === 'profile' && (
-            <Profile 
-                user={currentUser} 
-                onUpdateUser={handleUpdateUser} 
-            />
-        )}
-        {currentView === 'guidebook' && (
-            <Guidebook />
-        )}
-        {currentView === 'addCompany' && (
-             <Companies 
-                companies={companies} 
-                applications={applications}
-                currentUser={currentUser} 
-                onAddCompany={handleAddCompany}
-                onUpdateCompany={handleUpdateCompany}
-                onDeleteCompany={handleDeleteCompany}
-                onApply={handleApplyInternship}
-            />
-        )}
-        {currentView === 'uploadExcel' && (
-            <UploadExcel 
-                onUploadSuccess={refreshData} 
-                onNavigateToCompanies={() => setCurrentView('companies')}
-            />
-        )}
+
+        {currentView === 'profile' && <Profile user={currentUser} onUpdateUser={handleUpdateUser} />}
+        
+        {currentView === 'staff' && <StaffList users={users} />}
+        
+        {currentView === 'uploadExcel' && <UploadExcel onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}
+        
+        {currentView === 'systemData' && <SystemData onDataRestored={refreshData} />}
+        
+        {currentView === 'guidebook' && <Guidebook />}
       </Layout>
     </>
   );
