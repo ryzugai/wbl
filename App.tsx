@@ -64,12 +64,24 @@ function App() {
   const handleUpdateUser = async (updatedUser: User) => {
     try {
         const savedUser = await StorageService.updateUser(updatedUser);
-        setCurrentUser(savedUser); // Update session state
+        if (currentUser && currentUser.id === savedUser.id) {
+            setCurrentUser(savedUser); // Update session state if updating self
+        }
         refreshData();
         toast.success('Profil berjaya dikemaskini');
     } catch (error) {
         toast.error('Gagal mengemaskini profil');
     }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+      try {
+        await StorageService.deleteUser(id);
+        refreshData();
+        toast.success('Pengguna berjaya dipadam');
+      } catch(e) {
+        toast.error('Gagal memadam pengguna');
+      }
   };
 
   const handleAddCompany = async (companyData: Omit<Company, 'id'>) => {
@@ -222,6 +234,8 @@ function App() {
                 applications={applications} 
                 currentUser={currentUser}
                 onUpdateApplication={handleUpdateApplication}
+                onUpdateUser={handleUpdateUser}
+                onDeleteUser={handleDeleteUser}
             />
         )}
 

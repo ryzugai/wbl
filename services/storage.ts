@@ -200,6 +200,17 @@ export const StorageService = {
     return updatedUser;
   },
 
+  deleteUser: async (id: string): Promise<void> => {
+    if (db) {
+      await deleteDoc(doc(db, 'users', id));
+    } else {
+      const users = StorageService.getUsers();
+      const filtered = users.filter(u => u.id !== id);
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filtered));
+      notifyListeners();
+    }
+  },
+
   // --- COMPANIES ---
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
 

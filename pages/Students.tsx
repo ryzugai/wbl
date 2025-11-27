@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Eye, Upload } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
 interface StudentsProps {
@@ -9,12 +9,18 @@ interface StudentsProps {
   applications: Application[];
   currentUser: User;
   onUpdateApplication: (app: Application) => Promise<void>;
+  onUpdateUser: (user: User) => Promise<void>;
+  onDeleteUser: (id: string) => Promise<void>;
 }
 
-export const Students: React.FC<StudentsProps> = ({ users, applications, currentUser, onUpdateApplication }) => {
+export const Students: React.FC<StudentsProps> = ({ users, applications, currentUser, onUpdateApplication, onUpdateUser, onDeleteUser }) => {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [supervisorId, setSupervisorId] = useState('');
+
+  // Edit Student State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<User | null>(null);
 
   // Get all registered students
   const students = users.filter(u => u.role === UserRole.STUDENT);
@@ -48,7 +54,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const handleAssignClick = (app: Application) => {
     setSelectedApp(app);
     setSupervisorId(app.faculty_supervisor_id || '');
-    setIsModalOpen(true);
+    setIsAssignModalOpen(true);
   };
 
   const handleSaveSupervisor = async () => {
@@ -63,8 +69,17 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
       faculty_supervisor_staff_id: lecturer.staff_id
     });
     
-    setIsModalOpen(false);
+    setIsAssignModalOpen(false);
     setSelectedApp(null);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if(editingStudent) {
+          await onUpdateUser(editingStudent);
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+      }
   };
 
   return (
@@ -104,13 +119,13 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 </tr>
               )}
               {studentList.map((item: any) => (
-                <tr key={item.id} className="hover:bg-slate-50">
+                <tr key={item.id} className="hover:bg-slate-50 group">
                   <td className="p-4">
                     <div className="font-medium text-slate-900">{item.name}</div>
                     <div className="text-xs text-slate-500">{item.matric_no}</div>
                     <div className="text-xs text-slate-400 mt-1">{item.email}</div>
                   </td>
-                  <td className="p-4 text-sm text-slate-700">{item.program}</td>
+                  <td className="p-4 text-sm text-slate-700 max-w-xs truncate" title={item.program}>{item.program}</td>
                   <td className="p-4">
                     {item.placement ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -137,15 +152,31 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                   </td>
                   {currentUser.role === UserRole.COORDINATOR && (
                       <td className="p-4 text-center">
-                          {item.placement && (
-                              <button 
-                                onClick={() => handleAssignClick(item.placement)}
-                                className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                                title="Assign Penyelia"
-                              >
-                                  <UserPlus size={18} />
-                              </button>
-                          )}
+                          <div className="flex items-center justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                            {item.placement && (
+                                <button 
+                                    onClick={() => handleAssignClick(item.placement)}
+                                    className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                                    title="Assign Penyelia"
+                                >
+                                    <UserPlus size={18} />
+                                </button>
+                            )}
+                            <button 
+                                onClick={() => { setEditingStudent(item); setIsEditModalOpen(true); }}
+                                className="p-2 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
+                                title="Edit Pelajar"
+                            >
+                                <Edit size={18} />
+                            </button>
+                            <button 
+                                onClick={() => { if(confirm('Adakah anda pasti mahu memadam pelajar ini?')) onDeleteUser(item.id); }}
+                                className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                title="Padam Pelajar"
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                          </div>
                       </td>
                   )}
                 </tr>
@@ -155,9 +186,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         </div>
       </div>
 
+      {/* Assign Supervisor Modal */}
       <Modal 
-            isOpen={isModalOpen} 
-            onClose={() => setIsModalOpen(false)} 
+            isOpen={isAssignModalOpen} 
+            onClose={() => setIsAssignModalOpen(false)} 
             title="Tugaskan Penyelia Fakulti"
         >
             <div className="space-y-4">
@@ -188,6 +220,85 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     Simpan
                 </button>
             </div>
+        </Modal>
+
+        {/* Edit Student Modal */}
+        <Modal 
+            isOpen={isEditModalOpen} 
+            onClose={() => setIsEditModalOpen(false)} 
+            title="Kemaskini Maklumat Pelajar"
+        >
+            {editingStudent && (
+                <form onSubmit={handleEditSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nama Penuh</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border border-slate-300 rounded"
+                            value={editingStudent.name}
+                            onChange={(e) => setEditingStudent({...editingStudent, name: e.target.value})}
+                            required 
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">No. Matrik</label>
+                            <input 
+                                type="text" 
+                                className="w-full p-2 border border-slate-300 rounded"
+                                value={editingStudent.matric_no || ''}
+                                onChange={(e) => setEditingStudent({...editingStudent, matric_no: e.target.value})}
+                                required 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">No. KP</label>
+                            <input 
+                                type="text" 
+                                className="w-full p-2 border border-slate-300 rounded"
+                                value={editingStudent.ic_no || ''}
+                                onChange={(e) => setEditingStudent({...editingStudent, ic_no: e.target.value})}
+                                required 
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Program</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 border border-slate-300 rounded"
+                            value={editingStudent.program || ''}
+                            onChange={(e) => setEditingStudent({...editingStudent, program: e.target.value})}
+                            required 
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                            <input 
+                                type="email" 
+                                className="w-full p-2 border border-slate-300 rounded"
+                                value={editingStudent.email}
+                                onChange={(e) => setEditingStudent({...editingStudent, email: e.target.value})}
+                                required 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
+                            <input 
+                                type="tel" 
+                                className="w-full p-2 border border-slate-300 rounded"
+                                value={editingStudent.phone}
+                                onChange={(e) => setEditingStudent({...editingStudent, phone: e.target.value})}
+                                required 
+                            />
+                        </div>
+                    </div>
+                    <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4">
+                        Simpan Perubahan
+                    </button>
+                </form>
+            )}
         </Modal>
     </div>
   );
