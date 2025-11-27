@@ -42,13 +42,16 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
 
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const workbook = XLSX.read(bstr, { type: 'binary' });
+        // Parse as ArrayBuffer (More robust than BinaryString)
+        const arrayBuffer = evt.target?.result as ArrayBuffer;
+        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
         const wsname = workbook.SheetNames[0];
         const ws = workbook.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const jsonData = XLSX.utils.sheet_to_json(ws);
 
-        if (data.length === 0) {
+        if (jsonData.length === 0) {
           toast.error("Fail Excel kosong atau format tidak betul");
           setIsProcessing(false);
           return;
@@ -59,11 +62,11 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         const newLogs: string[] = [];
         const validCompanies: Omit<Company, 'id'>[] = [];
 
-        newLogs.push(`Menganalisis ${data.length} baris data...`);
+        newLogs.push(`Menganalisis ${jsonData.length} baris data...`);
 
         // 1. PROCESSING PHASE (No DB calls yet)
-        for (let i = 0; i < data.length; i++) {
-          const row: any = data[i];
+        for (let i = 0; i < jsonData.length; i++) {
+          const row: any = jsonData[i];
           
           const companyName = findColumnValue(row, ['Nama Syarikat', 'Company Name', 'Syarikat', 'Name', 'Nama Organisasi', 'Organization']);
           
@@ -155,12 +158,13 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
                 newLogs.push(`🎉 SEMUA DATA BERJAYA DISIMPAN!`);
                 toast.success(`${successCount} syarikat berjaya ditambah!`);
                 onUploadSuccess();
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Bulk Upload Error", error);
-                newLogs.push(`🛑 RALAT KRITIKAL: Gagal menyimpan data ke server. Sila semak sambungan internet.`);
-                toast.error("Gagal menyimpan data");
-                successCount = 0; // Reset if bulk save fails
-                failCount = data.length;
+                const errorMsg = error?.code ? `(${error.code})` : '';
+                newLogs.push(`🛑 RALAT KRITIKAL: Gagal menyimpan data ke server ${errorMsg}. Sila semak format data.`);
+                toast.error(`Gagal menyimpan: ${error.message || 'Server Error'}`);
+                successCount = 0; 
+                failCount = jsonData.length;
             }
         } else {
             newLogs.push(`⚠️ Tiada data sah untuk disimpan.`);
@@ -169,15 +173,16 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         setLogs(newLogs);
         setSummary({ success: successCount, failed: failCount });
 
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        toast.error("Ralat memproses fail Excel");
+        toast.error(`Ralat memproses fail Excel: ${error.message}`);
       } finally {
         setIsProcessing(false);
       }
     };
 
-    reader.readAsBinaryString(file);
+    // Switch to ArrayBuffer which is more compatible with XLSX libraries
+    reader.readAsArrayBuffer(file);
   };
 
   return (

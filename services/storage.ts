@@ -216,12 +216,27 @@ export const StorageService = {
     return newCompany;
   },
 
-  // NEW: Bulk Create for efficient uploads
+  // NEW: Bulk Create for efficient uploads with Strict Sanitization
   bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
-    const companiesWithIds = companies.map(c => ({ ...c, id: generateId() }));
+    // 1. Prepare and Sanitize Data
+    // Firestore fails if ANY field is 'undefined'. We must force everything to string or null.
+    const sanitizedCompanies = companies.map(c => ({
+      id: generateId(),
+      company_name: c.company_name || '',
+      company_district: c.company_district || '',
+      company_state: c.company_state || '',
+      company_address: c.company_address || '',
+      company_industry: c.company_industry || '',
+      company_contact_person: c.company_contact_person || '',
+      company_contact_email: c.company_contact_email || '',
+      company_contact_phone: c.company_contact_phone || '',
+      has_mou: !!c.has_mou, // Force boolean
+      mou_type: c.mou_type || null, // Use null for optional fields, NOT undefined
+      created_at: new Date().toISOString()
+    }));
 
     if (db) {
-      // Firestore batch limit is 500
+      // Firestore batch limit is 500. Using 250 for safety on slow connections.
       const chunkArray = (arr: any[], size: number) => {
         const results = [];
         while (arr.length) {
@@ -230,7 +245,7 @@ export const StorageService = {
         return results;
       };
 
-      const chunks = chunkArray([...companiesWithIds], 450); // 450 to be safe
+      const chunks = chunkArray([...sanitizedCompanies], 250);
 
       for (const chunk of chunks) {
         const batch = writeBatch(db);
@@ -242,7 +257,7 @@ export const StorageService = {
       }
     } else {
       const existing = StorageService.getCompanies();
-      const updated = [...existing, ...companiesWithIds];
+      const updated = [...existing, ...sanitizedCompanies];
       localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updated));
       notifyListeners();
     }
