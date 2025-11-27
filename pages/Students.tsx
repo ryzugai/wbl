@@ -163,7 +163,12 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                                 </button>
                             )}
                             <button 
-                                onClick={() => { setEditingStudent(item); setIsEditModalOpen(true); }}
+                                onClick={() => { 
+                                    // IMPORTANT: Strip 'placement' field before editing to avoid DB schema errors
+                                    const { placement, ...userData } = item;
+                                    setEditingStudent(userData); 
+                                    setIsEditModalOpen(true); 
+                                }}
                                 className="p-2 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
                                 title="Edit Pelajar"
                             >

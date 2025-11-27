@@ -180,8 +180,11 @@ export const StorageService = {
   updateUser: async (updatedUser: User): Promise<User> => {
     if (updatedUser.id === COORDINATOR_ACCOUNT.id) return updatedUser;
 
+    // Sanitize to remove undefined values which crash Firestore
+    const sanitizedUser = JSON.parse(JSON.stringify(updatedUser));
+
     if (db) {
-      await setDoc(doc(db, 'users', updatedUser.id), updatedUser, { merge: true });
+      await setDoc(doc(db, 'users', updatedUser.id), sanitizedUser, { merge: true });
     } else {
       const users = StorageService.getUsers();
       const index = users.findIndex(u => u.id === updatedUser.id);
