@@ -251,7 +251,14 @@ function App() {
 
         {currentView === 'profile' && <Profile user={currentUser} onUpdateUser={handleUpdateUser} />}
         
-        {currentView === 'staff' && <StaffList users={users} />}
+        {currentView === 'staff' && (
+            <StaffList 
+                users={users} 
+                currentUser={currentUser}
+                applications={applications}
+                onUpdateApplication={handleUpdateApplication}
+            />
+        )}
         
         {currentView === 'uploadExcel' && <UploadExcel onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}
         
