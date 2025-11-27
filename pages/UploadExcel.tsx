@@ -57,10 +57,11 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         let successCount = 0;
         let failCount = 0;
         const newLogs: string[] = [];
+        const validCompanies: Omit<Company, 'id'>[] = [];
 
-        newLogs.push(`Dijumpai ${data.length} baris data...`);
+        newLogs.push(`Menganalisis ${data.length} baris data...`);
 
-        // We process sequentially to avoid race conditions with LocalStorage
+        // 1. PROCESSING PHASE (No DB calls yet)
         for (let i = 0; i < data.length; i++) {
           const row: any = data[i];
           
@@ -76,7 +77,6 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
           const state = findColumnValue(row, ['Negeri', 'State']);
           const district = findColumnValue(row, ['Daerah', 'District', 'Mukim', 'Wilayah']);
           
-          // Capturing Full Address
           const address = findColumnValue(row, [
               'Alamat Penuh', 'Alamat Syarikat', 'Alamat', 'Address', 
               'Lokasi', 'Location', 'Premis', 'Pejabat', 'Postal Address', 'Tempat'
@@ -84,18 +84,15 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
           
           const industry = findColumnValue(row, ['Industri', 'Industry', 'Sektor', 'Bidang']);
           
-          // Capturing Responsible Officer (Pegawai)
           const contactPerson = findColumnValue(row, [
               'Nama Pegawai', 'Pegawai', 'Contact Person', 'Person In Charge', 'PIC', 
               'Officer', 'Penyelia', 'Supervisor', 'Coordinator', 'Staff', 'Hubungi', 'Person'
           ]);
           
-          // Capturing Email
           const email = findColumnValue(row, [
               'Email', 'E-mail', 'Emel', 'Mel', 'Alamat Email', 'Email Address', 'Mail'
           ]);
           
-          // Capturing Phone
           const phone = findColumnValue(row, [
               'Telefon', 'Phone', 'Tel', 'No Tel', 'No. Tel', 'Mobile', 
               'Bimbit', 'Handphone', 'H/P', 'Office', 'Pejabat', 'Call'
@@ -126,43 +123,51 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             company_name: companyName,
             company_state: state,
             company_district: district,
-            company_address: address, // Full address captured
+            company_address: address,
             company_industry: industry,
-            company_contact_person: contactPerson, // Officer captured
-            company_contact_email: email, // Email captured
-            company_contact_phone: phone, // Phone captured
+            company_contact_person: contactPerson,
+            company_contact_email: email,
+            company_contact_phone: phone,
             has_mou: hasMou,
             mou_type: mouType,
             created_at: new Date().toISOString()
           };
 
-          try {
-             await StorageService.createCompany(newCompany);
-             successCount++;
-             const details = [
-                 address ? 'Alamat' : '', 
-                 contactPerson ? 'PIC' : '', 
-                 email ? 'Email' : '', 
-                 phone ? 'Tel' : ''
-             ].filter(Boolean).join(', ');
-             
-             newLogs.push(`✅ Berjaya: ${newCompany.company_name} [${details || 'Nama shj'}]`);
-          } catch (error) {
-             failCount++;
-             newLogs.push(`⚠️ Gagal (${newCompany.company_name}): ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
+          validCompanies.push(newCompany);
+          successCount++;
+          
+          const details = [
+             address ? 'Alamat' : '', 
+             contactPerson ? 'PIC' : '', 
+             email ? 'Email' : '', 
+             phone ? 'Tel' : ''
+          ].filter(Boolean).join(', ');
+          
+          newLogs.push(`✅ Bersedia: ${newCompany.company_name} [${details || 'Nama shj'}]`);
+        }
+
+        // 2. SAVING PHASE (Bulk Upload)
+        if (validCompanies.length > 0) {
+            newLogs.push(`⏳ Sedang menyimpan ${validCompanies.length} rekod ke pangkalan data...`);
+            
+            try {
+                await StorageService.bulkCreateCompanies(validCompanies);
+                newLogs.push(`🎉 SEMUA DATA BERJAYA DISIMPAN!`);
+                toast.success(`${successCount} syarikat berjaya ditambah!`);
+                onUploadSuccess();
+            } catch (error) {
+                console.error("Bulk Upload Error", error);
+                newLogs.push(`🛑 RALAT KRITIKAL: Gagal menyimpan data ke server. Sila semak sambungan internet.`);
+                toast.error("Gagal menyimpan data");
+                successCount = 0; // Reset if bulk save fails
+                failCount = data.length;
+            }
+        } else {
+            newLogs.push(`⚠️ Tiada data sah untuk disimpan.`);
         }
 
         setLogs(newLogs);
         setSummary({ success: successCount, failed: failCount });
-        
-        if (successCount > 0) {
-          toast.success(`${successCount} syarikat berjaya ditambah!`);
-          // Trigger data refresh in parent
-          onUploadSuccess();
-        } else {
-          toast.error("Tiada syarikat berjaya ditambah.");
-        }
 
       } catch (error) {
         console.error(error);
@@ -247,7 +252,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             <h4 className="font-bold text-slate-700 mb-2 text-sm">Log Proses:</h4>
             <div className="bg-slate-900 text-slate-300 p-4 rounded-lg text-xs font-mono h-48 overflow-y-auto space-y-1">
               {logs.map((log, idx) => (
-                <div key={idx} className={log.includes('❌') || log.includes('⚠️') ? 'text-red-400' : 'text-green-400'}>
+                <div key={idx} className={log.includes('❌') || log.includes('🛑') ? 'text-red-400' : 'text-green-400'}>
                   {log}
                 </div>
               ))}

@@ -216,6 +216,38 @@ export const StorageService = {
     return newCompany;
   },
 
+  // NEW: Bulk Create for efficient uploads
+  bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
+    const companiesWithIds = companies.map(c => ({ ...c, id: generateId() }));
+
+    if (db) {
+      // Firestore batch limit is 500
+      const chunkArray = (arr: any[], size: number) => {
+        const results = [];
+        while (arr.length) {
+          results.push(arr.splice(0, size));
+        }
+        return results;
+      };
+
+      const chunks = chunkArray([...companiesWithIds], 450); // 450 to be safe
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach((company: any) => {
+          const ref = doc(db, 'companies', company.id);
+          batch.set(ref, company);
+        });
+        await batch.commit();
+      }
+    } else {
+      const existing = StorageService.getCompanies();
+      const updated = [...existing, ...companiesWithIds];
+      localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updated));
+      notifyListeners();
+    }
+  },
+
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
     if (db) {
       await setDoc(doc(db, 'companies', updatedCompany.id), updatedCompany, { merge: true });
@@ -292,7 +324,5 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));
     notifyListeners();
-
-    // If cloud connected, optional: We could push this to cloud, but better let user trigger "Upload Local to Cloud" manually
   }
 };
