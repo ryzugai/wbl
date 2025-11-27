@@ -239,7 +239,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nama Penuh</label>
                         <input 
                             type="text" 
-                            className="w-full p-2 border border-slate-300 rounded"
+                            className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900"
                             value={editingStudent.name}
                             onChange={(e) => setEditingStudent({...editingStudent, name: e.target.value})}
                             required 
@@ -250,7 +250,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                             <label className="block text-sm font-medium text-slate-700 mb-1">No. Matrik</label>
                             <input 
                                 type="text" 
-                                className="w-full p-2 border border-slate-300 rounded"
+                                className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900"
                                 value={editingStudent.matric_no || ''}
                                 onChange={(e) => setEditingStudent({...editingStudent, matric_no: e.target.value})}
                                 required 
@@ -260,7 +260,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                             <label className="block text-sm font-medium text-slate-700 mb-1">No. KP</label>
                             <input 
                                 type="text" 
-                                className="w-full p-2 border border-slate-300 rounded"
+                                className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900"
                                 value={editingStudent.ic_no || ''}
                                 onChange={(e) => setEditingStudent({...editingStudent, ic_no: e.target.value})}
                                 required 
@@ -271,7 +271,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                         <label className="block text-sm font-medium text-slate-700 mb-1">Program</label>
                         <input 
                             type="text" 
-                            className="w-full p-2 border border-slate-300 rounded"
+                            className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900"
                             value={editingStudent.program || ''}
                             onChange={(e) => setEditingStudent({...editingStudent, program: e.target.value})}
                             required 
@@ -282,7 +282,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                             <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                             <input 
                                 type="email" 
-                                className="w-full p-2 border border-slate-300 rounded"
+                                className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900"
                                 value={editingStudent.email}
                                 onChange={(e) => setEditingStudent({...editingStudent, email: e.target.value})}
                                 required 
@@ -292,7 +292,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                             <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
                             <input 
                                 type="tel" 
-                                className="w-full p-2 border border-slate-300 rounded"
+                                className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900"
                                 value={editingStudent.phone}
                                 onChange={(e) => setEditingStudent({...editingStudent, phone: e.target.value})}
                                 required 
