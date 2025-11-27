@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { StorageService } from '../services/storage';
 
@@ -15,14 +15,21 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentView, onNavigate, onLogout }) => {
   const [isCloud, setIsCloud] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     setIsCloud(StorageService.isCloudEnabled());
   }, []);
 
+  // Close mobile menu when view changes
+  const handleNavigate = (view: string) => {
+    onNavigate(view);
+    setIsMobileMenuOpen(false);
+  };
+
   const NavItem = ({ view, label, icon: Icon }: { view: string, label: string, icon: any }) => (
     <button
-      onClick={() => onNavigate(view)}
+      onClick={() => handleNavigate(view)}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
         currentView === view 
           ? 'bg-blue-600 text-white shadow-md' 
@@ -35,10 +42,38 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
+      
+      {/* Mobile Header Bar */}
+      <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+        <div className="flex items-center gap-2 font-bold text-blue-700">
+            <Building2 size={24} />
+            <span>WBL System</span>
+        </div>
+        <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+        >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+            className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
-        <div className="p-6 border-b border-slate-100">
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-40
+        w-64 bg-white border-r border-slate-200 flex flex-col h-screen
+        transform transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="p-6 border-b border-slate-100 hidden md:block">
           <h1 className="text-xl font-bold text-blue-700 flex items-center gap-2">
             <Building2 className="text-blue-600" />
             WBL System
@@ -54,6 +89,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                </span>
              )}
           </div>
+        </div>
+
+        {/* Mobile Sidebar Header */}
+        <div className="p-6 border-b border-slate-100 md:hidden flex justify-between items-center bg-slate-50">
+            <span className="font-bold text-slate-700">Menu</span>
+            <button onClick={() => setIsMobileMenuOpen(false)}>
+                <X size={20} className="text-slate-500"/>
+            </button>
         </div>
 
         <div className="p-4 flex-1 space-y-1 overflow-y-auto">
@@ -99,8 +142,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
         </div>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50">
-          <button onClick={() => onNavigate('profile')} className="flex items-center gap-3 w-full p-2 rounded hover:bg-white transition-colors">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+          <button onClick={() => handleNavigate('profile')} className="flex items-center gap-3 w-full p-2 rounded hover:bg-white transition-colors">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold shrink-0">
               {currentUser.name.charAt(0)}
             </div>
             <div className="flex-1 text-left overflow-hidden">
@@ -119,8 +162,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto h-screen p-4 md:p-8">
-        <div className="max-w-7xl mx-auto animate-fadeIn">
+      <main className="flex-1 overflow-y-auto h-[calc(100vh-65px)] md:h-screen p-4 md:p-8 w-full">
+        <div className="max-w-7xl mx-auto animate-fadeIn pb-20 md:pb-0">
           {children}
         </div>
       </main>
