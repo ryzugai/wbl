@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog, Book, Database } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, UserCircle, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
+import { StorageService } from '../services/storage';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,6 +14,12 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentView, onNavigate, onLogout }) => {
+  const [isCloud, setIsCloud] = useState(false);
+
+  useEffect(() => {
+    setIsCloud(StorageService.isCloudEnabled());
+  }, []);
+
   const NavItem = ({ view, label, icon: Icon }: { view: string, label: string, icon: any }) => (
     <button
       onClick={() => onNavigate(view)}
@@ -36,7 +43,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
             <Building2 className="text-blue-600" />
             WBL System
           </h1>
-          <p className="text-xs text-slate-500 mt-1">Sistem Latihan Industri</p>
+          <div className="flex items-center gap-1.5 mt-2">
+             {isCloud ? (
+               <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                 <Wifi size={10} /> LIVE SYNC
+               </span>
+             ) : (
+               <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                 <WifiOff size={10} /> OFFLINE
+               </span>
+             )}
+          </div>
         </div>
 
         <div className="p-4 flex-1 space-y-1 overflow-y-auto">
