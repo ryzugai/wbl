@@ -26,20 +26,26 @@ function App() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [users, setUsers] = useState<User[]>([]);
 
-  // Load Initial Data
+  const refreshData = () => {
+    setCompanies(StorageService.getCompanies());
+    setApplications(StorageService.getApplications());
+    setUsers(StorageService.getUsers());
+  };
+
+  // Load Initial Data & Subscribe to changes
   useEffect(() => {
     const user = StorageService.getCurrentUser();
     if (user) setCurrentUser(user);
     
     refreshData();
     setIsAuthChecking(false);
-  }, []);
 
-  const refreshData = () => {
-    setCompanies(StorageService.getCompanies());
-    setApplications(StorageService.getApplications());
-    setUsers(StorageService.getUsers());
-  };
+    // Subscribe to cross-tab updates
+    const unsubscribe = StorageService.subscribe(() => {
+        refreshData();
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);

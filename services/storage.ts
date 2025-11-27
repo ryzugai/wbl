@@ -9,6 +9,23 @@ const STORAGE_KEYS = {
   SESSION: 'wbl_session'
 };
 
+// Broadcast Channel for Cross-Tab Sync
+const channel = new BroadcastChannel('wbl_data_sync');
+const listeners: (() => void)[] = [];
+
+channel.onmessage = (event) => {
+  if (event.data === 'update') {
+    notifyListeners(false); // Don't re-broadcast to avoid loops
+  }
+};
+
+const notifyListeners = (broadcast = true) => {
+  listeners.forEach(l => l());
+  if (broadcast) {
+    channel.postMessage('update');
+  }
+};
+
 // Safe ID Generator (Fallback for non-secure contexts)
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -33,6 +50,15 @@ const init = () => {
 init();
 
 export const StorageService = {
+  // Subscribe to changes
+  subscribe: (callback: () => void) => {
+    listeners.push(callback);
+    return () => {
+      const index = listeners.indexOf(callback);
+      if (index > -1) listeners.splice(index, 1);
+    };
+  },
+
   // Auth
   login: async (username: string, password: string): Promise<User | null> => {
     if (username === COORDINATOR_ACCOUNT.username && password === COORDINATOR_ACCOUNT.password) {
@@ -70,6 +96,7 @@ export const StorageService = {
     const newUser = { ...user, id: generateId() };
     users.push(newUser);
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    notifyListeners();
     return newUser;
   },
 
@@ -89,6 +116,7 @@ export const StorageService = {
     if (currentUser && currentUser.id === updatedUser.id) {
         localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
     }
+    notifyListeners();
     return updatedUser;
   },
 
@@ -102,6 +130,7 @@ export const StorageService = {
     const newCompany = { ...company, id: generateId() };
     companies.push(newCompany);
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+    notifyListeners();
     return newCompany;
   },
 
@@ -111,6 +140,7 @@ export const StorageService = {
     if (index === -1) throw new Error('Company not found');
     companies[index] = updatedCompany;
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+    notifyListeners();
     return updatedCompany;
   },
 
@@ -118,6 +148,7 @@ export const StorageService = {
     const companies = StorageService.getCompanies();
     const filtered = companies.filter(c => c.id !== id);
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(filtered));
+    notifyListeners();
   },
 
   // Applications
@@ -130,6 +161,7 @@ export const StorageService = {
     const newApp = { ...app, id: generateId() };
     apps.push(newApp);
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    notifyListeners();
     return newApp;
   },
 
@@ -139,6 +171,7 @@ export const StorageService = {
     if (index === -1) throw new Error('Application not found');
     apps[index] = updatedApp;
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    notifyListeners();
     return updatedApp;
   },
 
@@ -160,5 +193,6 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));
+    notifyListeners();
   }
 };

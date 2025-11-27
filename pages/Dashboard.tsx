@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Application, Company } from '../types';
-import { Users, Building2, Clock, CheckCircle2 } from 'lucide-react';
+import { Users, Building2, Clock, CheckCircle2, AlertTriangle, Database } from 'lucide-react';
 
 interface DashboardProps {
   applications: Application[];
@@ -26,6 +27,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies })
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
+
+      {/* SYNC WARNING BANNER */}
+      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-4">
+        <div className="bg-orange-100 p-2 rounded-lg text-orange-600 shrink-0">
+            <AlertTriangle size={24} />
+        </div>
+        <div>
+            <h4 className="font-bold text-orange-800">Status Simpanan Data</h4>
+            <p className="text-sm text-orange-700 mt-1">
+                Sistem ini menggunakan <strong>Local Storage</strong>. Data anda disimpan secara automatik dalam pelayar ini sahaja. 
+                Data <strong>TIDAK</strong> disegerakkan (sync) secara automatik ke peranti atau pelayar lain (cth: Chrome ke Firefox).
+            </p>
+            <p className="text-sm text-orange-700 mt-2 font-medium flex items-center gap-1">
+                <Database size={14} />
+                Untuk memindahkan data, sila gunakan menu <span className="underline decoration-orange-500">Sistem & Data</span> untuk proses 'Backup & Restore'.
+            </p>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
