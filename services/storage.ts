@@ -2,14 +2,24 @@
 import { User, Company, Application } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocs, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, writeBatch } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   USERS: 'wbl_users',
   COMPANIES: 'wbl_companies',
   APPLICATIONS: 'wbl_applications',
-  SESSION: 'wbl_session',
-  FIREBASE_CONFIG: 'wbl_firebase_config'
+  SESSION: 'wbl_session'
+};
+
+// --- FIREBASE CONFIGURATION ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAPAspAMGl6eevn__-mc-EW8ZKGw9J09dY",
+  authDomain: "wblfptt.firebaseapp.com",
+  projectId: "wblfptt",
+  storageBucket: "wblfptt.firebasestorage.app",
+  messagingSenderId: "293839705020",
+  appId: "1:293839705020:web:452106a8d873256fc711b9",
+  measurementId: "G-DCP1822ZES"
 };
 
 // --- CLOUD SYNC SETUP ---
@@ -17,17 +27,13 @@ let db: any = null;
 let unsubscribeListeners: (() => void)[] = [];
 
 const initFirebase = () => {
-  const configStr = localStorage.getItem(STORAGE_KEYS.FIREBASE_CONFIG);
-  if (configStr) {
-    try {
-      const config = JSON.parse(configStr);
-      const app = !getApps().length ? initializeApp(config) : getApp();
-      db = getFirestore(app);
-      console.log('🔥 Firebase Connected');
-      setupRealtimeListeners();
-    } catch (e) {
-      console.error('Firebase init failed', e);
-    }
+  try {
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    db = getFirestore(app);
+    console.log('🔥 WBL Cloud Connected');
+    setupRealtimeListeners();
+  } catch (e) {
+    console.error('Firebase init failed', e);
   }
 };
 
@@ -51,6 +57,8 @@ const setupRealtimeListeners = () => {
       localStorage.setItem(storageKey, JSON.stringify(data));
       // Notify UI
       notifyListeners(); 
+    }, (error) => {
+        console.error("Sync Error:", error);
     });
     unsubscribeListeners.push(unsub);
   };
@@ -85,6 +93,7 @@ const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) {
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
   }
+  // Initialize Cloud automatically
   initFirebase();
 };
 
@@ -101,16 +110,6 @@ export const StorageService = {
 
   isCloudEnabled: () => !!db,
 
-  saveFirebaseConfig: (config: any) => {
-    localStorage.setItem(STORAGE_KEYS.FIREBASE_CONFIG, JSON.stringify(config));
-    window.location.reload(); // Reload to init firebase
-  },
-
-  removeFirebaseConfig: () => {
-    localStorage.removeItem(STORAGE_KEYS.FIREBASE_CONFIG);
-    window.location.reload();
-  },
-
   // --- CLOUD MIGRATION TOOL ---
   uploadLocalToCloud: async () => {
     if (!db) throw new Error('Cloud not connected');
@@ -120,11 +119,16 @@ export const StorageService = {
     const companies = StorageService.getCompanies();
     const apps = StorageService.getApplications();
 
+    // Filter out hardcoded admin to avoid overwriting if not needed, or include strictly
     users.forEach(u => {
-        if(u.id !== COORDINATOR_ACCOUNT.id) batch.set(doc(db, 'users', u.id), u);
+        if(u.id) batch.set(doc(db, 'users', u.id), u);
     });
-    companies.forEach(c => batch.set(doc(db, 'companies', c.id), c));
-    apps.forEach(a => batch.set(doc(db, 'applications', a.id), a));
+    companies.forEach(c => {
+        if(c.id) batch.set(doc(db, 'companies', c.id), c);
+    });
+    apps.forEach(a => {
+        if(a.id) batch.set(doc(db, 'applications', a.id), a);
+    });
 
     await batch.commit();
   },
@@ -188,7 +192,7 @@ export const StorageService = {
       }
     }
     
-    // Update session
+    // Update session if needed
     const currentUser = StorageService.getCurrentUser();
     if (currentUser && currentUser.id === updatedUser.id) {
         localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
@@ -276,15 +280,19 @@ export const StorageService = {
       companies: JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
       applications: JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
       timestamp: new Date().toISOString(),
-      version: '2.0'
+      version: '3.0'
     };
   },
 
   restoreFullSystem: (data: any) => {
     if (!data.users || !data.companies || !data.applications) throw new Error('Format fail tidak sah');
+    
+    // Restore to local storage
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));
     notifyListeners();
+
+    // If cloud connected, optional: We could push this to cloud, but better let user trigger "Upload Local to Cloud" manually
   }
 };
