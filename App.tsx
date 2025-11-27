@@ -214,7 +214,7 @@ function App() {
         onNavigate={setCurrentView}
         onLogout={handleLogout}
       >
-        {currentView === 'dashboard' && <Dashboard applications={applications} companies={companies} />}
+        {currentView === 'dashboard' && <Dashboard applications={applications} companies={companies} users={users} />}
         
         {(currentView === 'companies' || currentView === 'addCompany') && (
             <Companies 
