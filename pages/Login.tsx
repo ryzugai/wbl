@@ -17,11 +17,16 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = await StorageService.login(username, password);
-    if (user) {
-      onLoginSuccess(user);
-    } else {
-      toast.error('Username atau password salah');
+    try {
+        const user = await StorageService.login(username, password);
+        if (user) {
+            onLoginSuccess(user);
+        } else {
+            toast.error('Username atau password salah');
+        }
+    } catch (e: any) {
+        // Handle specific login errors (like Pending Approval)
+        toast.error(e.message || 'Ralat log masuk');
     }
   };
 

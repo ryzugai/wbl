@@ -1,3 +1,4 @@
+
 export enum UserRole {
   COORDINATOR = 'coordinator',
   LECTURER = 'lecturer',
@@ -24,7 +25,12 @@ export interface User {
   // Industry fields
   company_affiliation?: string;
   company_position?: string;
+  academic_level?: string; // New: Highest Academic Level
+  experience_years?: number; // New: Years of Experience
   has_dual_role?: boolean;
+  
+  // System fields
+  is_approved?: boolean; // New: Approval status for Trainers
 }
 
 export interface Company {

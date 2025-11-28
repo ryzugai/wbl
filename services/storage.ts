@@ -1,5 +1,5 @@
 
-import { User, Company, Application } from '../types';
+import { User, Company, Application, UserRole } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, writeBatch } from 'firebase/firestore';
@@ -119,7 +119,6 @@ export const StorageService = {
     const companies = StorageService.getCompanies();
     const apps = StorageService.getApplications();
 
-    // Filter out hardcoded admin to avoid overwriting if not needed, or include strictly
     users.forEach(u => {
         if(u.id) batch.set(doc(db, 'users', u.id), u);
     });
@@ -142,7 +141,12 @@ export const StorageService = {
     }
     const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
     const user = users.find((u: User) => u.username === username && u.password === password);
+    
     if (user) {
+      // Check for approval (Strict check against false, undefined implies approved for legacy users)
+      if (user.is_approved === false) {
+          throw new Error('Akaun anda masih dalam proses pengesahan oleh Penyelaras.');
+      }
       localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
       return user;
     }
@@ -165,7 +169,16 @@ export const StorageService = {
     const users = StorageService.getUsers();
     if (users.some(u => u.username === user.username)) throw new Error('Username already exists');
     
-    const newUser = { ...user, id: generateId() };
+    // Determine Approval Status
+    // Trainers or Supervisors acting as Trainers need approval.
+    // Pure Supervisors do not.
+    const needsApproval = user.role === UserRole.TRAINER || (user.role === UserRole.SUPERVISOR && user.has_dual_role);
+
+    const newUser = { 
+        ...user, 
+        id: generateId(),
+        is_approved: needsApproval ? false : true 
+    };
     
     if (db) {
       await setDoc(doc(db, 'users', newUser.id), newUser);
@@ -180,7 +193,6 @@ export const StorageService = {
   updateUser: async (updatedUser: User): Promise<User> => {
     if (updatedUser.id === COORDINATOR_ACCOUNT.id) return updatedUser;
 
-    // Sanitize to remove undefined values which crash Firestore
     const sanitizedUser = JSON.parse(JSON.stringify(updatedUser));
 
     if (db) {
@@ -195,7 +207,6 @@ export const StorageService = {
       }
     }
     
-    // Update session if needed
     const currentUser = StorageService.getCurrentUser();
     if (currentUser && currentUser.id === updatedUser.id) {
         localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
@@ -230,10 +241,7 @@ export const StorageService = {
     return newCompany;
   },
 
-  // NEW: Bulk Create for efficient uploads with Strict Sanitization
   bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
-    // 1. Prepare and Sanitize Data
-    // Firestore fails if ANY field is 'undefined'. We must force everything to string or null.
     const sanitizedCompanies = companies.map(c => ({
       id: generateId(),
       company_name: c.company_name || '',
@@ -244,13 +252,12 @@ export const StorageService = {
       company_contact_person: c.company_contact_person || '',
       company_contact_email: c.company_contact_email || '',
       company_contact_phone: c.company_contact_phone || '',
-      has_mou: !!c.has_mou, // Force boolean
-      mou_type: c.mou_type || null, // Use null for optional fields, NOT undefined
+      has_mou: !!c.has_mou,
+      mou_type: c.mou_type || null,
       created_at: new Date().toISOString()
     }));
 
     if (db) {
-      // Firestore batch limit is 500. Using 250 for safety on slow connections.
       const chunkArray = (arr: any[], size: number) => {
         const results = [];
         while (arr.length) {
@@ -334,7 +341,6 @@ export const StorageService = {
     return updatedApp;
   },
 
-  // --- BACKUP/RESTORE (Manual) ---
   getFullSystemBackup: () => {
     return {
       users: JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
@@ -347,8 +353,6 @@ export const StorageService = {
 
   restoreFullSystem: (data: any) => {
     if (!data.users || !data.companies || !data.applications) throw new Error('Format fail tidak sah');
-    
-    // Restore to local storage
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));

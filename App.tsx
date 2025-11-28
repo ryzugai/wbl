@@ -257,6 +257,8 @@ function App() {
                 currentUser={currentUser}
                 applications={applications}
                 onUpdateApplication={handleUpdateApplication}
+                onUpdateUser={handleUpdateUser}
+                onDeleteUser={handleDeleteUser}
             />
         )}
         
