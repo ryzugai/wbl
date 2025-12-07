@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit } from 'lucide-react';
+import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit, FileDown } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
-import { generateLOI } from '../utils/letterGenerator';
+import { generateLOI, downloadLOIWord } from '../utils/letterGenerator';
 
 interface CompaniesProps {
   companies: Company[];
@@ -315,13 +315,22 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                             </>
                         )}
                         {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
-                            <button
-                                onClick={() => generateLOI(company)}
-                                className="p-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 border border-indigo-100 transition-colors"
-                                title="Jana LOI"
-                            >
-                                <FileText size={16} />
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => generateLOI(company)}
+                                    className="p-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 border border-indigo-100 transition-colors"
+                                    title="Papar/Cetak LOI"
+                                >
+                                    <FileText size={16} />
+                                </button>
+                                <button
+                                    onClick={() => downloadLOIWord(company)}
+                                    className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 border border-green-100 transition-colors"
+                                    title="Export Word"
+                                >
+                                    <FileDown size={16} />
+                                </button>
+                            </>
                         )}
                     </div>
                   </td>

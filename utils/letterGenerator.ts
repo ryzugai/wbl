@@ -113,8 +113,40 @@ export const generateLOI = (company: Company) => {
             color: black; 
             font-size: 10pt;
         }
-        .header { text-align: center; margin-bottom: 15px; }
-        .logo { height: 70px; margin-bottom: 5px; }
+        
+        /* Balanced Header Table */
+        .header-table {
+            width: 90%; 
+            margin: 0 auto 20px auto;
+            border-collapse: collapse;
+        }
+        .header-table td {
+            vertical-align: middle;
+            border: none;
+            width: 50%;
+        }
+        .logo-cell {
+            text-align: right;
+            padding-right: 60px; /* Shifts UTeM logo left of center */
+        }
+        .placeholder-cell {
+            text-align: left;
+            padding-left: 30px; 
+        }
+
+        .logo { height: 80px; }
+        .company-logo-placeholder { 
+            width: 150px; 
+            height: 80px; 
+            border: 1px dashed #e0e0e0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            color: #ccc; 
+            font-size: 8pt;
+            background-color: #fafafa;
+            text-align: center;
+        }
         
         .title-section {
             text-align: center;
@@ -157,25 +189,32 @@ export const generateLOI = (company: Company) => {
             margin-top: 5px;
             width: 100%;
         }
-        .field-label {
-            font-size: 8pt;
-            margin-top: 2px;
-            color: #555;
-        }
-
+        
         .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; cursor: pointer; border-radius: 5px; font-family: sans-serif; z-index: 1000; }
         @media print { 
             .print-btn { display: none; } 
             body { padding: 0; margin: 0; }
+            .company-logo-placeholder { border: none; color: transparent; }
         }
       </style>
     </head>
     <body>
       <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
       
-      <div class="header">
-        <img src="https://www.utem.edu.my/templates/yootheme/cache/a4/utem-25300x-a44e3a0d.png" class="logo" alt="UTeM Logo">
-      </div>
+      <!-- Header using Table for alignment stability -->
+      <table class="header-table">
+        <tr>
+            <td class="logo-cell">
+                <!-- UTeM Logo with fallback background -->
+                <img src="https://www.utem.edu.my/templates/yootheme/cache/a4/utem-25300x-a44e3a0d.png" class="logo" alt="UTeM Logo" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'height:80px; width:150px; background:#eee; display:flex; align-items:center; justify-content:center;\'>Logo UTeM</div>'">
+            </td>
+            <td class="placeholder-cell">
+                <div class="company-logo-placeholder">
+                    [Ruang Logo Syarikat]
+                </div>
+            </td>
+        </tr>
+      </table>
 
       <div class="title-section">
         <div>LETTER OF INTENT</div>
@@ -196,7 +235,7 @@ export const generateLOI = (company: Company) => {
             <div class="sub-list">
               <div class="list-item">
                 <div class="list-bullet">(a)</div>
-                <div>Sharing of expertise between UTeM and ${company.company_name} related to <span style="background-color: #ffcccc; padding: 0 2px;">Work-Based Learning (WBL)</span> as agreed by both Parties;</div>
+                <div>Sharing of expertise between UTeM and ${company.company_name} related to Work-Based Learning (WBL) as agreed by both Parties;</div>
               </div>
               <div class="list-item">
                 <div class="list-bullet">(b)</div>
@@ -239,7 +278,10 @@ export const generateLOI = (company: Company) => {
         
         <!-- Signature Space -->
         <tr>
-            <td class="sig-space"></td>
+            <td class="sig-space" style="vertical-align: bottom; position: relative;">
+                <!-- Signature removed as requested -->
+                <div style="height: 70px;"></div>
+            </td>
             <td class="sig-space"></td>
         </tr>
 
@@ -251,7 +293,6 @@ export const generateLOI = (company: Company) => {
             <td style="vertical-align: bottom;">
                 <div style="height: 20px;"></div>
                 <div class="sig-line"></div>
-                <div class="field-label">(Name)</div>
             </td>
         </tr>
 
@@ -262,9 +303,7 @@ export const generateLOI = (company: Company) => {
                 Faculty of Technology Management and Technopreneurship
             </td>
             <td style="vertical-align: top;">
-                <div style="height: 20px;"></div>
-                <div class="sig-line"></div>
-                <div class="field-label">(Position)</div>
+                <div style="height: 40px;"></div>
             </td>
         </tr>
 
@@ -284,4 +323,130 @@ export const generateLOI = (company: Company) => {
 
   letterWindow.document.write(htmlContent);
   letterWindow.document.close();
+};
+
+export const downloadLOIWord = (company: Company) => {
+  const currentDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  
+  // Construct a Word-compatible HTML string
+  const htmlContent = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+      <meta charset="utf-8">
+      <title>Letter of Intent - ${company.company_name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.3; }
+        table { border-collapse: collapse; width: 100%; mso-element: table; }
+        td { vertical-align: top; padding: 5px; }
+        .header-table td { text-align: center; vertical-align: middle; }
+        .title-section { text-align: center; font-weight: bold; font-size: 12pt; margin-bottom: 15px; }
+        .parties { text-transform: uppercase; margin: 5px 0; }
+        .content { text-align: justify; font-size: 10pt; }
+        .signature-table { margin-top: 30px; font-size: 10pt; width: 100%; border: 1px solid black; }
+        .signature-table td { border: 1px solid black; padding: 5px 8px; width: 50%; vertical-align: top; }
+        .sig-line { border-bottom: 1px solid black; margin-top: 5px; width: 100%; }
+      </style>
+    </head>
+    <body>
+      
+      <!-- Header Table -->
+      <table class="header-table" style="width: 100%; margin-bottom: 20px;">
+        <tr>
+            <td style="text-align: right; width: 50%; padding-right: 60px;">
+                <img src="https://www.utem.edu.my/templates/yootheme/cache/a4/utem-25300x-a44e3a0d.png" width="150" height="80" alt="UTeM Logo">
+            </td>
+            <td style="text-align: left; width: 50%; padding-left: 30px;">
+                <div style="width: 150px; height: 80px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; color: #999;">
+                    [Company Logo]
+                </div>
+            </td>
+        </tr>
+      </table>
+
+      <div class="title-section">
+        <p>LETTER OF INTENT<br/>BETWEEN<br/>UNIVERSITI TEKNIKAL MALAYSIA MELAKA<br/>AND<br/>${company.company_name.toUpperCase()}</p>
+      </div>
+
+      <div class="content">
+        <p>
+          <strong>UTeM</strong> and <strong>${company.company_name}</strong> having met and discussed collaborative efforts between Parties hereby record their intent towards the collaboration under the following conditions:
+        </p>
+
+        <p>i. The areas of cooperation intended to be entered:</p>
+        <div style="margin-left: 30px;">
+            <p>(a) Sharing of expertise between UTeM and ${company.company_name} related to Work-Based Learning (WBL) as agreed by both Parties;</p>
+            <p>(b) Sharing of research resources, technical data, and facilities that are available in UTeM and ${company.company_name} subject to subsequent written consent by both Parties;</p>
+            <p>(c) Conducting other activities considered to be of benefits for both Parties through human capital development activities as of training and research programs; and</p>
+            <p>(d) Such other collaborative activities as may be mutually agreed between the Parties from time to time.</p>
+        </div>
+
+        <p>ii. Any cooperation between the Parties pursuant to this Letter of Intent that requires financial commitment, fulfilment of obligations and responsibilities of the Parties will be formalised and secured by a written agreement.</p>
+
+        <p>iii. This Letter of Intent does not constitute or create, and shall not be deemed to constitute or create any legally binding or enforceable obligations on the part of either Party to the Letter of Intent except by the execution of a Memorandum of Agreement between UTeM and ${company.company_name} containing such terms and conditions of the proposed collaboration.</p>
+
+        <p>This Letter of Intent is to be executed in the English language.</p>
+      </div>
+
+      <table class="signature-table">
+        <tr>
+            <td>Signed for and on behalf of</td>
+            <td>Signed for and on behalf of</td>
+        </tr>
+        <tr>
+            <td style="font-weight: bold; background-color: #f9f9f9;">UNIVERSITI TEKNIKAL MALAYSIA MELAKA</td>
+            <td style="font-weight: bold; background-color: #f9f9f9;">${company.company_name.toUpperCase()}</td>
+        </tr>
+        
+        <tr>
+            <td style="height: 70px; vertical-align: bottom;">
+                <!-- Signature Space -->
+            </td>
+            <td style="height: 70px;"></td>
+        </tr>
+
+        <tr>
+            <td style="vertical-align: bottom;">
+                <strong>PROF. DR. MOHD SYAIFUL RIZAL BIN HAMID</strong>
+            </td>
+            <td style="vertical-align: bottom;">
+                <br/>
+                <div class="sig-line"></div>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="vertical-align: top;">
+                Dean<br>
+                Faculty of Technology Management and Technopreneurship
+            </td>
+            <td style="vertical-align: top;">
+                <br/>
+            </td>
+        </tr>
+
+        <tr>
+            <td>Date: ${currentDate}</td>
+            <td>
+                Date: _______________
+            </td>
+        </tr>
+      </table>
+
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(['\ufeff', htmlContent], {
+    type: 'application/msword'
+  });
+  
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  // Saving as .doc is robust for HTML-Word conversion without external libraries
+  link.download = `LOI_${company.company_name.replace(/[^a-z0-9]/gi, '_')}.doc`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
