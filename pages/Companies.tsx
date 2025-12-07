@@ -4,6 +4,7 @@ import { Company, User, UserRole, Application } from '../types';
 import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
+import { generateLOI } from '../utils/letterGenerator';
 
 interface CompaniesProps {
   companies: Company[];
@@ -313,11 +314,11 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                               </button>
                             </>
                         )}
-                        {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && company.has_mou && (
-                            <button 
-                                className="p-1.5 bg-purple-50 text-purple-600 rounded hover:bg-purple-100 border border-purple-100 transition-colors"
-                                title="Lihat Dokumen"
-                                onClick={() => alert('Dokumen MoU belum diupload.')}
+                        {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
+                            <button
+                                onClick={() => generateLOI(company)}
+                                className="p-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 border border-indigo-100 transition-colors"
+                                title="Jana LOI"
                             >
                                 <FileText size={16} />
                             </button>
