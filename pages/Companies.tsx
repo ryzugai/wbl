@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit, FileDown } from 'lucide-react';
+import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit, FileDown, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { generateLOI, downloadLOIWord } from '../utils/letterGenerator';
+import { toast } from 'react-hot-toast';
 
 interface CompaniesProps {
   companies: Company[];
@@ -19,6 +20,9 @@ interface CompaniesProps {
 export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
+  const [sortOption, setSortOption] = useState('name_asc'); // name_asc, name_desc, state_asc, state_desc
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
@@ -62,13 +66,51 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
     }
   }, [currentUser, companies, myApplications]);
 
-  const filteredCompanies = companies.filter(c => {
-    const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.company_district.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          c.company_industry.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesState = filterState === 'all' || c.company_state === filterState;
-    return matchesSearch && matchesState;
-  });
+  // Filter & Sort Logic
+  const filteredAndSortedCompanies = companies
+    .filter(c => {
+      const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            c.company_district.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            c.company_industry.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesState = filterState === 'all' || c.company_state === filterState;
+      return matchesSearch && matchesState;
+    })
+    .sort((a, b) => {
+        switch (sortOption) {
+            case 'name_asc': return a.company_name.localeCompare(b.company_name);
+            case 'name_desc': return b.company_name.localeCompare(a.company_name);
+            case 'state_asc': return a.company_state.localeCompare(b.company_state);
+            case 'state_desc': return b.company_state.localeCompare(a.company_state);
+            default: return 0;
+        }
+    });
+
+  // Bulk Selection Handlers
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+          setSelectedIds(filteredAndSortedCompanies.map(c => c.id));
+      } else {
+          setSelectedIds([]);
+      }
+  };
+
+  const handleSelectOne = (id: string) => {
+      if (selectedIds.includes(id)) {
+          setSelectedIds(selectedIds.filter(sid => sid !== id));
+      } else {
+          setSelectedIds([...selectedIds, id]);
+      }
+  };
+
+  const handleBulkDelete = async () => {
+      if (confirm(`Adakah anda pasti mahu memadam ${selectedIds.length} syarikat terpilih?`)) {
+          for (const id of selectedIds) {
+              await onDeleteCompany(id);
+          }
+          setSelectedIds([]);
+          toast.success(`${selectedIds.length} syarikat berjaya dipadam.`);
+      }
+  };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -155,14 +197,25 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             )}
         </div>
         
-        {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
-            <button 
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-            >
-                <Plus size={20} /> Tambah Syarikat
-            </button>
-        )}
+        <div className="flex gap-2">
+            {selectedIds.length > 0 && currentUser.role === UserRole.COORDINATOR && (
+                <button 
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm animate-fadeIn"
+                >
+                    <Trash2 size={18} /> Padam ({selectedIds.length})
+                </button>
+            )}
+            
+            {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
+                <button 
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                    <Plus size={20} /> Tambah Syarikat
+                </button>
+            )}
+        </div>
       </div>
 
       {/* AI Suggestions Section */}
@@ -197,9 +250,9 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           </div>
       )}
 
-      {/* Search & Filter */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex-1 relative">
+      {/* Search, Filter & Sort */}
+      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 items-center">
+        <div className="flex-1 relative w-full">
           <Search className="absolute left-3 top-3 text-slate-400" size={20} />
           <input 
             type="text" 
@@ -209,14 +262,31 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select 
-            className="p-2 border border-slate-300 rounded-lg bg-white"
-            value={filterState}
-            onChange={(e) => setFilterState(e.target.value)}
-        >
-            <option value="all">Semua Negeri</option>
-            {MALAYSIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
-        </select>
+        
+        <div className="flex gap-2 w-full md:w-auto">
+            <select 
+                className="p-2 border border-slate-300 rounded-lg bg-white flex-1 md:w-40"
+                value={filterState}
+                onChange={(e) => setFilterState(e.target.value)}
+            >
+                <option value="all">Semua Negeri</option>
+                {MALAYSIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+            </select>
+
+            <div className="relative">
+                <ArrowUpDown className="absolute left-2 top-2.5 text-slate-400" size={16} />
+                <select 
+                    className="pl-8 p-2 border border-slate-300 rounded-lg bg-white flex-1 md:w-48 appearance-none"
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value)}
+                >
+                    <option value="name_asc">Nama (A-Z)</option>
+                    <option value="name_desc">Nama (Z-A)</option>
+                    <option value="state_asc">Negeri (A-Z)</option>
+                    <option value="state_desc">Negeri (Z-A)</option>
+                </select>
+            </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -224,6 +294,16 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                {currentUser.role === UserRole.COORDINATOR && (
+                    <th className="p-4 w-10 text-center">
+                        <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={filteredAndSortedCompanies.length > 0 && selectedIds.length === filteredAndSortedCompanies.length}
+                            onChange={handleSelectAll}
+                        />
+                    </th>
+                )}
                 <th className="p-4 font-semibold text-sm text-slate-600 w-1/4">Syarikat & Industri</th>
                 <th className="p-4 font-semibold text-sm text-slate-600 w-1/4">Lokasi & Alamat</th>
                 <th className="p-4 font-semibold text-sm text-slate-600 w-1/4">Hubungi</th>
@@ -232,13 +312,23 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredCompanies.length === 0 && (
+              {filteredAndSortedCompanies.length === 0 && (
                 <tr>
-                   <td colSpan={5} className="p-8 text-center text-slate-500">Tiada syarikat dijumpai.</td>
+                   <td colSpan={currentUser.role === UserRole.COORDINATOR ? 6 : 5} className="p-8 text-center text-slate-500">Tiada syarikat dijumpai.</td>
                 </tr>
               )}
-              {filteredCompanies.map(company => (
-                <tr key={company.id} className="hover:bg-slate-50 transition-colors group">
+              {filteredAndSortedCompanies.map(company => (
+                <tr key={company.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.includes(company.id) ? 'bg-blue-50' : ''}`}>
+                  {currentUser.role === UserRole.COORDINATOR && (
+                      <td className="p-4 align-top text-center">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={selectedIds.includes(company.id)}
+                            onChange={() => handleSelectOne(company.id)}
+                          />
+                      </td>
+                  )}
                   <td className="p-4 align-top">
                     <div className="font-bold text-slate-800 text-base mb-1">{company.company_name}</div>
                     <div className="flex items-center gap-1.5 text-sm text-slate-600 bg-slate-100 px-2 py-1 rounded w-fit">
