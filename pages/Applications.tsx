@@ -202,6 +202,17 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                 <Printer size={18} />
                             </button>
                         )}
+                        
+                        {/* Generate Letter (Student, if Pending - as a Request Letter) - Based on user requirement to generate when applied */}
+                        {currentUser.role === UserRole.STUDENT && app.application_status === 'Menunggu' && (
+                             <button
+                                onClick={() => { setSelectedApp(app); setModalType('letter'); }}
+                                className="p-2 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"
+                                title="Jana Surat Permohonan"
+                            >
+                                <Printer size={18} />
+                            </button>
+                        )}
 
                         {/* Reply Form (Student) */}
                         {currentUser.role === UserRole.STUDENT && app.application_status === 'Diluluskan' && (
@@ -395,34 +406,32 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
              </div>
         </Modal>
 
-        {/* Modal: Generate Letter Language Selection */}
+        {/* Modal: Generate Letter Confirmation */}
         <Modal
              isOpen={modalType === 'letter'}
              onClose={() => setModalType(null)}
-             title="Pilih Bahasa Surat"
+             title="Cetak Surat & Borang Jawapan"
         >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="text-center space-y-4">
+                <p className="text-slate-600">
+                    Sistem akan menjana <strong>Surat Sokongan Fakulti</strong> dan <strong>Borang Jawapan (Reply Form)</strong> untuk permohonan ke syarikat:
+                </p>
+                <div className="font-bold text-lg text-slate-800 bg-slate-50 p-3 rounded">
+                    {selectedApp?.company_name}
+                </div>
+                <p className="text-sm text-slate-500">
+                    Sila pastikan "Pop-up Blocker" dimatikan untuk membolehkan surat dijana.
+                </p>
+
                 <button 
                     onClick={() => {
                         const company = companies.find(c => c.company_name === selectedApp?.company_name);
-                        if(selectedApp) generateLetter(selectedApp, company, 'ms');
+                        if(selectedApp && currentUser) generateLetter(selectedApp, company, currentUser, 'en');
                         setModalType(null);
                     }}
-                    className="p-6 border-2 border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-center"
+                    className="w-full p-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
                 >
-                    <span className="text-2xl block mb-2">🇲🇾</span>
-                    <span className="font-bold text-slate-700">Bahasa Melayu</span>
-                </button>
-                <button 
-                    onClick={() => {
-                        const company = companies.find(c => c.company_name === selectedApp?.company_name);
-                        if(selectedApp) generateLetter(selectedApp, company, 'en');
-                        setModalType(null);
-                    }}
-                    className="p-6 border-2 border-slate-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-center"
-                >
-                     <span className="text-2xl block mb-2">🇬🇧</span>
-                     <span className="font-bold text-slate-700">English</span>
+                    <Printer size={20} /> Jana Surat (PDF)
                 </button>
             </div>
         </Modal>
