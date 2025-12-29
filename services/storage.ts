@@ -37,15 +37,12 @@ const initFirebase = () => {
   }
 };
 
-// Real-time listeners: Firestore -> LocalStorage -> UI
 const setupRealtimeListeners = () => {
   if (!db) return;
 
-  // Clear old listeners
   unsubscribeListeners.forEach(unsub => unsub());
   unsubscribeListeners = [];
 
-  // Helper to sync collection
   const syncCollection = (colName: string, storageKey: string) => {
     const q = query(collection(db, colName));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -53,9 +50,7 @@ const setupRealtimeListeners = () => {
       snapshot.forEach((doc) => {
         data.push(doc.data());
       });
-      // Update Local Storage (Cache)
       localStorage.setItem(storageKey, JSON.stringify(data));
-      // Notify UI
       notifyListeners(); 
     }, (error) => {
         console.error("Sync Error:", error);
@@ -68,13 +63,11 @@ const setupRealtimeListeners = () => {
   syncCollection('applications', STORAGE_KEYS.APPLICATIONS);
 };
 
-// --- LOCAL EVENT BUS ---
 const listeners: (() => void)[] = [];
 const notifyListeners = () => {
   listeners.forEach(l => l());
 };
 
-// Safe ID Generator
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -82,29 +75,34 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
-// Sanitization Helper to remove undefined values for Firebase
+/**
+ * Agresif Sanitization untuk Firebase
+ * Firestore akan reject ralat 400 jika ada key bernilai 'undefined'.
+ */
 const sanitizeForFirebase = (obj: any) => {
-    const clean: any = {};
+    if (obj === null || typeof obj !== 'object') return obj;
+    
+    const clean: any = Array.isArray(obj) ? [] : {};
+    
     Object.keys(obj).forEach(key => {
-        if (obj[key] !== undefined) {
-            clean[key] = obj[key];
+        const value = obj[key];
+        // Tukar undefined kepada string kosong, kekalkan yang lain
+        if (value === undefined) {
+            clean[key] = "";
+        } else if (value !== null && typeof value === 'object') {
+            clean[key] = sanitizeForFirebase(value);
+        } else {
+            clean[key] = value;
         }
     });
+    
     return clean;
 };
 
-// Init Default Data
 const init = () => {
-  if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) {
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) {
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
-  }
-  // Initialize Cloud automatically
+  if (!localStorage.getItem(STORAGE_KEYS.USERS)) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
+  if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
+  if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
   initFirebase();
 };
 
@@ -121,29 +119,15 @@ export const StorageService = {
 
   isCloudEnabled: () => !!db,
 
-  // --- CLOUD MIGRATION TOOL ---
   uploadLocalToCloud: async () => {
     if (!db) throw new Error('Cloud not connected');
-    
     const batch = writeBatch(db);
-    const users = StorageService.getUsers();
-    const companies = StorageService.getCompanies();
-    const apps = StorageService.getApplications();
-
-    users.forEach(u => {
-        if(u.id) batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u));
-    });
-    companies.forEach(c => {
-        if(c.id) batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c));
-    });
-    apps.forEach(a => {
-        if(a.id) batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a));
-    });
-
+    StorageService.getUsers().forEach(u => u.id && batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u)));
+    StorageService.getCompanies().forEach(c => c.id && batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c)));
+    StorageService.getApplications().forEach(a => a.id && batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a)));
     await batch.commit();
   },
 
-  // --- AUTH ---
   login: async (username: string, password: string): Promise<User | null> => {
     if (username === COORDINATOR_ACCOUNT.username && password === COORDINATOR_ACCOUNT.password) {
       const user = COORDINATOR_ACCOUNT as unknown as User;
@@ -152,45 +136,26 @@ export const StorageService = {
     }
     const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
     const user = users.find((u: User) => u.username === username && u.password === password);
-    
     if (user) {
-      // Check for approval (Strict check against false, undefined implies approved for legacy users)
-      if (user.is_approved === false) {
-          throw new Error('Akaun anda masih dalam proses pengesahan oleh Penyelaras.');
-      }
+      if (user.is_approved === false) throw new Error('Akaun masih menunggu kelulusan.');
       localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
       return user;
     }
     return null;
   },
 
-  logout: () => {
-    localStorage.removeItem(STORAGE_KEYS.SESSION);
-  },
-
+  logout: () => localStorage.removeItem(STORAGE_KEYS.SESSION),
   getCurrentUser: (): User | null => {
     const session = localStorage.getItem(STORAGE_KEYS.SESSION);
     return session ? JSON.parse(session) : null;
   },
 
-  // --- USERS ---
   getUsers: (): User[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
-
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
     const users = StorageService.getUsers();
-    if (users.some(u => u.username === user.username)) throw new Error('Username already exists');
-    
-    // Determine Approval Status
-    // Trainers or Supervisors acting as Trainers need approval.
-    // Pure Supervisors do not.
+    if (users.some(u => u.username === user.username)) throw new Error('Username sudah wujud');
     const needsApproval = user.role === UserRole.TRAINER || (user.role === UserRole.SUPERVISOR && user.has_dual_role);
-
-    const newUser = { 
-        ...user, 
-        id: generateId(),
-        is_approved: needsApproval ? false : true 
-    };
-    
+    const newUser = { ...user, id: generateId(), is_approved: !needsApproval };
     if (db) {
       await setDoc(doc(db, 'users', newUser.id), sanitizeForFirebase(newUser));
     } else {
@@ -202,12 +167,9 @@ export const StorageService = {
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
-    if (updatedUser.id === COORDINATOR_ACCOUNT.id) return updatedUser;
-
-    const sanitizedUser = sanitizeForFirebase(updatedUser);
-
+    const sanitized = sanitizeForFirebase(updatedUser);
     if (db) {
-      await setDoc(doc(db, 'users', updatedUser.id), sanitizedUser, { merge: true });
+      await setDoc(doc(db, 'users', updatedUser.id), sanitized, { merge: true });
     } else {
       const users = StorageService.getUsers();
       const index = users.findIndex(u => u.id === updatedUser.id);
@@ -217,33 +179,23 @@ export const StorageService = {
         notifyListeners();
       }
     }
-    
-    const currentUser = StorageService.getCurrentUser();
-    if (currentUser && currentUser.id === updatedUser.id) {
-        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
-    }
     return updatedUser;
   },
 
   deleteUser: async (id: string): Promise<void> => {
-    if (db) {
-      await deleteDoc(doc(db, 'users', id));
-    } else {
-      const users = StorageService.getUsers();
-      const filtered = users.filter(u => u.id !== id);
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filtered));
+    if (db) await deleteDoc(doc(db, 'users', id));
+    else {
+      const users = StorageService.getUsers().filter(u => u.id !== id);
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       notifyListeners();
     }
   },
 
-  // --- COMPANIES ---
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
-
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
     const newCompany = { ...company, id: generateId() };
-    if (db) {
-      await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
-    } else {
+    if (db) await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
+    else {
       const companies = StorageService.getCompanies();
       companies.push(newCompany);
       localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
@@ -254,52 +206,44 @@ export const StorageService = {
 
   bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
     const sanitizedCompanies = companies.map(c => ({
+      ...c,
       id: generateId(),
-      company_name: c.company_name || '',
-      company_district: c.company_district || '',
-      company_state: c.company_state || '',
-      company_address: c.company_address || '',
-      company_industry: c.company_industry || '',
-      company_contact_person: c.company_contact_person || '',
-      company_contact_email: c.company_contact_email || '',
-      company_contact_phone: c.company_contact_phone || '',
       has_mou: !!c.has_mou,
-      mou_type: c.mou_type || null,
-      created_at: new Date().toISOString()
+      created_at: c.created_at || new Date().toISOString()
     }));
 
     if (db) {
-      const chunkArray = (arr: any[], size: number) => {
+      const chunk = (arr: any[], size: number) => {
         const results = [];
-        while (arr.length) {
-          results.push(arr.splice(0, size));
-        }
+        for (let i = 0; i < arr.length; i += size) results.push(arr.slice(i, i + size));
         return results;
       };
 
-      const chunks = chunkArray([...sanitizedCompanies], 250);
-
-      for (const chunk of chunks) {
-        const batch = writeBatch(db);
-        chunk.forEach((company: any) => {
-          const ref = doc(db, 'companies', company.id);
-          batch.set(ref, sanitizeForFirebase(company));
+      const batches = chunk(sanitizedCompanies, 400); // Batch limit Firebase is 500
+      for (const b of batches) {
+        const writeBatchObj = writeBatch(db);
+        b.forEach(comp => {
+            const ref = doc(db, 'companies', comp.id);
+            writeBatchObj.set(ref, sanitizeForFirebase(comp));
         });
-        await batch.commit();
+        await writeBatchObj.commit();
       }
     } else {
       const existing = StorageService.getCompanies();
-      const updated = [...existing, ...sanitizedCompanies];
-      localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([...existing, ...sanitizedCompanies]));
       notifyListeners();
     }
   },
 
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
     const sanitized = sanitizeForFirebase(updatedCompany);
-    
     if (db) {
-      await setDoc(doc(db, 'companies', updatedCompany.id), sanitized, { merge: true });
+      try {
+        await setDoc(doc(db, 'companies', updatedCompany.id), sanitized, { merge: true });
+      } catch (e: any) {
+        console.error("Firestore Update Error:", e);
+        throw new Error(`Gagal mengemaskini di server: ${e.message}`);
+      }
     } else {
       const companies = StorageService.getCompanies();
       const index = companies.findIndex(c => c.id === updatedCompany.id);
@@ -313,24 +257,19 @@ export const StorageService = {
   },
 
   deleteCompany: async (id: string): Promise<void> => {
-    if (db) {
-      await deleteDoc(doc(db, 'companies', id));
-    } else {
-      const companies = StorageService.getCompanies();
-      const filtered = companies.filter(c => c.id !== id);
+    if (db) await deleteDoc(doc(db, 'companies', id));
+    else {
+      const filtered = StorageService.getCompanies().filter(c => c.id !== id);
       localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(filtered));
       notifyListeners();
     }
   },
 
-  // --- APPLICATIONS ---
   getApplications: (): Application[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
-
   createApplication: async (app: Omit<Application, 'id'>): Promise<Application> => {
     const newApp = { ...app, id: generateId() };
-    if (db) {
-      await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
-    } else {
+    if (db) await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
+    else {
       const apps = StorageService.getApplications();
       apps.push(newApp);
       localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
@@ -341,10 +280,8 @@ export const StorageService = {
 
   updateApplication: async (updatedApp: Application): Promise<Application> => {
     const sanitized = sanitizeForFirebase(updatedApp);
-    
-    if (db) {
-      await setDoc(doc(db, 'applications', updatedApp.id), sanitized, { merge: true });
-    } else {
+    if (db) await setDoc(doc(db, 'applications', updatedApp.id), sanitized, { merge: true });
+    else {
       const apps = StorageService.getApplications();
       const index = apps.findIndex(a => a.id === updatedApp.id);
       if (index !== -1) {
@@ -356,18 +293,16 @@ export const StorageService = {
     return updatedApp;
   },
 
-  getFullSystemBackup: () => {
-    return {
-      users: JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
-      companies: JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
-      applications: JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
-      timestamp: new Date().toISOString(),
-      version: '3.0'
-    };
-  },
+  getFullSystemBackup: () => ({
+    users: StorageService.getUsers(),
+    companies: StorageService.getCompanies(),
+    applications: StorageService.getApplications(),
+    timestamp: new Date().toISOString(),
+    version: '3.1'
+  }),
 
   restoreFullSystem: (data: any) => {
-    if (!data.users || !data.companies || !data.applications) throw new Error('Format fail tidak sah');
+    if (!data.users || !data.companies || !data.applications) throw new Error('Fail tidak sah');
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));

@@ -136,8 +136,8 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   };
 
   const handleEditClick = (company: Company) => {
-      // Create a deep copy to avoid direct state mutation
-      setEditingCompany(JSON.parse(JSON.stringify(company)));
+      // Pastikan klon yang bersih
+      setEditingCompany({ ...company });
       setIsEditModalOpen(true);
   };
 
@@ -145,27 +145,29 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       e.preventDefault();
       if (!editingCompany) return;
       
-      // Sanitization: Ensure no undefined values are sent to Firebase
-      const updatedData: any = { ...editingCompany };
+      // Bersihkan data sebelum hantar
+      const dataToUpdate: Company = {
+          ...editingCompany,
+          company_name: editingCompany.company_name || "",
+          company_address: editingCompany.company_address || "",
+          company_district: editingCompany.company_district || "",
+          company_state: editingCompany.company_state || "",
+          company_industry: editingCompany.company_industry || "",
+          company_contact_person: editingCompany.company_contact_person || "",
+          company_contact_email: editingCompany.company_contact_email || "",
+          company_contact_phone: editingCompany.company_contact_phone || "",
+          has_mou: !!editingCompany.has_mou,
+          mou_type: editingCompany.has_mou ? (editingCompany.mou_type || 'MoU') : undefined
+      };
       
-      if (!updatedData.has_mou) {
-          // If has_mou is false, remove the mou_type key entirely
-          delete updatedData.mou_type;
-      } else if (!updatedData.mou_type) {
-          // Default if checked but no type selected
-          updatedData.mou_type = 'MoU';
+      try {
+        await onUpdateCompany(dataToUpdate);
+        setIsEditModalOpen(false);
+        setEditingCompany(null);
+      } catch (err: any) {
+          console.error("Update submit error", err);
+          // Ralat diuruskan oleh toast dalam App.tsx tetapi kita catch di sini juga jika perlu logik tambahan
       }
-
-      // Convert any remaining undefined to null or empty strings
-      Object.keys(updatedData).forEach(key => {
-          if (updatedData[key] === undefined) {
-              updatedData[key] = "";
-          }
-      });
-      
-      await onUpdateCompany(updatedData as Company);
-      setIsEditModalOpen(false);
-      setEditingCompany(null);
   };
 
   const handleConfirmApply = async () => {
