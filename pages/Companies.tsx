@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, ArrowRight, HelpCircle, Edit, FileDown, ArrowUpDown, CheckSquare, Square } from 'lucide-react';
+import { Search, Plus, Trash2, Briefcase, MapPin, User as UserIcon, Mail, Phone, FileText, Sparkles, HelpCircle, Edit, FileDown, ArrowUpDown } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { generateLOI, downloadLOIWord } from '../utils/letterGenerator';
@@ -20,34 +20,30 @@ interface CompaniesProps {
 export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
-  const [sortOption, setSortOption] = useState('name_asc'); // name_asc, name_desc, state_asc, state_desc
+  const [sortOption, setSortOption] = useState('name_asc');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
-  // Confirmation Modal State
   const [confirmingCompany, setConfirmingCompany] = useState<Company | null>(null);
-  
-  // Suggestion State
   const [suggestedCompanies, setSuggestedCompanies] = useState<Company[]>([]);
 
-  // New Company Form State
   const [newCompany, setNewCompany] = useState<Partial<Company>>({
       company_state: 'Melaka',
-      has_mou: false
+      has_mou: false,
+      mou_type: 'MoU'
   });
 
-  // Edit Company Form State
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
-  // Calculate Student Stats
+  const canEditOrDelete = currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER;
+  const canBulkDelete = currentUser.role === UserRole.COORDINATOR;
+
   const myApplications = applications.filter(a => a.created_by === currentUser.username);
   const applicationCount = myApplications.length;
-  // Limit to 3 applications total (active or rejected)
   const isLimitReached = applicationCount >= 3;
 
-  // AI Suggestion Logic
   useEffect(() => {
     if (currentUser.role === UserRole.STUDENT && currentUser.address && currentUser.address.length > 3) {
       const addressLower = currentUser.address.toLowerCase();
@@ -55,9 +51,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
         const stateMatch = c.company_state && addressLower.includes(c.company_state.toLowerCase());
         const districtMatch = c.company_district && addressLower.includes(c.company_district.toLowerCase());
         const addressMatch = c.company_address && addressLower.includes(c.company_address.split(',')[0].toLowerCase());
-        
         const alreadyApplied = myApplications.some(app => app.company_name === c.company_name);
-        
         return (stateMatch || districtMatch || addressMatch) && !alreadyApplied;
       });
       setSuggestedCompanies(matches.slice(0, 3));
@@ -66,7 +60,6 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
     }
   }, [currentUser, companies, myApplications]);
 
-  // Filter & Sort Logic
   const filteredAndSortedCompanies = companies
     .filter(c => {
       const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -85,7 +78,6 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
         }
     });
 
-  // Bulk Selection Handlers
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.checked) {
           setSelectedIds(filteredAndSortedCompanies.map(c => c.id));
@@ -104,11 +96,16 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
 
   const handleBulkDelete = async () => {
       if (confirm(`Adakah anda pasti mahu memadam ${selectedIds.length} syarikat terpilih?`)) {
-          for (const id of selectedIds) {
-              await onDeleteCompany(id);
+          const toastId = toast.loading(`Sedang memadam ${selectedIds.length} syarikat...`);
+          try {
+              for (const id of selectedIds) {
+                  await onDeleteCompany(id);
+              }
+              setSelectedIds([]);
+              toast.success(`${selectedIds.length} syarikat berjaya dipadam.`, { id: toastId });
+          } catch (e) {
+              toast.error('Ralat berlaku semasa pemadaman pukal.', { id: toastId });
           }
-          setSelectedIds([]);
-          toast.success(`${selectedIds.length} syarikat berjaya dipadam.`);
       }
   };
 
@@ -126,11 +123,11 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           company_contact_email: newCompany.company_contact_email || '',
           company_contact_phone: newCompany.company_contact_phone || '',
           has_mou: newCompany.has_mou || false,
-          mou_type: newCompany.mou_type,
+          mou_type: newCompany.has_mou ? (newCompany.mou_type || 'MoU') : undefined,
           created_at: new Date().toISOString()
       });
       setIsAddModalOpen(false);
-      setNewCompany({ company_state: 'Melaka', has_mou: false });
+      setNewCompany({ company_state: 'Melaka', has_mou: false, mou_type: 'MoU' });
   };
 
   const handleEditClick = (company: Company) => {
@@ -142,7 +139,12 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       e.preventDefault();
       if (!editingCompany) return;
       
-      await onUpdateCompany(editingCompany);
+      const updatedData = {
+          ...editingCompany,
+          mou_type: editingCompany.has_mou ? (editingCompany.mou_type || 'MoU') : undefined
+      };
+      
+      await onUpdateCompany(updatedData);
       setIsEditModalOpen(false);
       setEditingCompany(null);
   };
@@ -156,9 +158,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
 
   const renderApplyButton = (company: Company) => {
       if (currentUser.role !== UserRole.STUDENT) return null;
-
       const hasApplied = myApplications.some(app => app.company_name === company.company_name);
-
       if (hasApplied) {
           return (
             <button disabled className="bg-green-100 text-green-700 px-3 py-1.5 rounded text-sm font-bold border border-green-200 cursor-not-allowed">
@@ -166,7 +166,6 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             </button>
           );
       }
-
       if (isLimitReached) {
           return (
             <button disabled className="bg-slate-100 text-slate-400 px-3 py-1.5 rounded text-sm font-medium border border-slate-200 cursor-not-allowed" title="Had maksimum 3 permohonan dicapai">
@@ -174,7 +173,6 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             </button>
           );
       }
-
       return (
         <button 
             onClick={() => setConfirmingCompany(company)}
@@ -198,7 +196,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
         </div>
         
         <div className="flex gap-2">
-            {selectedIds.length > 0 && currentUser.role === UserRole.COORDINATOR && (
+            {selectedIds.length > 0 && canBulkDelete && (
                 <button 
                     onClick={handleBulkDelete}
                     className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors shadow-sm animate-fadeIn"
@@ -218,7 +216,6 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
         </div>
       </div>
 
-      {/* AI Suggestions Section */}
       {suggestedCompanies.length > 0 && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6 animate-fadeIn">
               <div className="flex items-center gap-2 mb-4">
@@ -233,14 +230,14 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {suggestedCompanies.map(company => (
                       <div key={company.id} className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
-                          <h4 className="font-bold text-slate-800 mb-1">{company.company_name}</h4>
+                          <h4 className="font-bold text-slate-800 mb-1 truncate">{company.company_name}</h4>
                           <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
                               <MapPin size={12} />
                               {company.company_district}, {company.company_state}
                           </div>
                           <div className="flex justify-between items-center mt-2">
                               <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 truncate max-w-[120px]">
-                                  {company.company_industry}
+                                  {company.company_industry || 'Pelbagai'}
                               </span>
                               {renderApplyButton(company)}
                           </div>
@@ -250,7 +247,6 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           </div>
       )}
 
-      {/* Search, Filter & Sort */}
       <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 items-center">
         <div className="flex-1 relative w-full">
           <Search className="absolute left-3 top-3 text-slate-400" size={20} />
@@ -294,7 +290,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {currentUser.role === UserRole.COORDINATOR && (
+                {canBulkDelete && (
                     <th className="p-4 w-10 text-center">
                         <input 
                             type="checkbox" 
@@ -314,12 +310,12 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedCompanies.length === 0 && (
                 <tr>
-                   <td colSpan={currentUser.role === UserRole.COORDINATOR ? 6 : 5} className="p-8 text-center text-slate-500">Tiada syarikat dijumpai.</td>
+                   <td colSpan={canBulkDelete ? 6 : 5} className="p-8 text-center text-slate-500">Tiada syarikat dijumpai.</td>
                 </tr>
               )}
               {filteredAndSortedCompanies.map(company => (
                 <tr key={company.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.includes(company.id) ? 'bg-blue-50' : ''}`}>
-                  {currentUser.role === UserRole.COORDINATOR && (
+                  {canBulkDelete && (
                       <td className="p-4 align-top text-center">
                           <input 
                             type="checkbox" 
@@ -361,7 +357,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                         </div>
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Mail size={14} className="text-orange-500" />
-                            <span>{company.company_contact_email || '-'}</span>
+                            <span className="truncate max-w-[150px]">{company.company_contact_email || '-'}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                             <Phone size={14} className="text-green-500" />
@@ -386,7 +382,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                     <div className="flex justify-center gap-2 flex-wrap">
                         {renderApplyButton(company)}
                         
-                         {currentUser.role === UserRole.COORDINATOR && (
+                         {canEditOrDelete && (
                             <>
                               <button 
                                   onClick={() => handleEditClick(company)}
@@ -440,7 +436,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
               <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Negeri</label>
-                    <select className="w-full p-2 border rounded" value={newCompany.company_state} onChange={e => setNewCompany({...newCompany, company_state: e.target.value})}>
+                    <select className="w-full p-2 border rounded bg-white" value={newCompany.company_state} onChange={e => setNewCompany({...newCompany, company_state: e.target.value})}>
                         {MALAYSIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
@@ -477,76 +473,74 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                       <span className="text-sm font-medium">Ada MoU / LOI?</span>
                   </label>
                   {newCompany.has_mou && (
-                      <select className="p-1 border rounded text-sm" value={newCompany.mou_type} onChange={e => setNewCompany({...newCompany, mou_type: e.target.value as any})}>
+                      <select className="p-1 border rounded text-sm bg-white" value={newCompany.mou_type} onChange={e => setNewCompany({...newCompany, mou_type: e.target.value as any})}>
                           <option value="MoU">MoU</option>
                           <option value="LOI">LOI</option>
                       </select>
                   )}
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4">Simpan</button>
+              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4 transition-colors">Simpan</button>
           </form>
       </Modal>
 
-      {/* Edit Modal */}
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Kemaskini Syarikat">
           {editingCompany && (
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nama Syarikat</label>
-                    <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_name} onChange={e => setEditingCompany({...editingCompany, company_name: e.target.value})} />
+                    <input required type="text" className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_name} onChange={e => setEditingCompany({...editingCompany, company_name: e.target.value})} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Negeri</label>
-                        <select className="w-full p-2 border rounded" value={editingCompany.company_state} onChange={e => setEditingCompany({...editingCompany, company_state: e.target.value})}>
+                        <select className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_state} onChange={e => setEditingCompany({...editingCompany, company_state: e.target.value})}>
                             {MALAYSIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Daerah</label>
-                        <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_district} onChange={e => setEditingCompany({...editingCompany, company_district: e.target.value})} />
+                        <input required type="text" className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_district} onChange={e => setEditingCompany({...editingCompany, company_district: e.target.value})} />
                     </div>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Alamat Penuh</label>
-                    <textarea required className="w-full p-2 border rounded" rows={2} value={editingCompany.company_address} onChange={e => setEditingCompany({...editingCompany, company_address: e.target.value})} />
+                    <textarea required className="w-full p-2 border rounded bg-white text-slate-900" rows={2} value={editingCompany.company_address} onChange={e => setEditingCompany({...editingCompany, company_address: e.target.value})} />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Industri</label>
-                    <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_industry} onChange={e => setEditingCompany({...editingCompany, company_industry: e.target.value})} />
+                    <input required type="text" className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_industry} onChange={e => setEditingCompany({...editingCompany, company_industry: e.target.value})} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Pegawai Dihubungi</label>
-                        <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_contact_person} onChange={e => setEditingCompany({...editingCompany, company_contact_person: e.target.value})} />
+                        <input required type="text" className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_contact_person} onChange={e => setEditingCompany({...editingCompany, company_contact_person: e.target.value})} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
-                        <input required type="text" className="w-full p-2 border rounded" value={editingCompany.company_contact_phone} onChange={e => setEditingCompany({...editingCompany, company_contact_phone: e.target.value})} />
+                        <input required type="text" className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_contact_phone} onChange={e => setEditingCompany({...editingCompany, company_contact_phone: e.target.value})} />
                     </div>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <input required type="email" className="w-full p-2 border rounded" value={editingCompany.company_contact_email} onChange={e => setEditingCompany({...editingCompany, company_contact_email: e.target.value})} />
+                    <input required type="email" className="w-full p-2 border rounded bg-white text-slate-900" value={editingCompany.company_contact_email} onChange={e => setEditingCompany({...editingCompany, company_contact_email: e.target.value})} />
                 </div>
                 <div className="flex items-center gap-4 pt-2">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" className="h-4 w-4 text-blue-600" checked={editingCompany.has_mou} onChange={e => setEditingCompany({...editingCompany, has_mou: e.target.checked})} />
-                        <span className="text-sm font-medium">Ada MoU / LOI?</span>
+                        <span className="text-sm font-medium text-slate-700">Ada MoU / LOI?</span>
                     </label>
                     {editingCompany.has_mou && (
-                        <select className="p-1 border rounded text-sm" value={editingCompany.mou_type} onChange={e => setEditingCompany({...editingCompany, mou_type: e.target.value as any})}>
+                        <select className="p-1 border rounded text-sm bg-white text-slate-900" value={editingCompany.mou_type || 'MoU'} onChange={e => setEditingCompany({...editingCompany, mou_type: e.target.value as any})}>
                             <option value="MoU">MoU</option>
                             <option value="LOI">LOI</option>
                         </select>
                     )}
                 </div>
-                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4">Simpan Perubahan</button>
+                <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4 transition-colors">Simpan Perubahan</button>
               </form>
           )}
       </Modal>
 
-      {/* Confirmation Modal for Application */}
       <Modal 
         isOpen={!!confirmingCompany} 
         onClose={() => setConfirmingCompany(null)} 
