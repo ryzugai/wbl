@@ -113,7 +113,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       e.preventDefault();
       if (!newCompany.company_name) return;
       
-      await onAddCompany({
+      const companyToSave: Omit<Company, 'id'> = {
           company_name: newCompany.company_name!,
           company_state: newCompany.company_state || '',
           company_district: newCompany.company_district || '',
@@ -122,16 +122,22 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           company_contact_person: newCompany.company_contact_person || '',
           company_contact_email: newCompany.company_contact_email || '',
           company_contact_phone: newCompany.company_contact_phone || '',
-          has_mou: newCompany.has_mou || false,
-          mou_type: newCompany.has_mou ? (newCompany.mou_type || 'MoU') : undefined,
+          has_mou: !!newCompany.has_mou,
           created_at: new Date().toISOString()
-      });
+      };
+
+      if (newCompany.has_mou) {
+          companyToSave.mou_type = newCompany.mou_type || 'MoU';
+      }
+      
+      await onAddCompany(companyToSave);
       setIsAddModalOpen(false);
       setNewCompany({ company_state: 'Melaka', has_mou: false, mou_type: 'MoU' });
   };
 
   const handleEditClick = (company: Company) => {
-      setEditingCompany({ ...company });
+      // Create a deep copy to avoid direct state mutation
+      setEditingCompany(JSON.parse(JSON.stringify(company)));
       setIsEditModalOpen(true);
   };
 
@@ -139,12 +145,25 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       e.preventDefault();
       if (!editingCompany) return;
       
-      const updatedData = {
-          ...editingCompany,
-          mou_type: editingCompany.has_mou ? (editingCompany.mou_type || 'MoU') : undefined
-      };
+      // Sanitization: Ensure no undefined values are sent to Firebase
+      const updatedData: any = { ...editingCompany };
       
-      await onUpdateCompany(updatedData);
+      if (!updatedData.has_mou) {
+          // If has_mou is false, remove the mou_type key entirely
+          delete updatedData.mou_type;
+      } else if (!updatedData.mou_type) {
+          // Default if checked but no type selected
+          updatedData.mou_type = 'MoU';
+      }
+
+      // Convert any remaining undefined to null or empty strings
+      Object.keys(updatedData).forEach(key => {
+          if (updatedData[key] === undefined) {
+              updatedData[key] = "";
+          }
+      });
+      
+      await onUpdateCompany(updatedData as Company);
       setIsEditModalOpen(false);
       setEditingCompany(null);
   };

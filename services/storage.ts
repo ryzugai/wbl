@@ -82,6 +82,17 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+// Sanitization Helper to remove undefined values for Firebase
+const sanitizeForFirebase = (obj: any) => {
+    const clean: any = {};
+    Object.keys(obj).forEach(key => {
+        if (obj[key] !== undefined) {
+            clean[key] = obj[key];
+        }
+    });
+    return clean;
+};
+
 // Init Default Data
 const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
@@ -120,13 +131,13 @@ export const StorageService = {
     const apps = StorageService.getApplications();
 
     users.forEach(u => {
-        if(u.id) batch.set(doc(db, 'users', u.id), u);
+        if(u.id) batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u));
     });
     companies.forEach(c => {
-        if(c.id) batch.set(doc(db, 'companies', c.id), c);
+        if(c.id) batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c));
     });
     apps.forEach(a => {
-        if(a.id) batch.set(doc(db, 'applications', a.id), a);
+        if(a.id) batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a));
     });
 
     await batch.commit();
@@ -181,7 +192,7 @@ export const StorageService = {
     };
     
     if (db) {
-      await setDoc(doc(db, 'users', newUser.id), newUser);
+      await setDoc(doc(db, 'users', newUser.id), sanitizeForFirebase(newUser));
     } else {
       users.push(newUser);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
@@ -193,7 +204,7 @@ export const StorageService = {
   updateUser: async (updatedUser: User): Promise<User> => {
     if (updatedUser.id === COORDINATOR_ACCOUNT.id) return updatedUser;
 
-    const sanitizedUser = JSON.parse(JSON.stringify(updatedUser));
+    const sanitizedUser = sanitizeForFirebase(updatedUser);
 
     if (db) {
       await setDoc(doc(db, 'users', updatedUser.id), sanitizedUser, { merge: true });
@@ -231,7 +242,7 @@ export const StorageService = {
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
     const newCompany = { ...company, id: generateId() };
     if (db) {
-      await setDoc(doc(db, 'companies', newCompany.id), newCompany);
+      await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
     } else {
       const companies = StorageService.getCompanies();
       companies.push(newCompany);
@@ -272,7 +283,7 @@ export const StorageService = {
         const batch = writeBatch(db);
         chunk.forEach((company: any) => {
           const ref = doc(db, 'companies', company.id);
-          batch.set(ref, company);
+          batch.set(ref, sanitizeForFirebase(company));
         });
         await batch.commit();
       }
@@ -285,8 +296,10 @@ export const StorageService = {
   },
 
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
+    const sanitized = sanitizeForFirebase(updatedCompany);
+    
     if (db) {
-      await setDoc(doc(db, 'companies', updatedCompany.id), updatedCompany, { merge: true });
+      await setDoc(doc(db, 'companies', updatedCompany.id), sanitized, { merge: true });
     } else {
       const companies = StorageService.getCompanies();
       const index = companies.findIndex(c => c.id === updatedCompany.id);
@@ -316,7 +329,7 @@ export const StorageService = {
   createApplication: async (app: Omit<Application, 'id'>): Promise<Application> => {
     const newApp = { ...app, id: generateId() };
     if (db) {
-      await setDoc(doc(db, 'applications', newApp.id), newApp);
+      await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
     } else {
       const apps = StorageService.getApplications();
       apps.push(newApp);
@@ -327,8 +340,10 @@ export const StorageService = {
   },
 
   updateApplication: async (updatedApp: Application): Promise<Application> => {
+    const sanitized = sanitizeForFirebase(updatedApp);
+    
     if (db) {
-      await setDoc(doc(db, 'applications', updatedApp.id), updatedApp, { merge: true });
+      await setDoc(doc(db, 'applications', updatedApp.id), sanitized, { merge: true });
     } else {
       const apps = StorageService.getApplications();
       const index = apps.findIndex(a => a.id === updatedApp.id);
