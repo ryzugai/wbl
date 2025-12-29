@@ -11,7 +11,6 @@ const STORAGE_KEYS = {
   SESSION: 'wbl_session'
 };
 
-// --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyAPAspAMGl6eevn__-mc-EW8ZKGw9J09dY",
   authDomain: "wblfptt.firebaseapp.com",
@@ -22,7 +21,6 @@ const firebaseConfig = {
   measurementId: "G-DCP1822ZES"
 };
 
-// --- CLOUD SYNC SETUP ---
 let db: any = null;
 let unsubscribeListeners: (() => void)[] = [];
 
@@ -30,7 +28,6 @@ const initFirebase = () => {
   try {
     const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     db = getFirestore(app);
-    console.log('🔥 WBL Cloud Connected');
     setupRealtimeListeners();
   } catch (e) {
     console.error('Firebase init failed', e);
@@ -39,7 +36,6 @@ const initFirebase = () => {
 
 const setupRealtimeListeners = () => {
   if (!db) return;
-
   unsubscribeListeners.forEach(unsub => unsub());
   unsubscribeListeners = [];
 
@@ -53,7 +49,7 @@ const setupRealtimeListeners = () => {
       localStorage.setItem(storageKey, JSON.stringify(data));
       notifyListeners(); 
     }, (error) => {
-        console.error("Sync Error:", error);
+        console.error(`Sync Error for ${colName}:`, error);
     });
     unsubscribeListeners.push(unsub);
   };
@@ -75,28 +71,29 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
-/**
- * Agresif Sanitization untuk Firebase
- * Firestore akan reject ralat 400 jika ada key bernilai 'undefined'.
- */
-const sanitizeForFirebase = (obj: any) => {
-    if (obj === null || typeof obj !== 'object') return obj;
-    
-    const clean: any = Array.isArray(obj) ? [] : {};
-    
-    Object.keys(obj).forEach(key => {
-        const value = obj[key];
-        // Tukar undefined kepada string kosong, kekalkan yang lain
-        if (value === undefined) {
-            clean[key] = "";
-        } else if (value !== null && typeof value === 'object') {
-            clean[key] = sanitizeForFirebase(value);
-        } else {
-            clean[key] = value;
-        }
-    });
-    
+const sanitizeForFirebase = (obj: any): any => {
+  if (obj === undefined || obj === null) return null;
+  if (Array.isArray(obj)) return obj.map(v => sanitizeForFirebase(v));
+  if (typeof obj === 'object') {
+    const clean: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        clean[key] = sanitizeForFirebase(obj[key]);
+      }
+    }
     return clean;
+  }
+  return obj;
+};
+
+const getCurrentUser = (): User | null => {
+  const session = localStorage.getItem(STORAGE_KEYS.SESSION);
+  return session ? JSON.parse(session) : null;
+};
+
+const isCoordinator = () => {
+  const user = getCurrentUser();
+  return user?.role === UserRole.COORDINATOR;
 };
 
 const init = () => {
@@ -120,7 +117,8 @@ export const StorageService = {
   isCloudEnabled: () => !!db,
 
   uploadLocalToCloud: async () => {
-    if (!db) throw new Error('Cloud not connected');
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh melakukan operasi ini.');
+    if (!db) throw new Error('Cloud tidak disambungkan');
     const batch = writeBatch(db);
     StorageService.getUsers().forEach(u => u.id && batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u)));
     StorageService.getCompanies().forEach(c => c.id && batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c)));
@@ -145,12 +143,10 @@ export const StorageService = {
   },
 
   logout: () => localStorage.removeItem(STORAGE_KEYS.SESSION),
-  getCurrentUser: (): User | null => {
-    const session = localStorage.getItem(STORAGE_KEYS.SESSION);
-    return session ? JSON.parse(session) : null;
-  },
+  getCurrentUser,
 
   getUsers: (): User[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
+  
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
     const users = StorageService.getUsers();
     if (users.some(u => u.username === user.username)) throw new Error('Username sudah wujud');
@@ -167,6 +163,9 @@ export const StorageService = {
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
+    if (!isCoordinator() && updatedUser.id !== getCurrentUser()?.id) {
+        throw new Error('Hanya Penyelaras boleh mengemaskini maklumat pengguna lain.');
+    }
     const sanitized = sanitizeForFirebase(updatedUser);
     if (db) {
       await setDoc(doc(db, 'users', updatedUser.id), sanitized, { merge: true });
@@ -183,6 +182,7 @@ export const StorageService = {
   },
 
   deleteUser: async (id: string): Promise<void> => {
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh memadam akaun.');
     if (db) await deleteDoc(doc(db, 'users', id));
     else {
       const users = StorageService.getUsers().filter(u => u.id !== id);
@@ -192,10 +192,13 @@ export const StorageService = {
   },
 
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
+  
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh menambah syarikat.');
     const newCompany = { ...company, id: generateId() };
-    if (db) await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
-    else {
+    if (db) {
+      await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
+    } else {
       const companies = StorageService.getCompanies();
       companies.push(newCompany);
       localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
@@ -205,10 +208,14 @@ export const StorageService = {
   },
 
   bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh melakukan upload pukal.');
+    if (companies.length === 0) return;
+    
     const sanitizedCompanies = companies.map(c => ({
       ...c,
       id: generateId(),
       has_mou: !!c.has_mou,
+      mou_type: c.has_mou ? (c.mou_type || 'MoU') : null,
       created_at: c.created_at || new Date().toISOString()
     }));
 
@@ -219,7 +226,7 @@ export const StorageService = {
         return results;
       };
 
-      const batches = chunk(sanitizedCompanies, 400); // Batch limit Firebase is 500
+      const batches = chunk(sanitizedCompanies, 200); 
       for (const b of batches) {
         const writeBatchObj = writeBatch(db);
         b.forEach(comp => {
@@ -236,14 +243,10 @@ export const StorageService = {
   },
 
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh mengemaskini maklumat syarikat.');
     const sanitized = sanitizeForFirebase(updatedCompany);
     if (db) {
-      try {
-        await setDoc(doc(db, 'companies', updatedCompany.id), sanitized, { merge: true });
-      } catch (e: any) {
-        console.error("Firestore Update Error:", e);
-        throw new Error(`Gagal mengemaskini di server: ${e.message}`);
-      }
+      await setDoc(doc(db, 'companies', updatedCompany.id), sanitized, { merge: true });
     } else {
       const companies = StorageService.getCompanies();
       const index = companies.findIndex(c => c.id === updatedCompany.id);
@@ -257,6 +260,7 @@ export const StorageService = {
   },
 
   deleteCompany: async (id: string): Promise<void> => {
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh memadam syarikat.');
     if (db) await deleteDoc(doc(db, 'companies', id));
     else {
       const filtered = StorageService.getCompanies().filter(c => c.id !== id);
@@ -266,6 +270,7 @@ export const StorageService = {
   },
 
   getApplications: (): Application[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
+  
   createApplication: async (app: Omit<Application, 'id'>): Promise<Application> => {
     const newApp = { ...app, id: generateId() };
     if (db) await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
@@ -298,11 +303,12 @@ export const StorageService = {
     companies: StorageService.getCompanies(),
     applications: StorageService.getApplications(),
     timestamp: new Date().toISOString(),
-    version: '3.1'
+    version: '3.5'
   }),
 
   restoreFullSystem: (data: any) => {
-    if (!data.users || !data.companies || !data.applications) throw new Error('Fail tidak sah');
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh melakukan operasi Restore.');
+    if (!data.users || !data.companies || !data.applications) throw new Error('Fail tidak sah.');
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));

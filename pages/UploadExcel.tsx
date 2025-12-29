@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { StorageService } from '../services/storage';
 import { Company } from '../types';
-import { Upload, FileSpreadsheet, AlertCircle, ArrowRight } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface UploadExcelProps {
@@ -20,9 +20,10 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
     for (let key in row) {
       const normalizedKey = key.trim().toLowerCase();
       for (let name of possibleNames) {
-        if (normalizedKey === name.toLowerCase() || normalizedKey.includes(name.toLowerCase())) {
+        const normalizedName = name.trim().toLowerCase();
+        if (normalizedKey === normalizedName || normalizedKey.includes(normalizedName)) {
           const val = row[key];
-          return val !== undefined && val !== null ? String(val).trim() : '';
+          return (val !== undefined && val !== null) ? String(val).trim() : '';
         }
       }
     }
@@ -50,7 +51,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         const jsonData = XLSX.utils.sheet_to_json(ws);
 
         if (jsonData.length === 0) {
-          toast.error("Fail Excel kosong atau format tidak betul");
+          toast.error("Fail Excel kosong.");
           setIsProcessing(false);
           return;
         }
@@ -60,24 +61,23 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         const newLogs: string[] = [];
         const validCompanies: Omit<Company, 'id'>[] = [];
 
-        newLogs.push(`Menganalisis ${jsonData.length} baris data...`);
+        newLogs.push(`🚀 Menganalisis ${jsonData.length} baris...`);
 
         for (let i = 0; i < jsonData.length; i++) {
           const row: any = jsonData[i];
-          
-          const companyName = findColumnValue(row, ['Nama Syarikat', 'Company Name', 'Syarikat', 'Name', 'Organization']);
+          const companyName = findColumnValue(row, ['Nama Syarikat', 'Company Name', 'Syarikat', 'Name']);
           
           if (!companyName) {
             failCount++;
-            newLogs.push(`❌ Baris ${i + 2}: Nama syarikat tidak dijumpai`);
+            newLogs.push(`❌ Baris ${i + 2}: Nama syarikat tidak ditemui.`);
             continue;
           }
 
-          const state = findColumnValue(row, ['Negeri', 'State']);
+          const state = findColumnValue(row, ['Negeri', 'State', 'Region']);
           const district = findColumnValue(row, ['Daerah', 'District', 'Mukim']);
-          const address = findColumnValue(row, ['Alamat', 'Address', 'Lokasi', 'Location']);
+          const address = findColumnValue(row, ['Alamat', 'Address', 'Location']);
           const industry = findColumnValue(row, ['Industri', 'Industry', 'Sektor']);
-          const contactPerson = findColumnValue(row, ['Pegawai', 'PIC', 'Contact Person', 'Person']);
+          const contactPerson = findColumnValue(row, ['Pegawai', 'PIC', 'Contact Person']);
           const email = findColumnValue(row, ['Email', 'E-mail', 'Emel']);
           const phone = findColumnValue(row, ['Telefon', 'Phone', 'Tel', 'No. Tel']);
           const mouValue = findColumnValue(row, ['MoU', 'LOI', 'Agreement']);
@@ -87,7 +87,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
           
           if (mouValue) {
             const mouStr = String(mouValue).trim().toUpperCase();
-            if (mouStr.includes('MOU') || mouStr.includes('YA') || mouStr.includes('YES')) {
+            if (mouStr.includes('MOU') || mouStr === 'YA' || mouStr === 'YES') {
               hasMou = true;
               mouType = 'MoU';
             } else if (mouStr.includes('LOI')) {
@@ -96,18 +96,17 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             }
           }
 
-          // Bina objek yang bersih tanpa nilai undefined
           const newCompany: Omit<Company, 'id'> = {
             company_name: companyName,
-            company_state: state || "",
+            company_state: state || "Melaka",
             company_district: district || "",
             company_address: address || "",
-            company_industry: industry || "",
+            company_industry: industry || "Perkhidmatan",
             company_contact_person: contactPerson || "",
             company_contact_email: email || "",
             company_contact_phone: phone || "",
             has_mou: hasMou,
-            mou_type: hasMou ? (mouType || 'MoU') : undefined,
+            mou_type: hasMou ? (mouType || 'MoU') : null as any,
             created_at: new Date().toISOString()
           };
 
@@ -116,19 +115,21 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         }
 
         if (validCompanies.length > 0) {
-            newLogs.push(`⏳ Menyimpan ${validCompanies.length} rekod...`);
+            newLogs.push(`⏳ Menyimpan ke Cloud...`);
             await StorageService.bulkCreateCompanies(validCompanies);
-            newLogs.push(`🎉 DATA BERJAYA DISIMPAN!`);
+            newLogs.push(`✅ BERJAYA: ${successCount} syarikat disimpan.`);
             toast.success(`${successCount} syarikat berjaya ditambah!`);
             onUploadSuccess();
+        } else {
+            newLogs.push(`⚠️ Tiada data sah.`);
         }
 
         setLogs(newLogs);
         setSummary({ success: successCount, failed: failCount });
 
       } catch (error: any) {
-        console.error(error);
         toast.error(`Ralat: ${error.message}`);
+        setLogs(prev => [...prev, `🔴 RALAT: ${error.message}`]);
       } finally {
         setIsProcessing(false);
       }
@@ -141,61 +142,64 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
         <FileSpreadsheet className="text-green-600" />
-        Upload Data Syarikat
+        Upload Excel Syarikat
       </h2>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl">
-        <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
-          <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+        <div className="mb-6 bg-red-50 p-4 rounded-lg border border-red-100">
+          <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
             <AlertCircle size={18} />
-            Panduan Format Excel
+            PENTING: Ralat Insufficient Permissions?
           </h4>
-          <p className="text-sm text-blue-700">Sistem akan mengesan kolum secara automatik (Nama Syarikat, Alamat, Pegawai, dll).</p>
+          <p className="text-sm text-red-700">
+            Sila pastikan anda telah pergi ke <strong>Firebase Console > Firestore > Rules</strong> dan menetapkan:
+            <code className="block mt-2 bg-white p-2 rounded border font-mono text-xs">allow read, write: if true;</code>
+          </p>
         </div>
 
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors relative">
-          <input 
-            type="file" 
-            accept=".xlsx, .xls"
-            onChange={handleFileUpload}
-            disabled={isProcessing}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          />
+        <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors relative ${isProcessing ? 'border-blue-300 bg-blue-50' : 'border-slate-300 hover:bg-slate-50'}`}>
+          {!isProcessing && (
+            <input 
+                type="file" 
+                accept=".xlsx, .xls"
+                onChange={handleFileUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          )}
           <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
-               {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div> : <Upload size={24} />}
-            </div>
+            {isProcessing ? <Loader2 className="animate-spin text-blue-600" size={32} /> : <Upload size={32} className="text-slate-400" />}
             <div>
-              <p className="font-medium text-slate-700">Klik untuk upload fail Excel</p>
+              <p className="font-bold text-slate-700">Pilih Fail Excel</p>
+              <p className="text-xs text-slate-400 mt-1">Sistem menyokong .xlsx dan .xls</p>
             </div>
           </div>
         </div>
 
         {summary && (
           <div className="mt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="bg-green-50 p-4 rounded-lg border border-green-100 text-center">
                     <div className="text-2xl font-bold text-green-700">{summary.success}</div>
-                    <div className="text-xs font-bold uppercase">Berjaya</div>
+                    <div className="text-xs text-green-600">BERJAYA</div>
                 </div>
-                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                <div className="bg-red-50 p-4 rounded-lg border border-red-100 text-center">
                     <div className="text-2xl font-bold text-red-700">{summary.failed}</div>
-                    <div className="text-xs font-bold uppercase">Gagal</div>
+                    <div className="text-xs text-red-600">GAGAL</div>
                 </div>
             </div>
             <button 
                 onClick={onNavigateToCompanies}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium"
+                className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
             >
-                Lihat Syarikat <ArrowRight size={18} />
+                Lihat Senarai Syarikat <ArrowRight size={18} />
             </button>
           </div>
         )}
 
         {logs.length > 0 && (
           <div className="mt-6">
-            <div className="bg-slate-900 text-green-400 p-4 rounded-lg text-xs font-mono h-40 overflow-y-auto">
-              {logs.map((log, idx) => <div key={idx}>{log}</div>)}
+            <div className="bg-slate-900 text-green-400 p-4 rounded-lg text-[10px] font-mono h-40 overflow-y-auto">
+              {logs.map((log, idx) => <div key={idx} className="mb-1">{log}</div>)}
             </div>
           </div>
         )}
