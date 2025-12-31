@@ -81,6 +81,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
           const email = findColumnValue(row, ['Email', 'E-mail', 'Emel']);
           const phone = findColumnValue(row, ['Telefon', 'Phone', 'Tel', 'No. Tel']);
           const mouValue = findColumnValue(row, ['MoU', 'LOI', 'Agreement']);
+          const historyValue = findColumnValue(row, ['Sejarah', 'History', 'Pernah', 'Previous', 'Alumni']);
 
           let hasMou = false;
           let mouType: 'MoU' | 'LOI' | undefined = undefined;
@@ -96,6 +97,14 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             }
           }
 
+          let hasPrevious = false;
+          if (historyValue) {
+            const histStr = String(historyValue).trim().toUpperCase();
+            if (histStr === 'YA' || histStr === 'YES' || histStr === 'TRUE' || histStr === 'PERNAH') {
+              hasPrevious = true;
+            }
+          }
+
           const newCompany: Omit<Company, 'id'> = {
             company_name: companyName,
             company_state: state || "Melaka",
@@ -107,6 +116,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             company_contact_phone: phone || "",
             has_mou: hasMou,
             mou_type: hasMou ? (mouType || 'MoU') : null as any,
+            has_previous_wbl_students: hasPrevious,
             created_at: new Date().toISOString()
           };
 

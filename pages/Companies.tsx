@@ -1,10 +1,11 @@
 
 import React, { useState, useCallback } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Edit, Loader2, Users } from 'lucide-react';
+import { Search, Plus, Trash2, Edit, Loader2, Users, FileText, Printer, Download, FileJson, History } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { toast } from 'react-hot-toast';
+import { generateLOI, downloadLOIWord } from '../utils/letterGenerator';
 
 interface CompanyFormProps {
   data: Partial<Company>;
@@ -118,7 +119,7 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
         />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input 
             type="checkbox" 
@@ -139,6 +140,18 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
             <option value="LOI">LOI</option>
           </select>
         )}
+
+        <div className="border-t border-slate-200 my-1"></div>
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input 
+            type="checkbox" 
+            className="w-4 h-4 text-blue-600 rounded cursor-pointer" 
+            checked={data.has_previous_wbl_students || false} 
+            onChange={e => handleChange('has_previous_wbl_students', e.target.checked)} 
+          />
+          <span className="text-sm font-medium text-slate-700">Pernah mengambil pelajar WBL?</span>
+        </label>
       </div>
     </div>
   );
@@ -161,12 +174,15 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isLOIModalOpen, setIsLOIModalOpen] = useState(false);
   const [confirmingCompany, setConfirmingCompany] = useState<Company | null>(null);
+  const [selectedCompanyForLOI, setSelectedCompanyForLOI] = useState<Company | null>(null);
   
   const [newCompany, setNewCompany] = useState<Partial<Company>>({
       company_state: 'Melaka',
       has_mou: false,
-      mou_type: 'MoU'
+      mou_type: 'MoU',
+      has_previous_wbl_students: false
   });
   const [editingCompany, setEditingCompany] = useState<any>(null);
 
@@ -209,12 +225,13 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           company_contact_phone: newCompany.company_contact_phone || '',
           has_mou: !!newCompany.has_mou,
           mou_type: newCompany.has_mou ? (newCompany.mou_type || 'MoU') : null as any,
+          has_previous_wbl_students: !!newCompany.has_previous_wbl_students,
           created_at: new Date().toISOString()
         });
         setIsAddModalOpen(false);
-        setNewCompany({ company_state: 'Melaka', has_mou: false, mou_type: 'MoU' });
+        setNewCompany({ company_state: 'Melaka', has_mou: false, mou_type: 'MoU', has_previous_wbl_students: false });
       } catch (err: any) {
-          // Toast diuruskan oleh App.tsx
+          // Error handling by App.tsx
       } finally {
         setIsSubmitting(false);
       }
@@ -223,6 +240,11 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   const handleEditClick = (company: Company) => {
       setEditingCompany({ ...company });
       setIsEditModalOpen(true);
+  };
+
+  const handleLOIClick = (company: Company) => {
+      setSelectedCompanyForLOI(company);
+      setIsLOIModalOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -308,16 +330,22 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                 <tr><td colSpan={isCoordinator ? 5 : 4} className="p-8 text-center text-slate-500 italic">Tiada syarikat dijumpai.</td></tr>
               ) : (
                 filteredAndSortedCompanies.map(company => {
-                  // Tapis permohonan untuk syarikat ini
                   const companyApps = applications.filter(a => a.company_name === company.company_name);
 
                   return (
                     <tr key={company.id} className="hover:bg-slate-50 transition-colors group">
                       {isCoordinator && <td className="p-4 text-center"><input type="checkbox" checked={selectedIds.includes(company.id)} onChange={() => handleSelectOne(company.id)} /></td>}
                       <td className="p-4">
-                        <div className="font-bold text-slate-800">{company.company_name}</div>
+                        <div className="flex items-center gap-2">
+                            <div className="font-bold text-slate-800">{company.company_name}</div>
+                            {company.has_previous_wbl_students && (
+                                <History size={14} className="text-orange-500" title="Pernah mengambil pelajar WBL" />
+                            )}
+                        </div>
                         <div className="text-xs text-slate-500 flex items-center gap-1">
-                          {company.company_industry} {company.has_mou && <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px] font-bold">{company.mou_type}</span>}
+                          {company.company_industry} 
+                          {company.has_mou && <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px] font-bold">{company.mou_type}</span>}
+                          {company.has_previous_wbl_students && <span className="bg-orange-100 text-orange-700 px-1 rounded text-[10px] font-bold">ALUMNI WBL</span>}
                         </div>
                       </td>
                       <td className="p-4 text-sm text-slate-700">
@@ -354,6 +382,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                             )}
                             {isCoordinator && (
                                 <>
+                                  <button onClick={() => handleLOIClick(company)} className="p-1.5 bg-purple-50 text-purple-600 rounded border border-purple-100 hover:bg-purple-100 transition-colors" title="Jana LOI"><FileText size={16} /></button>
                                   <button onClick={() => handleEditClick(company)} className="p-1.5 bg-blue-50 text-blue-600 rounded border border-blue-100 hover:bg-blue-100 transition-colors" title="Edit"><Edit size={16} /></button>
                                   <button onClick={() => { if(confirm('Adakah anda pasti mahu memadam syarikat ini?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded border border-red-100 hover:bg-red-100 transition-colors" title="Padam"><Trash2 size={16} /></button>
                                 </>
@@ -368,6 +397,33 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           </table>
         </div>
       </div>
+
+      {/* Modal Jana LOI */}
+      <Modal isOpen={isLOIModalOpen} onClose={() => setIsLOIModalOpen(false)} title="Jana Letter of Intent (LOI)">
+        <div className="space-y-4">
+            <div className="p-4 bg-purple-50 border border-purple-100 rounded-lg text-center">
+                <p className="text-sm text-slate-600 mb-1">Syarikat Terpilih:</p>
+                <p className="font-bold text-purple-800 text-lg">{selectedCompanyForLOI?.company_name}</p>
+            </div>
+            <p className="text-sm text-slate-500 text-center">Pilih format untuk menjana draf surat hasrat kerjasama.</p>
+            <div className="grid grid-cols-2 gap-4">
+                <button 
+                    onClick={() => { if(selectedCompanyForLOI) generateLOI(selectedCompanyForLOI); setIsLOIModalOpen(false); }}
+                    className="flex flex-col items-center gap-2 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                >
+                    <div className="p-3 bg-red-100 text-red-600 rounded-full"><Printer size={24} /></div>
+                    <span className="font-bold text-sm text-slate-700">PDF (Browser)</span>
+                </button>
+                <button 
+                    onClick={() => { if(selectedCompanyForLOI) downloadLOIWord(selectedCompanyForLOI); setIsLOIModalOpen(false); }}
+                    className="flex flex-col items-center gap-2 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                >
+                    <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Download size={24} /></div>
+                    <span className="font-bold text-sm text-slate-700">Microsoft Word</span>
+                </button>
+            </div>
+        </div>
+      </Modal>
 
       {/* Modal Tambah Syarikat */}
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Tambah Syarikat Baru">

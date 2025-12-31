@@ -46,6 +46,7 @@ export interface Company {
   company_contact_phone: string;
   has_mou: boolean;
   mou_type?: 'MoU' | 'LOI';
+  has_previous_wbl_students?: boolean; // New: Track if company has history with WBL
   created_at: string;
 }
 
