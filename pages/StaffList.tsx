@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole, Application } from '../types';
-import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, CheckCircle, Edit, Trash2, Users } from 'lucide-react';
+import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, CheckCircle, Edit, Trash2, Users, ShieldCheck } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { Modal } from '../components/Modal';
 import { toast } from 'react-hot-toast';
@@ -24,12 +24,26 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
   const industryStaff = users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR);
 
   const isCoordinator = currentUser?.role === UserRole.COORDINATOR;
+  const isJKWBLViewer = currentUser?.is_jkwbl === true;
 
   const handleApproveUser = async (user: User) => {
-    if (!isCoordinator) return;
+    if (!isCoordinator && !isJKWBLViewer) return;
     try {
       await onUpdateUser({ ...user, is_approved: true });
       toast.success('Pengguna telah diluluskan');
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleToggleJKWBL = async (user: User) => {
+    if (!isCoordinator) {
+        toast.error("Hanya Penyelaras boleh menukar status JKWBL.");
+        return;
+    }
+    try {
+      await onUpdateUser({ ...user, is_jkwbl: !user.is_jkwbl });
+      toast.success(`Status JKWBL ${user.is_jkwbl ? 'dikeluarkan' : 'diberikan'}`);
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -102,18 +116,25 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                 (activeTab === 'lecturers' ? lecturers : industryStaff).map(user => (
                   <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4">
-                      <div className="font-bold text-slate-900">{user.name}</div>
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                          {user.name}
+                          {user.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
+                      </div>
                       <div className="text-xs text-slate-500 flex items-center gap-1"><Mail size={12} /> {user.email}</div>
                     </td>
                     <td className="p-4">
                       <div className="text-sm font-medium text-slate-700">
                         {activeTab === 'lecturers' ? user.staff_id : user.company_affiliation}
                       </div>
-                      <div className="text-[10px] uppercase font-bold text-slate-400">{ROLE_LABELS[user.role]}</div>
+                      <div className="text-[10px] uppercase font-bold text-slate-400">
+                          {ROLE_LABELS[user.role]}
+                          {user.is_jkwbl && <span className="ml-1 text-indigo-600">(JKWBL)</span>}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
-                        {isCoordinator && user.is_approved === false && (
+                        {/* Approval Action for Coordinator or JKWBL */}
+                        {(isCoordinator || isJKWBLViewer) && user.is_approved === false && (
                           <button 
                             onClick={() => handleApproveUser(user)} 
                             className="p-1.5 bg-green-50 text-green-600 rounded border border-green-200 hover:bg-green-100"
@@ -122,6 +143,19 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                             <CheckCircle size={16} />
                           </button>
                         )}
+                        
+                        {/* JKWBL Toggle - ONLY Coordinator */}
+                        {isCoordinator && user.role === UserRole.LECTURER && (
+                            <button 
+                                onClick={() => handleToggleJKWBL(user)} 
+                                className={`p-1.5 rounded border ${user.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                                title={user.is_jkwbl ? "Tarik Akses JKWBL" : "Beri Akses JKWBL"}
+                            >
+                                <ShieldCheck size={16} />
+                            </button>
+                        )}
+
+                        {/* Edit/Delete - ONLY Coordinator */}
                         {isCoordinator && (
                           <>
                             <button 

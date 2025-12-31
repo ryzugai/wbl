@@ -2,7 +2,7 @@
 import { User, Company, Application, UserRole } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   USERS: 'wbl_users',
@@ -72,7 +72,8 @@ const generateId = () => {
 };
 
 const sanitizeForFirebase = (obj: any): any => {
-  if (obj === undefined || obj === null) return null;
+  if (obj === undefined) return null;
+  if (obj === null) return null;
   if (Array.isArray(obj)) return obj.map(v => sanitizeForFirebase(v));
   if (typeof obj === 'object') {
     const clean: any = {};
@@ -93,8 +94,16 @@ const getCurrentUser = (): User | null => {
 
 const isCoordinator = () => {
   const user = getCurrentUser();
-  return user?.role === UserRole.COORDINATOR;
+  if (!user) return false;
+  return user.username === COORDINATOR_ACCOUNT.username || user.role === UserRole.COORDINATOR;
 };
+
+const isJKWBL = () => {
+  const user = getCurrentUser();
+  return user?.is_jkwbl === true;
+};
+
+const hasSystemAccess = () => isCoordinator() || isJKWBL();
 
 const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
@@ -117,7 +126,7 @@ export const StorageService = {
   isCloudEnabled: () => !!db,
 
   uploadLocalToCloud: async () => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh melakukan operasi ini.');
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh memuat naik data ke Cloud.');
     if (!db) throw new Error('Cloud tidak disambungkan');
     const batch = writeBatch(db);
     StorageService.getUsers().forEach(u => u.id && batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u)));
@@ -163,8 +172,12 @@ export const StorageService = {
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
-    if (!isCoordinator() && updatedUser.id !== getCurrentUser()?.id) {
-        throw new Error('Hanya Penyelaras boleh mengemaskini maklumat pengguna lain.');
+    // SECURITY: Only Coordinator can edit other people. Owners can edit self. JKWBL cannot edit others.
+    const current = getCurrentUser();
+    const isSelf = current?.id === updatedUser.id;
+    
+    if (!isCoordinator() && !isSelf) {
+        throw new Error('Akses Ditolak: Hanya Penyelaras boleh mengemaskini maklumat pengguna lain.');
     }
     const sanitized = sanitizeForFirebase(updatedUser);
     if (db) {
@@ -182,7 +195,7 @@ export const StorageService = {
   },
 
   deleteUser: async (id: string): Promise<void> => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh memadam akaun.');
+    if (!isCoordinator()) throw new Error('Akses Ditolak: Hanya Penyelaras boleh memadam akaun.');
     if (db) await deleteDoc(doc(db, 'users', id));
     else {
       const users = StorageService.getUsers().filter(u => u.id !== id);
@@ -194,7 +207,7 @@ export const StorageService = {
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
   
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh menambah syarikat.');
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh menambah syarikat.');
     const newCompany = { ...company, id: generateId() };
     if (db) {
       await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
@@ -208,7 +221,7 @@ export const StorageService = {
   },
 
   bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh melakukan upload pukal.');
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh melakukan upload pukal.');
     if (companies.length === 0) return;
     
     const sanitizedCompanies = companies.map(c => ({
@@ -243,13 +256,27 @@ export const StorageService = {
   },
 
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh mengemaskini maklumat syarikat.');
-    const sanitized = sanitizeForFirebase(updatedCompany);
+    if (!hasSystemAccess()) {
+        throw new Error('Akses Ditolak: Anda tidak mempunyai kebenaran untuk menyimpan data ke database.');
+    }
+
+    const { id, ...dataToUpdate } = updatedCompany;
+    const sanitizedData = sanitizeForFirebase(dataToUpdate);
+
     if (db) {
-      await setDoc(doc(db, 'companies', updatedCompany.id), sanitized, { merge: true });
+      try {
+        const docRef = doc(db, 'companies', id);
+        await updateDoc(docRef, sanitizedData);
+      } catch (e: any) {
+        console.error("Firebase Update Error:", e);
+        if (e.code === 'permission-denied') {
+            throw new Error("Ralat Firebase: Insufficient Permissions. Sila pastikan Rules di Console telah ditetapkan kepada 'allow read, write: if true' untuk sementara waktu.");
+        }
+        await setDoc(doc(db, 'companies', id), sanitizeForFirebase(updatedCompany), { merge: true });
+      }
     } else {
       const companies = StorageService.getCompanies();
-      const index = companies.findIndex(c => c.id === updatedCompany.id);
+      const index = companies.findIndex(c => c.id === id);
       if (index !== -1) {
         companies[index] = updatedCompany;
         localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
@@ -260,7 +287,7 @@ export const StorageService = {
   },
 
   deleteCompany: async (id: string): Promise<void> => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh memadam syarikat.');
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh memadam syarikat.');
     if (db) await deleteDoc(doc(db, 'companies', id));
     else {
       const filtered = StorageService.getCompanies().filter(c => c.id !== id);
@@ -303,11 +330,11 @@ export const StorageService = {
     companies: StorageService.getCompanies(),
     applications: StorageService.getApplications(),
     timestamp: new Date().toISOString(),
-    version: '3.5'
+    version: '4.0'
   }),
 
   restoreFullSystem: (data: any) => {
-    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh melakukan operasi Restore.');
+    if (!hasSystemAccess()) throw new Error('Hanya Penyelaras atau JKWBL boleh melakukan operasi Restore.');
     if (!data.users || !data.companies || !data.applications) throw new Error('Fail tidak sah.');
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));

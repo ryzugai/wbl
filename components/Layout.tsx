@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { StorageService } from '../services/storage';
 
@@ -20,6 +20,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   useEffect(() => {
     setIsCloud(StorageService.isCloudEnabled());
   }, []);
+
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR;
+  const isJKWBL = currentUser.is_jkwbl === true;
+  const hasSystemAccess = isCoordinator || isJKWBL;
 
   // Close mobile menu when view changes
   const handleNavigate = (view: string) => {
@@ -108,11 +112,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           
           <NavItem view="companies" label="Senarai Syarikat" icon={Building2} />
           
-          {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
+          {(hasSystemAccess || currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
             <NavItem view="students" label="Senarai Pelajar" icon={Users} />
           )}
 
-          {currentUser.role === UserRole.COORDINATOR && (
+          {hasSystemAccess && (
             <NavItem view="staff" label="Senarai Staf" icon={UserCog} />
           )}
           
@@ -123,17 +127,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           </div>
           <NavItem view="guidebook" label="Buku Panduan" icon={Book} />
           
-          {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
+          {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
              <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
              Pengurusan
            </div>
           )}
 
-           {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
+           {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
              <NavItem view="addCompany" label="Tambah Syarikat" icon={Upload} />
            )}
 
-           {currentUser.role === UserRole.COORDINATOR && (
+           {hasSystemAccess && (
              <>
                <NavItem view="uploadExcel" label="Upload Excel" icon={FileSpreadsheet} />
                <NavItem view="systemData" label="Sistem & Data" icon={Database} />
@@ -143,12 +147,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
 
         <div className="p-4 border-t border-slate-100 bg-slate-50">
           <button onClick={() => handleNavigate('profile')} className="flex items-center gap-3 w-full p-2 rounded hover:bg-white transition-colors">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold shrink-0 relative">
               {currentUser.name.charAt(0)}
+              {isJKWBL && (
+                  <div className="absolute -top-1 -right-1 bg-indigo-600 text-white p-0.5 rounded-full border border-white" title="Ahli JKWBL">
+                      <ShieldCheck size={10} />
+                  </div>
+              )}
             </div>
             <div className="flex-1 text-left overflow-hidden">
               <div className="text-sm font-semibold truncate">{currentUser.name}</div>
-              <div className="text-xs text-slate-500 truncate">{ROLE_LABELS[currentUser.role]}</div>
+              <div className="text-xs text-slate-500 truncate flex items-center gap-1">
+                  {ROLE_LABELS[currentUser.role]}
+                  {isJKWBL && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1 rounded">JKWBL</span>}
+              </div>
             </div>
           </button>
           <button 

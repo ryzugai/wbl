@@ -15,6 +15,7 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
+  is_jkwbl?: boolean; // New: Jawatankuasa WBL status
   // Student fields
   program?: string;
   matric_no?: string;

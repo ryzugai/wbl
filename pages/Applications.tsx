@@ -28,13 +28,17 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   const [uploadStatus, setUploadStatus] = useState('uploaded_email');
   const [uploadNotes, setUploadNotes] = useState('');
 
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR;
+  const isJKWBL = currentUser.is_jkwbl === true;
+  const hasSystemAccess = isCoordinator || isJKWBL;
+
   // Filter apps based on role
   const filteredApps = applications.filter(app => {
     if (currentUser.role === UserRole.STUDENT) return app.created_by === currentUser.username;
     if (currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) {
       return app.company_name === currentUser.company_affiliation;
     }
-    return true; // Coordinator/Lecturer sees all
+    return true; // Coordinator/Lecturer/JKWBL sees all
   });
 
   const lecturers = users.filter(u => u.role === UserRole.LECTURER);
@@ -157,10 +161,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                     </td>
                     <td className="p-4">
                         <div className="flex justify-center gap-2 flex-wrap">
-                        {/* Actions based on Roles */}
-                        
-                        {/* Approve/Reject (Coordinator/Lecturer) */}
-                        {(currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER) && (
+                        {/* Approve/Reject (Coordinator/Lecturer/JKWBL) */}
+                        {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
                             <>
                              {app.application_status === 'Menunggu' && (
                                 <>
@@ -172,8 +174,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                 </button>
                                 </>
                              )}
-                             {/* Reopen Button for Coordinator */}
-                             {app.application_status === 'Ditolak' && currentUser.role === UserRole.COORDINATOR && (
+                             {/* Reopen Button for Coordinator/JKWBL */}
+                             {app.application_status === 'Ditolak' && hasSystemAccess && (
                                  <button onClick={() => initiateStatusChange(app, 'Menunggu')} className="flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-xs font-bold shadow-sm" title="Buka Semula Permohonan">
                                     <RefreshCcw size={14} /> Buka Semula
                                  </button>
@@ -181,8 +183,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             </>
                         )}
 
-                        {/* Assign Supervisor (Coordinator only, if Approved) */}
-                        {currentUser.role === UserRole.COORDINATOR && app.application_status === 'Diluluskan' && (
+                        {/* Assign Supervisor (Coordinator/JKWBL, if Approved) */}
+                        {hasSystemAccess && app.application_status === 'Diluluskan' && (
                             <button 
                                 onClick={() => { setSelectedApp(app); setModalType('supervisor'); }}
                                 className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
@@ -203,7 +205,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             </button>
                         )}
                         
-                        {/* Generate Letter (Student, if Pending - as a Request Letter) - Based on user requirement to generate when applied */}
+                        {/* Generate Letter (Student, if Pending - as a Request Letter) */}
                         {currentUser.role === UserRole.STUDENT && app.application_status === 'Menunggu' && (
                              <button
                                 onClick={() => { setSelectedApp(app); setModalType('letter'); }}
@@ -225,8 +227,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             </button>
                         )}
 
-                        {/* Verify Reply Form (Coordinator) */}
-                        {currentUser.role === UserRole.COORDINATOR && app.reply_form_image && (
+                        {/* Verify Reply Form (Coordinator/JKWBL) */}
+                        {hasSystemAccess && app.reply_form_image && (
                             <button
                                 onClick={() => { setSelectedApp(app); setModalType('viewReply'); }}
                                 className={`p-2 rounded ${app.reply_form_verified ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}
@@ -395,7 +397,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                     </div>
                  )}
 
-                 {currentUser.role === UserRole.COORDINATOR && !selectedApp?.reply_form_verified && (
+                 {hasSystemAccess && !selectedApp?.reply_form_verified && (
                      <button 
                         onClick={handleVerifyReply}
                         className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"

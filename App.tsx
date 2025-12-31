@@ -69,8 +69,9 @@ function App() {
         }
         refreshData();
         toast.success('Profil berjaya dikemaskini');
-    } catch (error) {
-        toast.error('Gagal mengemaskini profil');
+    } catch (error: any) {
+        toast.error(`Gagal mengemaskini profil: ${error.message}`);
+        throw error; // Re-throw so modal stays open
     }
   };
 
@@ -89,8 +90,9 @@ function App() {
           await StorageService.createCompany(companyData);
           refreshData();
           toast.success('Syarikat berjaya ditambah');
-      } catch (e) {
-          toast.error('Gagal menambah syarikat');
+      } catch (e: any) {
+          toast.error(`Gagal menambah syarikat: ${e.message}`);
+          throw e;
       }
   };
 
@@ -99,26 +101,26 @@ function App() {
           await StorageService.updateCompany(company);
           refreshData();
           toast.success('Maklumat syarikat dikemaskini');
-      } catch (e) {
-          toast.error('Gagal mengemaskini syarikat');
+      } catch (e: any) {
+          toast.error(`Gagal mengemaskini syarikat: ${e.message}`);
+          throw e; // PENTING: Melempar ralat semula supaya modal tidak tutup
       }
   };
 
   const handleDeleteCompany = async (id: string) => {
-      await StorageService.deleteCompany(id);
-      refreshData();
-      toast.success('Syarikat dipadam');
+      try {
+          await StorageService.deleteCompany(id);
+          refreshData();
+          toast.success('Syarikat dipadam');
+      } catch (e: any) {
+          toast.error(`Gagal memadam: ${e.message}`);
+      }
   };
 
   const handleApplyInternship = async (company: Company) => {
       if(!currentUser) return;
       
-      // Get fresh data
       const currentApps = StorageService.getApplications();
-      
-      // Validation: Check if user already applied > 3 (Active or total)
-      // We count active (Menunggu/Diluluskan) to limit concurrent active requests, 
-      // but usually WBL limits total choices. Let's limit total attempts to 3 for now.
       const myApps = currentApps.filter(a => a.created_by === currentUser.username);
       
       if(myApps.length >= 3) {
@@ -150,25 +152,22 @@ function App() {
         await StorageService.createApplication(newApp);
         refreshData();
         toast.success('Permohonan berjaya dihantar!');
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        toast.error('Ralat menghantar permohonan.');
+        toast.error(`Ralat menghantar permohonan: ${error.message}`);
       }
   };
 
   const handleUpdateApplication = async (app: Application) => {
       try {
-        // First update the target application
         await StorageService.updateApplication(app);
         
-        // Auto-Reject Logic
-        // If a Coordinator approves this app, automatically reject other 'Menunggu' apps for this student
         if(app.application_status === 'Diluluskan') {
-            const allApps = StorageService.getApplications(); // Get latest
+            const allApps = StorageService.getApplications();
             const otherPendingApps = allApps.filter(a => 
-                a.created_by === app.created_by && // Same student
-                a.id !== app.id && // Not this app
-                a.application_status === 'Menunggu' // Only pending ones
+                a.created_by === app.created_by && 
+                a.id !== app.id && 
+                a.application_status === 'Menunggu'
             );
 
             for(const other of otherPendingApps) {
@@ -182,12 +181,12 @@ function App() {
             }
         }
 
-        // IMPORTANT: Refresh data to reflect changes in UI (both the approved app AND the auto-rejected ones)
         refreshData();
         toast.success('Status permohonan dikemaskini');
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        toast.error('Gagal mengemaskini permohonan');
+        toast.error(`Gagal mengemaskini permohonan: ${error.message}`);
+        throw error;
       }
   };
 

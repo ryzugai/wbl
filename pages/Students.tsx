@@ -26,6 +26,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const students = users.filter(u => u.role === UserRole.STUDENT);
   const lecturers = users.filter(u => u.role === UserRole.LECTURER);
   
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR;
+  const isJKWBL = currentUser.is_jkwbl === true;
+  const hasSystemAccess = isCoordinator || isJKWBL;
+
   // Get all approved applications for matching
   const approvedApps = applications.filter(a => a.application_status === 'Diluluskan');
 
@@ -103,7 +107,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 <th className="p-4 font-semibold text-sm text-slate-600">Penempatan</th>
                 <th className="p-4 font-semibold text-sm text-slate-600">Tarikh Mula</th>
                 <th className="p-4 font-semibold text-sm text-slate-600">Penyelia Fakulti</th>
-                {currentUser.role === UserRole.COORDINATOR && (
+                {hasSystemAccess && (
                     <th className="p-4 font-semibold text-sm text-slate-600 text-center">Tindakan</th>
                 )}
               </tr>
@@ -111,7 +115,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             <tbody className="divide-y divide-slate-100">
               {studentList.length === 0 && (
                 <tr>
-                   <td colSpan={currentUser.role === UserRole.COORDINATOR ? 6 : 5} className="p-8 text-center text-slate-500">
+                   <td colSpan={hasSystemAccess ? 6 : 5} className="p-8 text-center text-slate-500">
                        {(currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) 
                         ? `Tiada pelajar yang diluluskan untuk syarikat ${currentUser.company_affiliation || 'anda'}.`
                         : "Tiada pelajar dijumpai."}
@@ -150,7 +154,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                           <span className="text-slate-400 italic text-xs">Belum ditugaskan</span>
                       )}
                   </td>
-                  {currentUser.role === UserRole.COORDINATOR && (
+                  {hasSystemAccess && (
                       <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
                             {item.placement && (
@@ -162,25 +166,30 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                                     <UserPlus size={18} />
                                 </button>
                             )}
-                            <button 
-                                onClick={() => { 
-                                    // IMPORTANT: Strip 'placement' field before editing to avoid DB schema errors
-                                    const { placement, ...userData } = item;
-                                    setEditingStudent(userData); 
-                                    setIsEditModalOpen(true); 
-                                }}
-                                className="p-2 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
-                                title="Edit Pelajar"
-                            >
-                                <Edit size={18} />
-                            </button>
-                            <button 
-                                onClick={() => { if(confirm('Adakah anda pasti mahu memadam pelajar ini?')) onDeleteUser(item.id); }}
-                                className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
-                                title="Padam Pelajar"
-                            >
-                                <Trash2 size={18} />
-                            </button>
+                            {/* Edit/Delete Restricted to Coordinator ONLY */}
+                            {isCoordinator && (
+                                <>
+                                    <button 
+                                        onClick={() => { 
+                                            // IMPORTANT: Strip 'placement' field before editing to avoid DB schema errors
+                                            const { placement, ...userData } = item;
+                                            setEditingStudent(userData); 
+                                            setIsEditModalOpen(true); 
+                                        }}
+                                        className="p-2 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
+                                        title="Edit Pelajar"
+                                    >
+                                        <Edit size={18} />
+                                    </button>
+                                    <button 
+                                        onClick={() => { if(confirm('Adakah anda pasti mahu memadam pelajar ini?')) onDeleteUser(item.id); }}
+                                        className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                        title="Padam Pelajar"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </>
+                            )}
                           </div>
                       </td>
                   )}
