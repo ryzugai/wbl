@@ -1,8 +1,9 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
-import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone } from 'lucide-react';
+import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { AdConfig } from '../types';
 
 interface SystemDataProps {
   onDataRestored: () => void;
@@ -11,9 +12,17 @@ interface SystemDataProps {
 export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCloudMode, setIsCloudMode] = useState(false);
+  
+  // Ad Management State
+  const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
+  const [isUpdatingAd, setIsUpdatingAd] = useState(false);
 
   useEffect(() => {
     setIsCloudMode(StorageService.isCloudEnabled());
+    const unsub = StorageService.subscribe(() => {
+      setAdConfig(StorageService.getAdConfig());
+    });
+    return () => unsub();
   }, []);
 
   const handleCloudMigration = async () => {
@@ -30,6 +39,19 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
     } catch (e) {
       console.error(e);
       toast.error('Gagal memuat naik data.', { id: loadingToast });
+    }
+  };
+
+  const handleUpdateAd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdatingAd(true);
+    try {
+      await StorageService.updateAdConfig(adConfig);
+      toast.success('Iklan berjaya dikemaskini!');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsUpdatingAd(false);
     }
   };
 
@@ -85,6 +107,69 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
             <h2 className="text-2xl font-bold text-slate-800">Sistem & Data</h2>
             <p className="text-slate-500">Pengurusan pangkalan data dan sinkronisasi.</p>
         </div>
+      </div>
+
+      {/* AD MANAGEMENT SECTION */}
+      <div className="p-6 rounded-xl border bg-white border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
+            <Image size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">Pengurusan Iklan Dashboard</h3>
+            <p className="text-xs text-slate-500">Iklan menegak bergerak yang dipaparkan pada Dashboard semua pengguna.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleUpdateAd} className="space-y-4 max-w-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Pautan Gambar Iklan (URL)</label>
+              <input 
+                type="url" 
+                placeholder="https://example.com/banner.jpg"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
+                value={adConfig.imageUrl}
+                onChange={e => setAdConfig({...adConfig, imageUrl: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Pautan Destinasi (Klik)</label>
+              <input 
+                type="url" 
+                placeholder="https://google.com"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
+                value={adConfig.destinationUrl}
+                onChange={e => setAdConfig({...adConfig, destinationUrl: e.target.value})}
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700">Status Iklan:</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${adConfig.isEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {adConfig.isEnabled ? 'AKTIF' : 'TIDAK AKTIF'}
+              </span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setAdConfig({...adConfig, isEnabled: !adConfig.isEnabled})}
+              className={`p-1 rounded-full transition-colors ${adConfig.isEnabled ? 'text-blue-600' : 'text-slate-400'}`}
+            >
+              {adConfig.isEnabled ? <ToggleRight size={40} /> : <ToggleLeft size={40} />}
+            </button>
+          </div>
+
+          <button 
+            disabled={isUpdatingAd}
+            type="submit" 
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center gap-2 active:scale-95 transition-all disabled:bg-slate-400"
+          >
+            {isUpdatingAd ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+            Simpan Tetapan Iklan
+          </button>
+        </form>
       </div>
 
       {/* CLOUD STATUS SECTION */}

@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { Application, Company, User, UserRole } from '../types';
-import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Application, Company, User, UserRole, AdConfig } from '../types';
+import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink } from 'lucide-react';
+import { StorageService } from '../services/storage';
 
 interface DashboardProps {
   applications: Application[];
@@ -10,10 +11,19 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users }) => {
+  const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
+  const [showAd, setShowAd] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = StorageService.subscribe(() => {
+      setAdConfig(StorageService.getAdConfig());
+    });
+    return () => unsubscribe();
+  }, []);
+
   const pending = applications.filter(a => a.application_status === 'Menunggu').length;
   const approved = applications.filter(a => a.application_status === 'Diluluskan').length;
 
-  // User Statistics
   const totalStudents = users.filter(u => u.role === UserRole.STUDENT).length;
   const totalLecturers = users.filter(u => u.role === UserRole.LECTURER).length;
   const totalIndustryStaff = users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR).length;
@@ -31,9 +41,57 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
       
+      {/* CSS Animation Definitions */}
+      <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes floatVertical {
+              0% { transform: translateY(-50%) translateY(0px); }
+              50% { transform: translateY(-50%) translateY(-30px); }
+              100% { transform: translateY(-50%) translateY(0px); }
+          }
+          .animate-float-vertical {
+              animation: floatVertical 5s ease-in-out infinite;
+          }
+      `}} />
+
+      {/* Floating Animated Ad - Membenarkan paparan pada skrin sederhana ke atas */}
+      {showAd && adConfig.isEnabled && adConfig.imageUrl && (
+        <div className="fixed right-4 md:right-8 top-1/2 -translate-y-1/2 z-[100] animate-float-vertical hidden md:block group">
+            <div className="relative w-40 md:w-56 bg-white p-2 rounded-2xl shadow-[0_20px_50px_rgba(8,_112,_184,_0.2)] border-2 border-blue-400 overflow-hidden transition-all hover:scale-105">
+                <button 
+                    onClick={() => setShowAd(false)}
+                    className="absolute top-2 right-2 bg-white/90 hover:bg-red-500 hover:text-white p-1.5 rounded-full text-slate-600 z-20 shadow-md transition-all active:scale-90"
+                    title="Tutup Iklan"
+                >
+                    <X size={14} />
+                </button>
+                <a 
+                  href={adConfig.destinationUrl || '#'} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block relative overflow-hidden rounded-xl"
+                >
+                  <img 
+                    src={adConfig.imageUrl} 
+                    alt="Iklan Sistem" 
+                    className="w-full h-auto max-h-[350px] object-cover transition-transform duration-700 group-hover:scale-110"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://placehold.co/400x600?text=Iklan+Tiada';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <ExternalLink className="text-white drop-shadow-md" size={32} />
+                  </div>
+                </a>
+                <div className="mt-3 text-[10px] font-black text-center text-blue-700 uppercase tracking-[0.2em] bg-blue-50 py-1.5 rounded-lg border border-blue-100">
+                    Maklumat Rasmi
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* User Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard 
@@ -100,7 +158,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
           {applications.length > 0 ? (
             <div className="space-y-4">
               {applications.slice(0, 5).map(app => (
-                <div key={app.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100">
+                <div key={app.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all">
                   <div>
                     <p className="font-medium text-slate-800">{app.student_name}</p>
                     <p className="text-xs text-slate-500">{app.company_name}</p>
@@ -120,12 +178,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
           )}
         </div>
 
-        <div className="bg-blue-600 p-6 rounded-xl shadow-md text-white">
-            <h3 className="font-bold text-lg mb-2">Selamat Datang ke WBL System</h3>
-            <p className="text-blue-100 mb-6">Sistem pengurusan latihan industri yang efisien.</p>
-            <div className="bg-white/10 p-4 rounded-lg backdrop-blur-sm">
-                <p className="text-sm">Sila pastikan semua maklumat pelajar dan syarikat dikemaskini sebelum membuat permohonan.</p>
+        <div className="bg-blue-600 p-6 rounded-xl shadow-md text-white relative overflow-hidden">
+            <div className="relative z-10">
+                <h3 className="font-bold text-lg mb-2">Selamat Datang ke WBL System</h3>
+                <p className="text-blue-100 mb-6">Sistem pengurusan latihan industri yang efisien.</p>
+                <div className="bg-white/10 p-4 rounded-lg backdrop-blur-sm">
+                    <p className="text-sm">Sila pastikan semua maklumat pelajar dan syarikat dikemaskini sebelum membuat permohonan.</p>
+                </div>
             </div>
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+            <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 bg-blue-400/20 rounded-full blur-xl"></div>
         </div>
       </div>
     </div>

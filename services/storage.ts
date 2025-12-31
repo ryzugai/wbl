@@ -1,14 +1,15 @@
 
-import { User, Company, Application, UserRole } from '../types';
+import { User, Company, Application, UserRole, AdConfig } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   USERS: 'wbl_users',
   COMPANIES: 'wbl_companies',
   APPLICATIONS: 'wbl_applications',
-  SESSION: 'wbl_session'
+  SESSION: 'wbl_session',
+  AD_CONFIG: 'wbl_ad_config'
 };
 
 const firebaseConfig = {
@@ -57,6 +58,15 @@ const setupRealtimeListeners = () => {
   syncCollection('users', STORAGE_KEYS.USERS);
   syncCollection('companies', STORAGE_KEYS.COMPANIES);
   syncCollection('applications', STORAGE_KEYS.APPLICATIONS);
+  
+  // Sync Ad Config
+  const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
+    if (snapshot.exists()) {
+      localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(snapshot.data()));
+      notifyListeners();
+    }
+  });
+  unsubscribeListeners.push(unsubAd);
 };
 
 const listeners: (() => void)[] = [];
@@ -109,6 +119,9 @@ const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
+  if (!localStorage.getItem(STORAGE_KEYS.AD_CONFIG)) {
+    localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ imageUrl: '', destinationUrl: '', isEnabled: false }));
+  }
   initFirebase();
 };
 
@@ -125,6 +138,21 @@ export const StorageService = {
 
   isCloudEnabled: () => !!db,
 
+  getAdConfig: (): AdConfig => {
+    const data = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
+    return data ? JSON.parse(data) : { imageUrl: '', destinationUrl: '', isEnabled: false };
+  },
+
+  updateAdConfig: async (config: AdConfig): Promise<void> => {
+    if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh mengemaskini iklan.');
+    if (db) {
+      await setDoc(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(config));
+    } else {
+      localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(config));
+      notifyListeners();
+    }
+  },
+
   uploadLocalToCloud: async () => {
     if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh memuat naik data ke Cloud.');
     if (!db) throw new Error('Cloud tidak disambungkan');
@@ -132,6 +160,10 @@ export const StorageService = {
     StorageService.getUsers().forEach(u => u.id && batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u)));
     StorageService.getCompanies().forEach(c => c.id && batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c)));
     StorageService.getApplications().forEach(a => a.id && batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a)));
+    
+    // Sync Ad Config also
+    batch.set(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(StorageService.getAdConfig()));
+    
     await batch.commit();
   },
 
@@ -172,7 +204,6 @@ export const StorageService = {
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
-    // SECURITY: Only Coordinator can edit other people. Owners can edit self. JKWBL cannot edit others.
     const current = getCurrentUser();
     const isSelf = current?.id === updatedUser.id;
     
@@ -329,6 +360,7 @@ export const StorageService = {
     users: StorageService.getUsers(),
     companies: StorageService.getCompanies(),
     applications: StorageService.getApplications(),
+    adConfig: StorageService.getAdConfig(),
     timestamp: new Date().toISOString(),
     version: '4.0'
   }),
@@ -339,6 +371,7 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));
+    if (data.adConfig) localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(data.adConfig));
     notifyListeners();
   }
 };

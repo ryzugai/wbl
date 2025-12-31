@@ -15,23 +15,18 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
-  is_jkwbl?: boolean; // New: Jawatankuasa WBL status
-  // Student fields
+  is_jkwbl?: boolean;
   program?: string;
   matric_no?: string;
   ic_no?: string;
-  address?: string; // Added residential address
-  // Staff fields
+  address?: string;
   staff_id?: string;
-  // Industry fields
   company_affiliation?: string;
   company_position?: string;
-  academic_level?: string; // New: Highest Academic Level
-  experience_years?: number; // New: Years of Experience
+  academic_level?: string;
+  experience_years?: number;
   has_dual_role?: boolean;
-  
-  // System fields
-  is_approved?: boolean; // New: Approval status for Trainers
+  is_approved?: boolean;
 }
 
 export interface Company {
@@ -46,7 +41,7 @@ export interface Company {
   company_contact_phone: string;
   has_mou: boolean;
   mou_type?: 'MoU' | 'LOI';
-  has_previous_wbl_students?: boolean; // New: Track if company has history with WBL
+  has_previous_wbl_students?: boolean;
   created_at: string;
 }
 
@@ -61,17 +56,20 @@ export interface Application {
   company_state: string;
   application_status: 'Menunggu' | 'Diluluskan' | 'Ditolak';
   start_date: string;
-  // Supervisor
   faculty_supervisor_id?: string;
   faculty_supervisor_name?: string;
   faculty_supervisor_staff_id?: string;
-  // Reply Form
-  reply_form_image?: string; // Storing status text or base64
+  reply_form_image?: string;
   reply_form_uploaded_at?: string;
   reply_form_verified: boolean;
   reply_form_verified_by?: string;
   reply_form_verified_at?: string;
-  
-  created_by: string; // student username
+  created_by: string;
   created_at: string;
+}
+
+export interface AdConfig {
+  imageUrl: string;
+  destinationUrl: string;
+  isEnabled: boolean;
 }
