@@ -382,48 +382,75 @@ export const generateLOI = (company: Company) => {
 };
 
 export const downloadLOIWord = (company: Company) => {
-    // ... existing word download code ...
-     const currentDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const currentDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   
-  // Construct a Word-compatible HTML string
   const htmlContent = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset="utf-8">
       <title>Letter of Intent - ${company.company_name}</title>
+      <!--[if gte mso 9]>
+      <xml>
+        <w:WordDocument>
+          <w:View>Print</w:View>
+          <w:Zoom>90</w:Zoom>
+          <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+      </xml>
+      <![endif]-->
       <style>
-        body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.3; }
-        table { border-collapse: collapse; width: 100%; mso-element: table; }
-        td { vertical-align: top; padding: 5px; }
+        @page {
+          mso-page-orientation: portrait;
+          size: 21cm 29.7cm;
+          margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow Margins for Single Page */
+          mso-header-margin: 0.5cm;
+          mso-footer-margin: 0.5cm;
+        }
+        body { 
+          font-family: Arial, sans-serif; 
+          font-size: 9pt; /* Smaller font to fit single page */
+          line-height: 1.15; /* Compact line height */
+          margin: 0;
+          padding: 0;
+        }
+        table { border-collapse: collapse; width: 100%; mso-table-lspace:0pt; mso-table-rspace:0pt; }
+        td { vertical-align: top; padding: 3px; }
         .header-table td { text-align: center; vertical-align: middle; }
-        .title-section { text-align: center; font-weight: bold; font-size: 12pt; margin-bottom: 15px; }
-        .parties { text-transform: uppercase; margin: 5px 0; }
-        .content { text-align: justify; font-size: 10pt; }
-        .signature-table { margin-top: 30px; font-size: 10pt; width: 100%; border: 1px solid black; }
-        .signature-table td { border: 1px solid black; padding: 5px 8px; width: 50%; vertical-align: top; }
-        .sig-line { border-bottom: 1px solid black; margin-top: 5px; width: 100%; }
+        .title-section { text-align: center; font-weight: bold; font-size: 11pt; margin-top: 5pt; margin-bottom: 10pt; }
+        .parties { text-transform: uppercase; margin: 2pt 0; }
+        .content { text-align: justify; font-size: 9pt; mso-line-height-rule:exactly; line-height: 12pt; }
+        .signature-table { margin-top: 15pt; font-size: 9pt; width: 100%; border: 1px solid black; }
+        .signature-table td { border: 1px solid black; padding: 4pt 6pt; width: 50%; vertical-align: top; }
+        .sig-line { border-bottom: 1px solid black; margin-top: 2pt; width: 100%; }
+        p { margin-top: 0pt; margin-bottom: 6pt; }
       </style>
     </head>
     <body>
-      <table class="header-table" style="width: 100%; margin-bottom: 20px;">
+      <table class="header-table" style="width: 100%; margin-bottom: 10pt;">
         <tr>
-            <td style="text-align: right; width: 50%; padding-right: 60px;">
-                <img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" width="150" height="80" alt="UTeM Logo">
+            <td style="text-align: right; width: 50%; padding-right: 40pt;">
+                <img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" width="120" height="65" alt="UTeM Logo">
             </td>
-            <td style="text-align: left; width: 50%; padding-left: 30px;">
-                <div style="width: 150px; height: 80px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; color: #999;">
-                    [Company Logo]
+            <td style="text-align: left; width: 50%; padding-left: 20pt;">
+                <div style="width: 120pt; height: 60pt; border: 1px dashed #ccc; text-align: center; font-size: 7pt; color: #999;">
+                    <br/><br/>[Logo Syarikat]
                 </div>
             </td>
         </tr>
       </table>
+      
       <div class="title-section">
-        <p>LETTER OF INTENT<br/>BETWEEN<br/>UNIVERSITI TEKNIKAL MALAYSIA MELAKA<br/>AND<br/>${company.company_name.toUpperCase()}</p>
+        <p class="parties">LETTER OF INTENT</p>
+        <p class="parties">BETWEEN</p>
+        <p class="parties">UNIVERSITI TEKNIKAL MALAYSIA MELAKA</p>
+        <p class="parties">AND</p>
+        <p class="parties">${company.company_name.toUpperCase()}</p>
       </div>
+
       <div class="content">
         <p><strong>UTeM</strong> and <strong>${company.company_name}</strong> having met and discussed collaborative efforts between Parties hereby record their intent towards the collaboration under the following conditions:</p>
-        <p>i. The areas of cooperation intended to be entered:</p>
-        <div style="margin-left: 30px;">
+        <p style="margin-left: 0pt;">i. The areas of cooperation intended to be entered:</p>
+        <div style="margin-left: 20pt;">
             <p>(a) Sharing of expertise between UTeM and ${company.company_name} related to Work-Based Learning (WBL) as agreed by both Parties;</p>
             <p>(b) Sharing of research resources, technical data, and facilities that are available in UTeM and ${company.company_name} subject to subsequent written consent by both Parties;</p>
             <p>(c) Conducting other activities considered to be of benefits for both Parties through human capital development activities as of training and research programs; and</p>
@@ -433,13 +460,40 @@ export const downloadLOIWord = (company: Company) => {
         <p>iii. This Letter of Intent does not constitute or create, and shall not be deemed to constitute or create any legally binding or enforceable obligations on the part of either Party to the Letter of Intent except by the execution of a Memorandum of Agreement between UTeM and ${company.company_name} containing such terms and conditions of the proposed collaboration.</p>
         <p>This Letter of Intent is to be executed in the English language.</p>
       </div>
+
       <table class="signature-table">
-        <tr><td>Signed for and on behalf of</td><td>Signed for and on behalf of</td></tr>
-        <tr><td style="font-weight: bold; background-color: #f9f9f9;">UNIVERSITI TEKNIKAL MALAYSIA MELAKA</td><td style="font-weight: bold; background-color: #f9f9f9;">${company.company_name.toUpperCase()}</td></tr>
-        <tr><td style="height: 70px; vertical-align: bottom;"><!-- Signature Space --></td><td style="height: 70px;"></td></tr>
-        <tr><td style="vertical-align: bottom;"><strong>PROF. DR. MOHD SYAIFUL RIZAL BIN HAMID</strong></td><td style="vertical-align: bottom;"><br/><div class="sig-line"></div></td></tr>
-        <tr><td style="vertical-align: top;">Dean<br>Faculty of Technology Management and Technopreneurship</td><td style="vertical-align: top;"><br/></td></tr>
-        <tr><td>Date: ${currentDate}</td><td>Date: _______________</td></tr>
+        <tr>
+            <td style="border-bottom: 0px;">Signed for and on behalf of</td>
+            <td style="border-bottom: 0px;">Signed for and on behalf of</td>
+        </tr>
+        <tr>
+            <td style="font-weight: bold; background-color: #f3f3f3;">UNIVERSITI TEKNIKAL MALAYSIA MELAKA</td>
+            <td style="font-weight: bold; background-color: #f3f3f3;">${company.company_name.toUpperCase()}</td>
+        </tr>
+        <tr>
+            <td style="height: 50pt; vertical-align: bottom;">
+                <!-- Space for Stamp/Signature -->
+            </td>
+            <td style="height: 50pt;">
+                <!-- Space for Stamp/Signature -->
+            </td>
+        </tr>
+        <tr>
+            <td style="vertical-align: bottom;">
+                <strong>PROF. DR. MOHD SYAIFUL RIZAL BIN HAMID</strong><br/>
+                Dean<br/>
+                Faculty of Technology Management and Technopreneurship
+            </td>
+            <td style="vertical-align: bottom;">
+                <br/><div class="sig-line"></div>
+                Name:<br/>
+                Position:<br/>
+            </td>
+        </tr>
+        <tr>
+            <td>Date: ${currentDate}</td>
+            <td>Date: _______________</td>
+        </tr>
       </table>
     </body>
     </html>

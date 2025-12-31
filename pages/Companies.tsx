@@ -188,7 +188,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.username === 'guzairy' || currentUser.is_jkwbl;
   const myApplications = applications.filter(a => a.created_by === currentUser.username);
-  const isLimitReached = myApplications.length >= 3;
+  const isLimitReached = myApplications.length >= 4;
 
   const filteredAndSortedCompanies = companies
     .filter(c => {
@@ -277,7 +277,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             <h2 className="text-2xl font-bold text-slate-800">Senarai Syarikat</h2>
             {currentUser.role === UserRole.STUDENT && (
                 <p className="text-sm text-slate-500 mt-1">
-                    Had Permohonan: <span className={`font-bold ${isLimitReached ? 'text-red-600' : 'text-blue-600'}`}>{myApplications.length}/3</span>
+                    Had Permohonan: <span className={`font-bold ${isLimitReached ? 'text-red-600' : 'text-blue-600'}`}>{myApplications.length}/4</span>
                 </p>
             )}
         </div>

@@ -123,8 +123,8 @@ function App() {
       const currentApps = StorageService.getApplications();
       const myApps = currentApps.filter(a => a.created_by === currentUser.username);
       
-      if(myApps.length >= 3) {
-          toast.error('Anda telah mencapai had maksimum 3 permohonan.');
+      if(myApps.length >= 4) {
+          toast.error('Anda telah mencapai had maksimum 4 permohonan.');
           return;
       }
       
