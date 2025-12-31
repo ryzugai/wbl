@@ -119,9 +119,24 @@ const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
-  if (!localStorage.getItem(STORAGE_KEYS.AD_CONFIG)) {
-    localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ imageUrl: '', destinationUrl: '', isEnabled: false }));
+  
+  // Migrasi data lama jika perlu atau set default baru
+  const rawAd = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
+  if (!rawAd) {
+    localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ items: [], isEnabled: false }));
+  } else {
+    try {
+      const parsed = JSON.parse(rawAd);
+      // Jika masih format lama (string imageUrl), tukar ke format baru
+      if (parsed.imageUrl !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ 
+          items: parsed.imageUrl ? [{ id: 'legacy', imageUrl: parsed.imageUrl, destinationUrl: parsed.destinationUrl || '' }] : [], 
+          isEnabled: parsed.isEnabled || false 
+        }));
+      }
+    } catch(e) {}
   }
+
   initFirebase();
 };
 
@@ -140,7 +155,17 @@ export const StorageService = {
 
   getAdConfig: (): AdConfig => {
     const data = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
-    return data ? JSON.parse(data) : { imageUrl: '', destinationUrl: '', isEnabled: false };
+    const defaultVal = { items: [], isEnabled: false };
+    if (!data) return defaultVal;
+    try {
+      const parsed = JSON.parse(data);
+      // Safety check for legacy formats
+      if (parsed.items) return parsed;
+      if (parsed.imageUrl) return { items: [{ id: 'migrated', imageUrl: parsed.imageUrl, destinationUrl: parsed.destinationUrl || '' }], isEnabled: parsed.isEnabled };
+      return defaultVal;
+    } catch(e) {
+      return defaultVal;
+    }
   },
 
   updateAdConfig: async (config: AdConfig): Promise<void> => {
@@ -161,7 +186,6 @@ export const StorageService = {
     StorageService.getCompanies().forEach(c => c.id && batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c)));
     StorageService.getApplications().forEach(a => a.id && batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a)));
     
-    // Sync Ad Config also
     batch.set(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(StorageService.getAdConfig()));
     
     await batch.commit();

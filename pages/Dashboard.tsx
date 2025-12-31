@@ -13,6 +13,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users }) => {
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [showAd, setShowAd] = useState(true);
+  const [currentAdIndex, setCurrentAdIndex] = useState(0);
 
   useEffect(() => {
     const unsubscribe = StorageService.subscribe(() => {
@@ -20,6 +21,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     });
     return () => unsubscribe();
   }, []);
+
+  // Timer untuk Karusel Iklan (Setiap 10 Saat)
+  useEffect(() => {
+    if (adConfig.isEnabled && adConfig.items.length > 1 && showAd) {
+      const timer = setInterval(() => {
+        setCurrentAdIndex((prev) => (prev + 1) % adConfig.items.length);
+      }, 10000); // 10 saat
+      return () => clearInterval(timer);
+    }
+  }, [adConfig.isEnabled, adConfig.items.length, showAd]);
+
+  const activeAd = adConfig.isEnabled && adConfig.items.length > 0 ? adConfig.items[currentAdIndex] : null;
 
   const pending = applications.filter(a => a.application_status === 'Menunggu').length;
   const approved = applications.filter(a => a.application_status === 'Diluluskan').length;
@@ -54,10 +67,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
           .animate-float-vertical {
               animation: floatVertical 5s ease-in-out infinite;
           }
+          .ad-fade-enter {
+              opacity: 0;
+              transform: scale(0.95);
+          }
+          .ad-fade-active {
+              opacity: 1;
+              transform: scale(1);
+              transition: all 500ms ease-in-out;
+          }
       `}} />
 
       {/* Floating Animated Ad - Membenarkan paparan pada skrin sederhana ke atas */}
-      {showAd && adConfig.isEnabled && adConfig.imageUrl && (
+      {showAd && adConfig.isEnabled && activeAd && (
         <div className="fixed right-4 md:right-8 top-1/2 -translate-y-1/2 z-[100] animate-float-vertical hidden md:block group">
             <div className="relative w-40 md:w-56 bg-white p-2 rounded-2xl shadow-[0_20px_50px_rgba(8,_112,_184,_0.2)] border-2 border-blue-400 overflow-hidden transition-all hover:scale-105">
                 <button 
@@ -67,25 +89,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                 >
                     <X size={14} />
                 </button>
-                <a 
-                  href={adConfig.destinationUrl || '#'} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block relative overflow-hidden rounded-xl"
-                >
-                  <img 
-                    src={adConfig.imageUrl} 
-                    alt="Iklan Sistem" 
-                    className="w-full h-auto max-h-[350px] object-cover transition-transform duration-700 group-hover:scale-110"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://placehold.co/400x600?text=Iklan+Tiada';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <ExternalLink className="text-white drop-shadow-md" size={32} />
-                  </div>
-                </a>
-                <div className="mt-3 text-[10px] font-black text-center text-blue-700 uppercase tracking-[0.2em] bg-blue-50 py-1.5 rounded-lg border border-blue-100">
+                
+                <div className="relative overflow-hidden rounded-xl bg-slate-100 h-[250px] md:h-[350px]">
+                    <a 
+                      key={activeAd.id}
+                      href={activeAd.destinationUrl || '#'} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block w-full h-full animate-[fadeIn_0.5s_ease-in-out]"
+                    >
+                      <img 
+                        src={activeAd.imageUrl} 
+                        alt="Iklan Sistem" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x600?text=Iklan+Tiada';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <ExternalLink className="text-white drop-shadow-md" size={32} />
+                      </div>
+                    </a>
+                </div>
+
+                {/* Indikator Karusel */}
+                {adConfig.items.length > 1 && (
+                    <div className="flex justify-center gap-1.5 mt-2">
+                        {adConfig.items.map((_, idx) => (
+                            <div 
+                                key={idx} 
+                                className={`h-1.5 rounded-full transition-all ${idx === currentAdIndex ? 'w-4 bg-blue-600' : 'w-1.5 bg-slate-300'}`}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                <div className="mt-2 text-[10px] font-black text-center text-blue-700 uppercase tracking-[0.2em] bg-blue-50 py-1.5 rounded-lg border border-blue-100">
                     Maklumat Rasmi
                 </div>
             </div>

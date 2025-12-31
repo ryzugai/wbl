@@ -1,9 +1,9 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { StorageService } from '../services/storage';
-import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
+import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { AdConfig } from '../types';
+import { AdConfig, AdItem } from '../types';
 
 interface SystemDataProps {
   onDataRestored: () => void;
@@ -46,13 +46,39 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
     e.preventDefault();
     setIsUpdatingAd(true);
     try {
-      await StorageService.updateAdConfig(adConfig);
-      toast.success('Iklan berjaya dikemaskini!');
+      // Filter out empty ads
+      const cleanItems = adConfig.items.filter(item => item.imageUrl.trim() !== '');
+      await StorageService.updateAdConfig({ ...adConfig, items: cleanItems });
+      toast.success('Sistem Iklan berjaya dikemaskini!');
     } catch (e: any) {
       toast.error(e.message);
     } finally {
       setIsUpdatingAd(false);
     }
+  };
+
+  const addNewAdRow = () => {
+    if (adConfig.items.length >= 10) {
+      toast.error('Had maksimum 10 iklan sahaja.');
+      return;
+    }
+    const newItem: AdItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      imageUrl: '',
+      destinationUrl: ''
+    };
+    setAdConfig({ ...adConfig, items: [...adConfig.items, newItem] });
+  };
+
+  const removeAdRow = (id: string) => {
+    setAdConfig({ ...adConfig, items: adConfig.items.filter(item => item.id !== id) });
+  };
+
+  const updateAdItem = (id: string, field: keyof AdItem, value: string) => {
+    const newItems = adConfig.items.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    );
+    setAdConfig({ ...adConfig, items: newItems });
   };
 
   // Backup/Restore Logic
@@ -111,64 +137,89 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
 
       {/* AD MANAGEMENT SECTION */}
       <div className="p-6 rounded-xl border bg-white border-slate-200 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
-            <Image size={24} />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
+              <Image size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">Pengurusan Iklan Karusel</h3>
+              <p className="text-xs text-slate-500">Iklan akan bertukar secara automatik setiap 10 saat (Maks 10).</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">Pengurusan Iklan Dashboard</h3>
-            <p className="text-xs text-slate-500">Iklan menegak bergerak yang dipaparkan pada Dashboard semua pengguna.</p>
+          <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-xl border">
+              <span className="text-xs font-bold text-slate-500 ml-2">STATUS:</span>
+              <button 
+                type="button"
+                onClick={() => setAdConfig({...adConfig, isEnabled: !adConfig.isEnabled})}
+                className={`p-1 rounded-full transition-colors ${adConfig.isEnabled ? 'text-blue-600' : 'text-slate-400'}`}
+              >
+                {adConfig.isEnabled ? <ToggleRight size={40} /> : <ToggleLeft size={40} />}
+              </button>
           </div>
         </div>
 
-        <form onSubmit={handleUpdateAd} className="space-y-4 max-w-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Pautan Gambar Iklan (URL)</label>
-              <input 
-                type="url" 
-                placeholder="https://example.com/banner.jpg"
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
-                value={adConfig.imageUrl}
-                onChange={e => setAdConfig({...adConfig, imageUrl: e.target.value})}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Pautan Destinasi (Klik)</label>
-              <input 
-                type="url" 
-                placeholder="https://google.com"
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
-                value={adConfig.destinationUrl}
-                onChange={e => setAdConfig({...adConfig, destinationUrl: e.target.value})}
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-700">Status Iklan:</span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${adConfig.isEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {adConfig.isEnabled ? 'AKTIF' : 'TIDAK AKTIF'}
-              </span>
-            </div>
-            <button 
-              type="button"
-              onClick={() => setAdConfig({...adConfig, isEnabled: !adConfig.isEnabled})}
-              className={`p-1 rounded-full transition-colors ${adConfig.isEnabled ? 'text-blue-600' : 'text-slate-400'}`}
-            >
-              {adConfig.isEnabled ? <ToggleRight size={40} /> : <ToggleLeft size={40} />}
-            </button>
+        <form onSubmit={handleUpdateAd} className="space-y-6">
+          <div className="space-y-4">
+            {adConfig.items.map((item, index) => (
+              <div key={item.id} className="group relative grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_auto] items-end gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-xs">
+                  {index + 1}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">URL Gambar</label>
+                  <input 
+                    type="url" 
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none text-sm"
+                    value={item.imageUrl}
+                    onChange={e => updateAdItem(item.id, 'imageUrl', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Pautan Destinasi</label>
+                  <input 
+                    type="url" 
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none text-sm"
+                    value={item.destinationUrl}
+                    onChange={e => updateAdItem(item.id, 'destinationUrl', e.target.value)}
+                  />
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => removeAdRow(item.id)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            ))}
+
+            {adConfig.items.length === 0 && (
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <p className="text-sm text-slate-500">Tiada iklan dikonfigurasi. Klik butang di bawah untuk menambah iklan.</p>
+              </div>
+            )}
           </div>
 
-          <button 
-            disabled={isUpdatingAd}
-            type="submit" 
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center gap-2 active:scale-95 transition-all disabled:bg-slate-400"
-          >
-            {isUpdatingAd ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-            Simpan Tetapan Iklan
-          </button>
+          <div className="flex flex-col md:flex-row gap-4">
+            <button 
+              type="button"
+              onClick={addNewAdRow}
+              className="px-6 py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center gap-2 transition-all"
+            >
+              <Plus size={18} /> Tambah Iklan
+            </button>
+            <button 
+              disabled={isUpdatingAd}
+              type="submit" 
+              className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-400"
+            >
+              {isUpdatingAd ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              Simpan Semua Tetapan Iklan
+            </button>
+          </div>
         </form>
       </div>
 

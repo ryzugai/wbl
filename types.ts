@@ -68,8 +68,13 @@ export interface Application {
   created_at: string;
 }
 
-export interface AdConfig {
+export interface AdItem {
+  id: string;
   imageUrl: string;
   destinationUrl: string;
+}
+
+export interface AdConfig {
+  items: AdItem[];
   isEnabled: boolean;
 }
