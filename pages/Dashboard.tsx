@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Application, Company, User, UserRole, AdConfig } from '../types';
-import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award } from 'lucide-react';
+import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer } from 'lucide-react';
 import { StorageService } from '../services/storage';
 
 interface DashboardProps {
@@ -14,6 +14,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [showAd, setShowAd] = useState(true);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
     const unsubscribe = StorageService.subscribe(() => {
@@ -32,11 +33,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     }
   }, [adConfig.isEnabled, adConfig.items.length, showAd]);
 
+  // Logik Countdown ke 5 Oktober 2026
+  useEffect(() => {
+    const targetDate = new Date('2026-10-05T00:00:00').getTime();
+
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const distance = targetDate - now;
+
+      if (distance < 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+
+      setTimeLeft({
+        days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((distance % (1000 * 60)) / 1000)
+      });
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Logik Pengiraan Garis Masa
   const timelineProgress = useMemo(() => {
     const now = new Date();
     const start = new Date('2026-06-01'); // Mula fasa persediaan
-    const end = new Date('2027-09-30');   // Tamat WBL
+    const end = new Date('2027-10-01');   // Tamat WBL
     
     if (now < start) return 0;
     if (now > end) return 100;
@@ -57,10 +84,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
 
   const milestones = [
     { date: 'Jun 2026', label: 'Persediaan', icon: ClipboardCheck, desc: 'Taklimat & Permohonan' },
-    { date: '1 Okt 2026', label: 'Mula WBL', icon: Flag, desc: 'Lapor Diri Industri' },
+    { date: '5 Okt 2026', label: 'Mula WBL', icon: Flag, desc: 'Lapor Diri Industri' },
     { date: 'Mac 2027', label: 'Pantau 1 & 2', icon: MapPin, desc: 'Lawatan Penyelia' },
     { date: 'Ogos 2027', label: 'Penilaian', icon: CheckCircle2, desc: 'Prestasi Akhir' },
-    { date: '30 Sep 2027', label: 'Tamat', icon: Award, desc: 'Penyerahan Laporan' },
+    { date: '1 Okt 2027', label: 'Tamat', icon: Award, desc: 'Penyerahan Laporan' },
   ];
 
   const StatCard = ({ label, value, icon: Icon, colorClass, bgClass }: any) => (
@@ -98,6 +125,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         }
         .animate-slideInUp { animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-pulse-custom { animation: pulse-blue 2s infinite; }
+        .animate-fadeIn { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}} />
 
       {/* Mini Floating Ad Popup */}
@@ -131,7 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         </div>
       )}
 
-      {/* INFOGRAFIK GARIS MASA (TIMELINE) */}
+      {/* INFOGRAFIK GARIS MASA (TIMELINE) & COUNTDOWN */}
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between mb-10">
             <div>
@@ -144,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
             </div>
         </div>
 
-        <div className="relative pt-10 pb-16 px-4">
+        <div className="relative pt-10 pb-16 px-4 mb-8">
             {/* Track Line */}
             <div className="absolute top-1/2 left-0 w-full h-1.5 bg-slate-100 -translate-y-1/2 rounded-full overflow-hidden">
                 <div 
@@ -167,10 +196,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                 </div>
             </div>
 
-            {/* Milestones */}
+            {/* milestones */}
             <div className="relative flex justify-between">
                 {milestones.map((m, idx) => {
-                    const milestoneDate = new Date(m.date.includes('202') ? (m.date === '1 Okt 2026' ? '2026-10-01' : m.date === '30 Sep 2027' ? '2027-09-30' : m.date === 'Jun 2026' ? '2026-06-01' : m.date === 'Mac 2027' ? '2027-03-01' : '2027-08-01') : '2026-01-01');
+                    const milestoneDateString = m.date === 'Jun 2026' ? '2026-06-01' : 
+                                               m.date === '5 Okt 2026' ? '2026-10-05' : 
+                                               m.date === 'Mac 2027' ? '2027-03-01' : 
+                                               m.date === 'Ogos 2027' ? '2027-08-01' : 
+                                               '2027-10-01';
+                    const milestoneDate = new Date(milestoneDateString);
                     const isPast = new Date() >= milestoneDate;
                     const Icon = m.icon;
 
@@ -189,6 +223,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                         </div>
                     );
                 })}
+            </div>
+        </div>
+
+        {/* Countdown Section */}
+        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mt-6 animate-fadeIn">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200">
+                        <Timer size={24} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-slate-800">Masa Berbaki ke 5 Okt 2026</h4>
+                        <p className="text-xs text-slate-500">Kira detik bermula Laporan Diri Industri.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-3 md:gap-6">
+                    {[
+                        { label: 'Hari', value: timeLeft.days },
+                        { label: 'Jam', value: timeLeft.hours },
+                        { label: 'Minit', value: timeLeft.minutes },
+                        { label: 'Saat', value: timeLeft.seconds }
+                    ].map((unit, idx) => (
+                        <div key={idx} className="flex flex-col items-center">
+                            <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center justify-center text-xl md:text-2xl font-black text-blue-600 tabular-nums">
+                                {String(unit.value).padStart(2, '0')}
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase mt-2 tracking-widest">{unit.label}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
       </div>
