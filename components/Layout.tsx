@@ -16,6 +16,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentView, onNavigate, onLogout }) => {
   const [isCloud, setIsCloud] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     setIsCloud(StorageService.isCloudEnabled());
@@ -170,13 +171,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
             <LogOut size={16} />
             Log Keluar
           </button>
+          
+          <div className="mt-4 pt-4 border-t border-slate-200 text-center">
+             <p className="text-[9px] text-slate-400 leading-tight">
+                Copyright &copy; {currentYear}<br/>Dr. Mohd Guzairy bin Abd Ghani
+             </p>
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto h-[calc(100vh-65px)] md:h-screen p-4 md:p-8 w-full">
-        <div className="max-w-7xl mx-auto animate-fadeIn pb-20 md:pb-0">
-          {children}
+        <div className="max-w-7xl mx-auto animate-fadeIn pb-20 md:pb-0 flex flex-col min-h-full">
+          <div className="flex-1">
+            {children}
+          </div>
+          
+          <footer className="mt-12 py-6 border-t border-slate-200 text-center no-print">
+            <p className="text-[10px] md:text-xs text-slate-400">
+              Copyright &copy; {currentYear} Dr. Mohd Guzairy bin Abd Ghani. Hak Cipta Terpelihara.
+            </p>
+          </footer>
         </div>
       </main>
     </div>
