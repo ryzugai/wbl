@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Edit, Loader2 } from 'lucide-react';
+import { Search, Plus, Trash2, Edit, Loader2, Users } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { toast } from 'react-hot-toast';
@@ -170,7 +170,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   });
   const [editingCompany, setEditingCompany] = useState<any>(null);
 
-  const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.username === 'guzairy';
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.username === 'guzairy' || currentUser.is_jkwbl;
   const myApplications = applications.filter(a => a.created_by === currentUser.username);
   const isLimitReached = myApplications.length >= 3;
 
@@ -299,38 +299,70 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                 {isCoordinator && <th className="p-4 w-10 text-center"><input type="checkbox" onChange={handleSelectAll} /></th>}
                 <th className="p-4 font-semibold text-sm text-slate-600">Syarikat</th>
                 <th className="p-4 font-semibold text-sm text-slate-600">Lokasi</th>
+                <th className="p-4 font-semibold text-sm text-slate-600">Pemohon</th>
                 <th className="p-4 font-semibold text-sm text-slate-600 text-center">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedCompanies.length === 0 ? (
-                <tr><td colSpan={isCoordinator ? 4 : 3} className="p-8 text-center text-slate-500 italic">Tiada syarikat dijumpai.</td></tr>
+                <tr><td colSpan={isCoordinator ? 5 : 4} className="p-8 text-center text-slate-500 italic">Tiada syarikat dijumpai.</td></tr>
               ) : (
-                filteredAndSortedCompanies.map(company => (
-                  <tr key={company.id} className="hover:bg-slate-50 transition-colors">
-                    {isCoordinator && <td className="p-4 text-center"><input type="checkbox" checked={selectedIds.includes(company.id)} onChange={() => handleSelectOne(company.id)} /></td>}
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800">{company.company_name}</div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1">
-                        {company.company_industry} {company.has_mou && <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px] font-bold">{company.mou_type}</span>}
-                      </div>
-                    </td>
-                    <td className="p-4 text-sm text-slate-700">{company.company_district}, {company.company_state}</td>
-                    <td className="p-4">
-                      <div className="flex justify-center gap-2">
-                          {currentUser.role === UserRole.STUDENT && !myApplications.some(a => a.company_name === company.company_name) && !isLimitReached && (
-                              <button onClick={() => setConfirmingCompany(company)} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-blue-700 shadow-sm transition-all">Mohon</button>
+                filteredAndSortedCompanies.map(company => {
+                  // Tapis permohonan untuk syarikat ini
+                  const companyApps = applications.filter(a => a.company_name === company.company_name);
+
+                  return (
+                    <tr key={company.id} className="hover:bg-slate-50 transition-colors group">
+                      {isCoordinator && <td className="p-4 text-center"><input type="checkbox" checked={selectedIds.includes(company.id)} onChange={() => handleSelectOne(company.id)} /></td>}
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{company.company_name}</div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1">
+                          {company.company_industry} {company.has_mou && <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px] font-bold">{company.mou_type}</span>}
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm text-slate-700">
+                        <div className="font-medium">{company.company_district}</div>
+                        <div className="text-xs text-slate-400">{company.company_state}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {companyApps.length > 0 ? (
+                            companyApps.map(app => (
+                              <span 
+                                key={app.id} 
+                                title={app.application_status}
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
+                                  app.application_status === 'Diluluskan' 
+                                    ? 'bg-green-50 text-green-700 border-green-200' 
+                                    : app.application_status === 'Ditolak'
+                                    ? 'bg-red-50 text-red-700 border-red-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                {app.student_name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Tiada pemohon</span>
                           )}
-                          {isCoordinator && (
-                              <>
-                                <button onClick={() => handleEditClick(company)} className="p-1.5 bg-blue-50 text-blue-600 rounded border border-blue-100 hover:bg-blue-100" title="Edit"><Edit size={16} /></button>
-                                <button onClick={() => { if(confirm('Adakah anda pasti mahu memadam syarikat ini?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded border border-red-100 hover:bg-red-100" title="Padam"><Trash2 size={16} /></button>
-                              </>
-                          )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex justify-center gap-2">
+                            {currentUser.role === UserRole.STUDENT && !myApplications.some(a => a.company_name === company.company_name) && !isLimitReached && (
+                                <button onClick={() => setConfirmingCompany(company)} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-blue-700 shadow-sm transition-all active:scale-95">Mohon</button>
+                            )}
+                            {isCoordinator && (
+                                <>
+                                  <button onClick={() => handleEditClick(company)} className="p-1.5 bg-blue-50 text-blue-600 rounded border border-blue-100 hover:bg-blue-100 transition-colors" title="Edit"><Edit size={16} /></button>
+                                  <button onClick={() => { if(confirm('Adakah anda pasti mahu memadam syarikat ini?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded border border-red-100 hover:bg-red-100 transition-colors" title="Padam"><Trash2 size={16} /></button>
+                                </>
+                            )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -348,7 +380,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       </Modal>
 
       {/* Modal Kemaskini Syarikat */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Kemaskini Syarikat">
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Kemaskini Maklumat Syarikat">
           {editingCompany && (
               <form onSubmit={handleEditSubmit} className="space-y-6">
                 <CompanyForm data={editingCompany} setData={setEditingCompany} />
