@@ -27,7 +27,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     if (adConfig.isEnabled && adConfig.items.length > 1 && showAd) {
       const timer = setInterval(() => {
         setCurrentAdIndex((prev) => (prev + 1) % adConfig.items.length);
-      }, 10000); // 10 saat
+      }, 10000);
       return () => clearInterval(timer);
     }
   }, [adConfig.isEnabled, adConfig.items.length, showAd]);
@@ -57,75 +57,75 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     <div className="space-y-8 relative">
       <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
       
-      {/* CSS Animation Definitions */}
+      {/* CSS Animasi Khusus */}
       <style dangerouslySetInnerHTML={{ __html: `
-          @keyframes floatVertical {
-              0% { transform: translateY(-50%) translateY(0px); }
-              50% { transform: translateY(-50%) translateY(-30px); }
-              100% { transform: translateY(-50%) translateY(0px); }
-          }
-          .animate-float-vertical {
-              animation: floatVertical 5s ease-in-out infinite;
-          }
-          .ad-fade-enter {
-              opacity: 0;
-              transform: scale(0.95);
-          }
-          .ad-fade-active {
-              opacity: 1;
-              transform: scale(1);
-              transition: all 500ms ease-in-out;
-          }
+        @keyframes slideInUp {
+          from { transform: translateY(100px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slideInUp {
+          animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
       `}} />
 
-      {/* Floating Animated Ad - Membenarkan paparan pada skrin sederhana ke atas */}
+      {/* Mini Floating Ad Popup (Penjuru Bawah Kanan) */}
       {showAd && adConfig.isEnabled && activeAd && (
-        <div className="fixed right-4 md:right-8 top-1/2 -translate-y-1/2 z-[100] animate-float-vertical hidden md:block group">
-            <div className="relative w-40 md:w-56 bg-white p-2 rounded-2xl shadow-[0_20px_50px_rgba(8,_112,_184,_0.2)] border-2 border-blue-400 overflow-hidden transition-all hover:scale-105">
-                <button 
-                    onClick={() => setShowAd(false)}
-                    className="absolute top-2 right-2 bg-white/90 hover:bg-red-500 hover:text-white p-1.5 rounded-full text-slate-600 z-20 shadow-md transition-all active:scale-90"
-                    title="Tutup Iklan"
-                >
-                    <X size={14} />
-                </button>
+        <div className="fixed bottom-6 right-6 z-[100] hidden md:block animate-slideInUp group">
+            <div className="relative w-[280px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden transition-all hover:shadow-[0_25px_60px_rgba(0,0,0,0.2)]">
                 
-                <div className="relative overflow-hidden rounded-xl bg-slate-100 h-[250px] md:h-[350px]">
+                {/* Header Kecil & Butang Tutup */}
+                <div className="absolute top-2 right-2 z-50 flex gap-2">
+                    <button 
+                        onClick={() => setShowAd(false)}
+                        className="bg-black/40 hover:bg-red-500 text-white p-1 rounded-full backdrop-blur-sm transition-colors"
+                        title="Tutup"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+
+                {/* Kontainer Gambar Dinamik (Ikut nisbah gambar) */}
+                <div className="relative bg-slate-100 min-h-[100px]">
                     <a 
                       key={activeAd.id}
                       href={activeAd.destinationUrl || '#'} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="block w-full h-full animate-[fadeIn_0.5s_ease-in-out]"
+                      className="block w-full transition-opacity duration-500 animate-fadeIn"
                     >
                       <img 
                         src={activeAd.imageUrl} 
-                        alt="Iklan Sistem" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        alt="Iklan" 
+                        className="w-full h-auto object-contain max-h-[400px]"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x600?text=Iklan+Tiada';
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x200?text=Imej+Tidak+Sah';
                         }}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <ExternalLink className="text-white drop-shadow-md" size={32} />
+                      
+                      {/* Overlay Link */}
+                      <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors flex items-center justify-center">
+                        <ExternalLink className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" size={24} />
                       </div>
                     </a>
                 </div>
 
-                {/* Indikator Karusel */}
-                {adConfig.items.length > 1 && (
-                    <div className="flex justify-center gap-1.5 mt-2">
-                        {adConfig.items.map((_, idx) => (
-                            <div 
-                                key={idx} 
-                                className={`h-1.5 rounded-full transition-all ${idx === currentAdIndex ? 'w-4 bg-blue-600' : 'w-1.5 bg-slate-300'}`}
-                            />
-                        ))}
+                {/* Footer Iklan & Indikator */}
+                <div className="p-3 bg-white border-t border-slate-100">
+                    <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Informasi WBL</span>
+                        
+                        {/* Dots Karusel */}
+                        {adConfig.items.length > 1 && (
+                            <div className="flex gap-1">
+                                {adConfig.items.map((_, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        className={`h-1 rounded-full transition-all ${idx === currentAdIndex ? 'w-3 bg-blue-500' : 'w-1 bg-slate-300'}`}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
-                )}
-
-                <div className="mt-2 text-[10px] font-black text-center text-blue-700 uppercase tracking-[0.2em] bg-blue-50 py-1.5 rounded-lg border border-blue-100">
-                    Maklumat Rasmi
                 </div>
             </div>
         </div>
