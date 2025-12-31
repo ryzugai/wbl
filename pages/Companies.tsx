@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Edit, Loader2, Users, FileText, Printer, Download, FileJson, History } from 'lucide-react';
+import { Search, Plus, Trash2, Edit, Loader2, Users, FileText, Printer, Download, FileJson, History, SortAsc } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { toast } from 'react-hot-toast';
@@ -170,6 +170,7 @@ interface CompaniesProps {
 export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'alphabetical' | 'latest'>('alphabetical');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -197,7 +198,16 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       const matchesState = filterState === 'all' || c.company_state === filterState;
       return matchesSearch && matchesState;
     })
-    .sort((a, b) => a.company_name.localeCompare(b.company_name));
+    .sort((a, b) => {
+      if (sortOrder === 'alphabetical') {
+        return a.company_name.localeCompare(b.company_name);
+      } else {
+        // Sort by created_at descending (latest first)
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      }
+    });
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.checked) setSelectedIds(filteredAndSortedCompanies.map(c => c.id));
@@ -303,14 +313,29 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select 
-            className="p-2 border border-slate-300 rounded-lg bg-white w-full md:w-auto text-slate-800 outline-none"
-            value={filterState}
-            onChange={(e) => setFilterState(e.target.value)}
-        >
-            <option value="all">Semua Negeri</option>
-            {MALAYSIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
-        </select>
+        
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                <SortAsc size={18} className="text-slate-400" />
+                <select 
+                    className="bg-transparent text-sm text-slate-700 outline-none font-medium"
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value as any)}
+                >
+                    <option value="alphabetical">Susun: Nama (A-Z)</option>
+                    <option value="latest">Susun: Terkini</option>
+                </select>
+            </div>
+
+            <select 
+                className="p-2 border border-slate-300 rounded-lg bg-white text-sm text-slate-800 outline-none font-medium min-w-[150px]"
+                value={filterState}
+                onChange={(e) => setFilterState(e.target.value)}
+            >
+                <option value="all">Semua Negeri</option>
+                {MALAYSIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+            </select>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
