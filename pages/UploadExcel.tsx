@@ -162,7 +162,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             PENTING: Ralat Insufficient Permissions?
           </h4>
           <p className="text-sm text-red-700">
-            Sila pastikan anda telah pergi ke <strong>Firebase Console > Firestore > Rules</strong> dan menetapkan:
+            Sila pastikan anda telah pergi ke <strong>Firebase Console &gt; Firestore &gt; Rules</strong> dan menetapkan:
             <code className="block mt-2 bg-white p-2 rounded border font-mono text-xs">allow read, write: if true;</code>
           </p>
         </div>
