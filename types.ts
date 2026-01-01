@@ -27,6 +27,17 @@ export interface User {
   experience_years?: number;
   has_dual_role?: boolean;
   is_approved?: boolean;
+  profile_image?: string;
+  // Resume Data Fields
+  resume_about?: string;
+  resume_skills_soft?: string; // Stored as JSON string [{name, level}]
+  resume_skills_tech?: string; // Stored as JSON string [{name, level}]
+  resume_languages?: string;   // Stored as JSON string [{name, level}]
+  resume_education?: string;    // Format JSON stringified
+  resume_projects?: string;     // Format JSON stringified
+  resume_work_experience?: string; 
+  resume_cgpa?: string;
+  resume_courses?: string;
 }
 
 export interface Company {
