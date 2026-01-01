@@ -162,7 +162,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             PENTING: Masalah Kebenaran Firestore?
           </h4>
           <p className="text-sm text-red-700">
-            Sila pastikan anda telah menetapkan peraturan pada tab Rules di pangkalan data Firestore kepada:
+            Sila pastikan anda telah menetapkan peraturan pada tab Rules di pangkalan data Firestore kepada kod di bawah (Salin dan Tampal):
             <code className="block mt-2 bg-white p-2 rounded border font-mono text-xs">allow read, write: if true;</code>
           </p>
         </div>
