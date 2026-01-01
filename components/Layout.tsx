@@ -174,7 +174,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           
           <div className="mt-4 pt-4 border-t border-slate-200 text-center">
              <p className="text-[9px] text-slate-400 leading-tight">
-                Copyright &copy; {currentYear}<br/>Dr. Mohd Guzairy bin Abd Ghani
+                Hak Cipta © {currentYear}<br/>Dr. Mohd Guzairy bin Abd Ghani
              </p>
           </div>
         </div>
@@ -189,7 +189,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           
           <footer className="mt-12 py-6 border-t border-slate-200 text-center no-print">
             <p className="text-[10px] md:text-xs text-slate-400">
-              Copyright &copy; {currentYear} Dr. Mohd Guzairy bin Abd Ghani. Hak Cipta Terpelihara.
+              Hak Cipta © {currentYear} Dr. Mohd Guzairy bin Abd Ghani. Hak Cipta Terpelihara.
             </p>
           </footer>
         </div>
