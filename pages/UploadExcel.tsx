@@ -159,10 +159,10 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         <div className="mb-6 bg-red-50 p-4 rounded-lg border border-red-100">
           <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
             <AlertCircle size={18} />
-            PENTING: Ralat Insufficient Permissions?
+            PENTING: Masalah Kebenaran Firestore?
           </h4>
           <p className="text-sm text-red-700">
-            Sila pastikan anda telah pergi ke <strong>Firebase Console - Firestore - Rules</strong> dan menetapkan:
+            Sila pastikan anda telah menetapkan peraturan pada tab Rules di pangkalan data Firestore kepada:
             <code className="block mt-2 bg-white p-2 rounded border font-mono text-xs">allow read, write: if true;</code>
           </p>
         </div>
