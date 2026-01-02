@@ -17,6 +17,7 @@ interface StudentsProps {
 }
 
 export const Students: React.FC<StudentsProps> = ({ users, applications, currentUser, onUpdateApplication, onUpdateUser, onDeleteUser }) => {
+  const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [supervisorId, setSupervisorId] = useState('');
@@ -86,8 +87,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         'Daerah (Syarikat)': s.placement?.company_district || '-',
         'Negeri (Syarikat)': s.placement?.company_state || '-',
         'Tarikh Mula': s.placement?.start_date || '-',
-        'Penyelia Fakulti': s.placement?.faculty_supervisor_name || '-',
-        'ID Staf Penyelia': s.placement?.faculty_supervisor_staff_id || '-'
+        'Penyelia Fakulti': s.placement?.faculty_supervisor_name || s.faculty_supervisor_name || '-',
+        'ID Staf Penyelia': s.placement?.faculty_supervisor_staff_id || s.faculty_supervisor_staff_id || '-'
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -103,26 +104,48 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
     }
   };
 
-  const handleAssignClick = (app: Application) => {
-    setSelectedApp(app);
-    setSupervisorId(app.faculty_supervisor_id || '');
+  const handleAssignClick = (student: any) => {
+    setSelectedStudent(student);
+    setSelectedApp(student.placement || null);
+    
+    // Set current supervisor if exists
+    const currentSupId = student.placement?.faculty_supervisor_id || student.faculty_supervisor_id || '';
+    setSupervisorId(currentSupId);
     setIsAssignModalOpen(true);
   };
 
   const handleSaveSupervisor = async () => {
-    if (!selectedApp || !supervisorId) return;
+    if (!selectedStudent || !supervisorId) return;
     const lecturer = lecturers.find(l => l.id === supervisorId);
     if (!lecturer) return;
 
-    await onUpdateApplication({
-      ...selectedApp,
-      faculty_supervisor_id: lecturer.id,
-      faculty_supervisor_name: lecturer.name,
-      faculty_supervisor_staff_id: lecturer.staff_id
-    });
-    
-    setIsAssignModalOpen(false);
-    setSelectedApp(null);
+    try {
+        // 1. Update Application if exists
+        if (selectedApp) {
+            await onUpdateApplication({
+                ...selectedApp,
+                faculty_supervisor_id: lecturer.id,
+                faculty_supervisor_name: lecturer.name,
+                faculty_supervisor_staff_id: lecturer.staff_id
+            });
+        }
+
+        // 2. Also update User profile to ensure it persists regardless of placement status
+        const { placement, ...studentData } = selectedStudent as any;
+        await onUpdateUser({
+            ...studentData,
+            faculty_supervisor_id: lecturer.id,
+            faculty_supervisor_name: lecturer.name,
+            faculty_supervisor_staff_id: lecturer.staff_id
+        });
+        
+        toast.success(`Penyelia ${lecturer.name} telah ditugaskan.`);
+        setIsAssignModalOpen(false);
+        setSelectedStudent(null);
+        setSelectedApp(null);
+    } catch (e: any) {
+        toast.error(`Gagal menyimpan: ${e.message}`);
+    }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -182,99 +205,104 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                    </td>
                 </tr>
               )}
-              {studentList.map((item: any) => (
-                <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
-                  <td className="p-4">
-                    <div className="font-bold text-slate-900 flex items-center gap-2">
-                        {item.name}
-                        {item.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
-                    </div>
-                    <div className="text-xs text-slate-500 font-medium">{item.matric_no}</div>
-                    <div className="text-xs text-slate-400 mt-1">{item.email}</div>
-                  </td>
-                  <td className="p-4 text-sm text-slate-700 max-w-xs truncate" title={item.program}>{item.program}</td>
-                  <td className="p-4">
-                    {item.placement ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">
-                        {item.placement.company_name}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                        Belum ditempatkan
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-4 text-sm text-slate-600 font-medium">
-                      {item.placement?.start_date || '-'}
-                  </td>
-                  <td className="p-4 text-sm text-slate-600">
-                      {item.placement?.faculty_supervisor_name ? (
-                          <div className="flex items-center gap-2 text-blue-700">
-                              <UserCheck size={16} />
-                              <span className="font-bold text-xs">{item.placement.faculty_supervisor_name}</span>
-                          </div>
-                      ) : (
-                          <span className="text-slate-400 italic text-xs">Belum ditugaskan</span>
-                      )}
-                  </td>
-                  <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {/* Resume View for Staff / Coordinator */}
-                        <button 
-                            onClick={() => generateResume(item)}
-                            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all border border-indigo-100 shadow-sm"
-                            title="Lihat Resume Pelajar"
-                        >
-                            <FileText size={18} />
-                        </button>
-
-                        {/* JKWBL Toggle - ONLY Coordinator */}
-                        {isCoordinator && (
-                            <button 
-                                onClick={() => handleToggleJKWBL(item)} 
-                                className={`p-2 rounded-lg border transition-all shadow-sm ${item.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
-                                title={item.is_jkwbl ? "Tarik Akses JKWBL" : "Beri Akses JKWBL"}
-                            >
-                                <ShieldCheck size={18} />
-                            </button>
-                        )}
-
-                        {hasSystemAccess && item.placement && (
-                            <button 
-                                onClick={() => handleAssignClick(item.placement)}
-                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all border border-blue-100 shadow-sm"
-                                title="Tugaskan Penyelia"
-                            >
-                                <UserPlus size={18} />
-                            </button>
-                        )}
-                        {/* Edit/Delete Restricted to Coordinator ONLY */}
-                        {isCoordinator && (
-                            <>
-                                <button 
-                                    onClick={() => { 
-                                        const { placement, ...userData } = item;
-                                        setEditingStudent(userData); 
-                                        setIsEditModalOpen(true); 
-                                    }}
-                                    className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-all border border-yellow-100 shadow-sm"
-                                    title="Edit Pelajar"
-                                >
-                                    <Edit size={18} />
-                                </button>
-                                <button 
-                                    onClick={() => { if(confirm('Adakah anda pasti mahu memadam pelajar ini?')) onDeleteUser(item.id); }}
-                                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all border border-red-100 shadow-sm"
-                                    title="Padam Pelajar"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </>
-                        )}
+              {studentList.map((item: any) => {
+                const displaySupName = item.placement?.faculty_supervisor_name || item.faculty_supervisor_name;
+                
+                return (
+                  <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
+                    <td className="p-4">
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                          {item.name}
+                          {item.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
                       </div>
-                  </td>
-                </tr>
-              ))}
+                      <div className="text-xs text-slate-500 font-medium">{item.matric_no}</div>
+                      <div className="text-xs text-slate-400 mt-1">{item.email}</div>
+                    </td>
+                    <td className="p-4 text-sm text-slate-700 max-w-xs truncate" title={item.program}>{item.program}</td>
+                    <td className="p-4">
+                      {item.placement ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+                          {item.placement.company_name}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                          Belum ditempatkan
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 text-sm text-slate-600 font-medium">
+                        {item.placement?.start_date || '-'}
+                    </td>
+                    <td className="p-4 text-sm text-slate-600">
+                        {displaySupName ? (
+                            <div className="flex items-center gap-2 text-blue-700">
+                                <UserCheck size={16} />
+                                <span className="font-bold text-xs">{displaySupName}</span>
+                            </div>
+                        ) : (
+                            <span className="text-slate-400 italic text-xs">Belum ditugaskan</span>
+                        )}
+                    </td>
+                    <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Resume View for Staff / Coordinator */}
+                          <button 
+                              onClick={() => generateResume(item)}
+                              className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all border border-indigo-100 shadow-sm"
+                              title="Lihat Resume Pelajar"
+                          >
+                              <FileText size={18} />
+                          </button>
+
+                          {/* JKWBL Toggle - ONLY Coordinator */}
+                          {isCoordinator && (
+                              <button 
+                                  onClick={() => handleToggleJKWBL(item)} 
+                                  className={`p-2 rounded-lg border transition-all shadow-sm ${item.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                                  title={item.is_jkwbl ? "Tarik Akses JKWBL" : "Beri Akses JKWBL"}
+                              >
+                                  <ShieldCheck size={18} />
+                              </button>
+                          )}
+
+                          {/* Assign Supervisor - Allowed for placements OR JKWBL members */}
+                          {hasSystemAccess && (item.placement || item.is_jkwbl) && (
+                              <button 
+                                  onClick={() => handleAssignClick(item)}
+                                  className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all border border-blue-100 shadow-sm"
+                                  title="Tugaskan Penyelia"
+                              >
+                                  <UserPlus size={18} />
+                              </button>
+                          )}
+                          {/* Edit/Delete Restricted to Coordinator ONLY */}
+                          {isCoordinator && (
+                              <>
+                                  <button 
+                                      onClick={() => { 
+                                          const { placement, ...userData } = item;
+                                          setEditingStudent(userData); 
+                                          setIsEditModalOpen(true); 
+                                      }}
+                                      className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-all border border-yellow-100 shadow-sm"
+                                      title="Edit Pelajar"
+                                  >
+                                      <Edit size={18} />
+                                  </button>
+                                  <button 
+                                      onClick={() => { if(confirm('Adakah anda pasti mahu memadam pelajar ini?')) onDeleteUser(item.id); }}
+                                      className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all border border-red-100 shadow-sm"
+                                      title="Padam Pelajar"
+                                  >
+                                      <Trash2 size={18} />
+                                  </button>
+                              </>
+                          )}
+                        </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -287,8 +315,16 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             title="Tugaskan Penyelia Fakulti"
         >
             <div className="space-y-4">
-                <p className="text-sm text-slate-600">Pelajar: <strong>{selectedApp?.student_name}</strong></p>
-                <p className="text-sm text-slate-600">Syarikat: <strong>{selectedApp?.company_name}</strong></p>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <p className="text-sm text-slate-600">Pelajar: <strong>{selectedStudent?.name}</strong></p>
+                    <p className="text-xs text-slate-500">{selectedStudent?.matric_no}</p>
+                    {selectedApp ? (
+                        <p className="text-xs text-green-600 font-bold mt-1">Syarikat: {selectedApp.company_name}</p>
+                    ) : (
+                        <p className="text-xs text-orange-600 font-bold mt-1 italic">Penempatan belum dimuktamadkan (Mod JKWBL)</p>
+                    )}
+                </div>
+
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Pensyarah</label>
                     <select 
@@ -297,9 +333,11 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                         className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900"
                     >
                         <option value="">-- Pilih --</option>
-                        {users.filter(u => u.role === UserRole.LECTURER).length > 0 ? (
-                            users.filter(u => u.role === UserRole.LECTURER).map(lec => (
-                                <option key={lec.id} value={lec.id}>{lec.name} ({lec.staff_id})</option>
+                        {lecturers.length > 0 ? (
+                            lecturers.map(lec => (
+                                <option key={lec.id} value={lec.id}>
+                                    {lec.name} ({lec.staff_id}) {lec.is_jkwbl ? ' - [Ahli JKWBL]' : ''}
+                                </option>
                             ))
                         ) : (
                             <option value="" disabled>Tiada pensyarah berdaftar</option>
@@ -311,7 +349,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     disabled={!supervisorId}
                     className={`w-full py-2 rounded text-white font-bold transition-all ${!supervisorId ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md active:scale-95'}`}
                 >
-                    Simpan
+                    Simpan Tugasan
                 </button>
             </div>
         </Modal>

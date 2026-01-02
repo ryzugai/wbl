@@ -28,6 +28,10 @@ export interface User {
   has_dual_role?: boolean;
   is_approved?: boolean;
   profile_image?: string;
+  // Supervisor assigned directly to student
+  faculty_supervisor_id?: string;
+  faculty_supervisor_name?: string;
+  faculty_supervisor_staff_id?: string;
   // Resume Data Fields
   resume_about?: string;
   resume_skills_soft?: string; // Stored as JSON string [{name, level}]
