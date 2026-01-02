@@ -4,7 +4,7 @@ import { StorageService } from '../services/storage';
 import { UserRole, Company } from '../types';
 import { getRoleLabels } from '../constants';
 import { toast } from 'react-hot-toast';
-import { MapPin, Sparkles, Building2 } from 'lucide-react';
+import { MapPin, Sparkles, Building2, BookCheck } from 'lucide-react';
 import { Language, t } from '../translations';
 
 interface RegisterProps {
@@ -21,7 +21,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
     username: '', password: '', name: '', email: '', phone: '', role: UserRole.STUDENT,
     program: PREDEFINED_PROGRAM, matric_no: '', ic_no: '', address: '', staff_id: '',
     company_affiliation: '', company_position: '', has_dual_role: false,
-    academic_level: '', experience_years: 0
+    academic_level: '', experience_years: 0, teaching_subjects: '[]'
   });
   
   const [programOption, setProgramOption] = useState<'default' | 'custom'>('default');
@@ -77,11 +77,27 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
     setFormData(prev => ({ 
         ...prev, 
         role,
-        has_dual_role: false 
+        has_dual_role: false,
+        teaching_subjects: '[]'
     }));
   };
 
+  const toggleSubject = (subjectKey: string) => {
+    const current = JSON.parse(formData.teaching_subjects || '[]');
+    const next = current.includes(subjectKey) 
+        ? current.filter((s: string) => s !== subjectKey)
+        : [...current, subjectKey];
+    setFormData({ ...formData, teaching_subjects: JSON.stringify(next) });
+  };
+
   const roleLabels = getRoleLabels(language);
+
+  const subjects = [
+    { key: 'analitik', label: t(language, 'subAnalitik') },
+    { key: 'operasi', label: t(language, 'subOperasi') },
+    { key: 'digital', label: t(language, 'subDigital') },
+    { key: 'jenama', label: t(language, 'subJenama') },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -149,6 +165,38 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
             </div>
           </div>
 
+          {/* LECTURER FIELDS */}
+          {formData.role === UserRole.LECTURER && (
+              <div className="p-4 bg-slate-50 rounded-lg space-y-4 border border-slate-200">
+                 <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wide">{t(language, 'staffInfo')}</h4>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700">{t(language, 'staffId')}</label>
+                    <input required type="text" className="w-full p-2 border rounded bg-white" onChange={e => setFormData({...formData, staff_id: e.target.value})} />
+                 </div>
+                 
+                 <div className="border-t border-slate-200 pt-3">
+                    <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <BookCheck size={18} className="text-blue-600" />
+                        {t(language, 'teachingExp')} (Optional)
+                    </label>
+                    <p className="text-xs text-slate-500 mb-3">{t(language, 'teachingSubjectsHint')}</p>
+                    <div className="grid grid-cols-1 gap-2">
+                        {subjects.map(s => (
+                            <label key={s.key} className="flex items-center gap-3 p-2 bg-white border border-slate-200 rounded-lg hover:border-blue-300 transition-colors cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 text-blue-600 rounded" 
+                                    checked={JSON.parse(formData.teaching_subjects || '[]').includes(s.key)}
+                                    onChange={() => toggleSubject(s.key)}
+                                />
+                                <span className="text-xs text-slate-700 font-medium group-hover:text-blue-700 transition-colors">{s.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                 </div>
+              </div>
+          )}
+
           {/* STUDENT FIELDS */}
           {formData.role === UserRole.STUDENT && (
             <div className="p-4 bg-slate-50 rounded-lg space-y-3 border border-slate-200">
@@ -209,8 +257,8 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
             </div>
           )}
 
-          {/* STAFF FIELDS */}
-          {(formData.role === UserRole.LECTURER || formData.role === UserRole.TRAINER) && (
+          {/* INDUSTRY TRAINER FIELDS (Not Lecturer) */}
+          {formData.role === UserRole.TRAINER && (
               <div className="p-4 bg-slate-50 rounded-lg space-y-3 border border-slate-200">
                  <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wide">{t(language, 'staffInfo')}</h4>
                  <div>

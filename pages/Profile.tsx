@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole } from '../types';
-import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ROLE_LABELS } from '../constants';
 import { generateResume, ResumeTheme } from '../utils/resumeGenerator';
 import { Modal } from '../components/Modal';
+import { t } from '../translations';
 
 const PREDEFINED_PROGRAM = "Ijazah Sarjana Muda Teknousahawanan dengan Kepujian";
 
@@ -67,16 +68,20 @@ const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, onCha
 interface ProfileProps {
   user: User;
   onUpdateUser: (updatedUser: User) => Promise<void>;
+  language: 'ms' | 'en';
 }
 
-export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
-  const [formData, setFormData] = useState<User>({ ...user });
+export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }) => {
+  const [formData, setFormData] = useState<User>(() => ({ 
+    ...user, 
+    teaching_subjects: user.teaching_subjects || '[]' 
+  }));
   const [password, setPassword] = useState(user.password || '');
   const [isEditing, setIsEditing] = useState(false);
   const [programOption, setProgramOption] = useState<'default' | 'custom'>('default');
   const [customProgram, setCustomProgram] = useState('');
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [selectedLang, setSelectedLang] = useState<'ms' | 'en'>('ms');
+  const [selectedLang, setSelectedLang] = useState<'ms' | 'en'>(language);
   const [selectedTheme, setSelectedTheme] = useState<ResumeTheme>('modern-blue');
   const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,8 +95,9 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
   const [langsList, setLangsList] = useState<any[]>([]);
 
   useEffect(() => {
-    setFormData({ ...user });
+    setFormData({ ...user, teaching_subjects: user.teaching_subjects || '[]' });
     setPassword(user.password || '');
+    setSelectedLang(language);
     
     if (user.role === UserRole.STUDENT) {
       if (user.program === PREDEFINED_PROGRAM || !user.program) {
@@ -119,7 +125,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
         setEduHistory([]); setProjHistory([]); setWorkHistory([]); setSoftSkillsList([]); setTechSkillsList([]); setLangsList([]);
       }
     }
-  }, [user]);
+  }, [user, language]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -156,6 +162,14 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
     }
   };
 
+  const toggleSubject = (subjectKey: string) => {
+    const current = JSON.parse(formData.teaching_subjects || '[]');
+    const next = current.includes(subjectKey) 
+        ? current.filter((s: string) => s !== subjectKey)
+        : [...current, subjectKey];
+    setFormData({ ...formData, teaching_subjects: JSON.stringify(next) });
+  };
+
   const addItem = (setter: any, list: any[], template: any) => setter([...list, template]);
   const removeItem = (setter: any, list: any[], index: number) => setter(list.filter((_, i) => i !== index));
   const updateItem = (setter: any, list: any[], index: number, field: string, val: any) => {
@@ -186,10 +200,17 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
     { id: 'professional-slate', name: 'Arang', color: 'bg-slate-900' },
   ];
 
+  const teachingSubjects = [
+    { key: 'analitik', label: t(language, 'subAnalitik') },
+    { key: 'operasi', label: t(language, 'subOperasi') },
+    { key: 'digital', label: t(language, 'subDigital') },
+    { key: 'jenama', label: t(language, 'subJenama') },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Profil Pengguna</h2>
+        <h2 className="text-2xl font-bold text-slate-800">{t(language, 'profileTitle')}</h2>
         <div className="flex gap-3">
             {user.role === UserRole.STUDENT && !isEditing && (
                 <button 
@@ -198,13 +219,13 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors shadow-sm disabled:bg-slate-400"
                 >
                     {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />} 
-                    Jana Resume Infografik
+                    {t(language, 'profileGenResume')}
                 </button>
             )}
             {!isEditing ? (
-            <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">Kemaskini Profil</button>
+            <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">{t(language, 'editUser')}</button>
             ) : (
-            <button onClick={() => { setFormData({...user}); setPassword(user.password || ''); setIsEditing(false); }} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 font-medium transition-colors">Batal</button>
+            <button onClick={() => { setFormData({...user, teaching_subjects: user.teaching_subjects || '[]'}); setPassword(user.password || ''); setIsEditing(false); }} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 font-medium transition-colors">{t(language, 'cancel')}</button>
             )}
         </div>
       </div>
@@ -262,38 +283,82 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             )}
 
             <section className="space-y-4">
-              <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">Maklumat Akaun</h4>
+              <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'profileAccountInfo')}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputField label="Username" icon={UserIcon} value={formData.username} disabled={true} isEditing={isEditing} />
-                <InputField label="Kata Laluan" icon={Lock} type="password" value={password} onChange={setPassword} isEditing={isEditing} />
+                <InputField label={t(language, 'username')} icon={UserIcon} value={formData.username} disabled={true} isEditing={isEditing} />
+                <InputField label={t(language, 'password')} icon={Lock} type="password" value={password} onChange={setPassword} isEditing={isEditing} />
               </div>
             </section>
 
             <section className="space-y-4">
-              <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">Maklumat Peribadi</h4>
+              <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'profilePersonalInfo')}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                    <InputField label="Nama Penuh" icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} isEditing={isEditing} />
+                    <InputField label={t(language, 'fullName')} icon={UserIcon} value={formData.name} onChange={(v: string) => setFormData({...formData, name: v})} isEditing={isEditing} />
                 </div>
-                <InputField label="Email" icon={Mail} value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} isEditing={isEditing} />
-                <InputField label="No. Telefon" icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} isEditing={isEditing} />
+                <InputField label={t(language, 'email')} icon={Mail} value={formData.email} onChange={(v: string) => setFormData({...formData, email: v})} isEditing={isEditing} />
+                <InputField label={t(language, 'phone')} icon={Phone} value={formData.phone} onChange={(v: string) => setFormData({...formData, phone: v})} isEditing={isEditing} />
               </div>
             </section>
+
+            {/* LECTURER SPECIFIC SECTION */}
+            {formData.role === UserRole.LECTURER && (
+                <section className="space-y-4">
+                    <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'staffInfo')}</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <InputField label={t(language, 'staffId')} icon={CreditCard} value={formData.staff_id} onChange={(v: string) => setFormData({...formData, staff_id: v})} isEditing={isEditing} />
+                    </div>
+                    
+                    <div className="space-y-3 pt-2">
+                        <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                            <BookCheck size={18} className="text-blue-600" />
+                            {t(language, 'teachingExp')}
+                        </label>
+                        {isEditing ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {teachingSubjects.map(s => (
+                                    <label key={s.key} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-300 transition-colors cursor-pointer group shadow-sm">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-5 h-5 text-blue-600 rounded" 
+                                            checked={JSON.parse(formData.teaching_subjects || '[]').includes(s.key)}
+                                            onChange={() => toggleSubject(s.key)}
+                                        />
+                                        <span className="text-xs text-slate-700 font-bold group-hover:text-blue-700 transition-colors">{s.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {teachingSubjects.filter(s => JSON.parse(formData.teaching_subjects || '[]').includes(s.key)).map(s => (
+                                    <div key={s.key} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 font-bold text-xs shadow-sm">
+                                        <Check size={16} />
+                                        {s.label}
+                                    </div>
+                                ))}
+                                {JSON.parse(formData.teaching_subjects || '[]').length === 0 && (
+                                    <div className="text-slate-400 italic text-sm py-2">Tiada rekod pengajaran dinyatakan.</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
 
             {formData.role === UserRole.STUDENT && (
                 <>
                 <section className="space-y-4">
-                    <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">Maklumat Pelajar</h4>
+                    <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'profileStudentInfo')}</h4>
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-slate-700">Program</label>
+                        <label className="text-sm font-medium text-slate-700">{t(language, 'program')}</label>
                         {isEditing ? (
                             <div className="space-y-2">
                                 <select className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 shadow-sm" value={programOption} onChange={(e) => setProgramOption(e.target.value as 'default' | 'custom')}>
                                     <option value="default">{PREDEFINED_PROGRAM}</option>
-                                    <option value="custom">Lain-lain (Custom)</option>
+                                    <option value="custom">{t(language, 'otherCustom')}</option>
                                 </select>
                                 {programOption === 'custom' && (
-                                    <input type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 shadow-sm" placeholder="Masukkan nama program..." value={customProgram} onChange={(e) => setCustomProgram(e.target.value)} />
+                                    <input type="text" className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 shadow-sm" placeholder={t(language, 'program')} value={customProgram} onChange={(e) => setCustomProgram(e.target.value)} />
                                 )}
                             </div>
                         ) : (
@@ -301,12 +366,12 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                         )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <InputField label="No. Matrik" icon={CreditCard} value={formData.matric_no} onChange={(v: string) => setFormData({...formData, matric_no: v})} isEditing={isEditing} />
-                        <InputField label="No. Kad Pengenalan" icon={Fingerprint} value={formData.ic_no} onChange={(v: string) => setFormData({...formData, ic_no: v})} isEditing={isEditing} />
+                        <InputField label={t(language, 'matricNo')} icon={CreditCard} value={formData.matric_no} onChange={(v: string) => setFormData({...formData, matric_no: v})} isEditing={isEditing} />
+                        <InputField label={t(language, 'icNo')} icon={Fingerprint} value={formData.ic_no} onChange={(v: string) => setFormData({...formData, ic_no: v})} isEditing={isEditing} />
                         <InputField label="CGPA Semasa" icon={Award} value={formData.resume_cgpa} placeholder="Contoh: 3.85" onChange={(v: string) => setFormData({...formData, resume_cgpa: v})} isEditing={isEditing} />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-slate-700">Alamat Tempat Tinggal</label>
+                        <label className="text-sm font-medium text-slate-700">{t(language, 'address')}</label>
                         <div className="relative">
                             <div className="absolute top-3 left-3 text-slate-400"><MapPin size={18} /></div>
                             <textarea disabled={!isEditing} className={`w-full pl-10 pr-4 py-2 border rounded-lg transition-colors ${!isEditing ? 'bg-slate-100 text-slate-600 border-transparent' : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 shadow-sm'}`} rows={3} value={formData.address || ''} onChange={(e) => setFormData({...formData, address: e.target.value})} />
@@ -317,12 +382,12 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                 <section className="space-y-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
                     <div className="flex items-center gap-2 mb-2 text-indigo-700">
                         <Sparkles size={20} />
-                        <h4 className="text-lg font-bold uppercase tracking-wide">Butiran Resume Infografik</h4>
+                        <h4 className="text-lg font-bold uppercase tracking-wide">{t(language, 'profileResumeDetails')}</h4>
                     </div>
 
                     <div className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Tentang Saya (Ringkasan Profil)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'profileAbout')}</label>
                             <textarea 
                                 disabled={!isEditing}
                                 className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 transition-colors ${isEditing ? 'bg-white border-slate-300 text-slate-900 shadow-sm' : 'bg-slate-100 border-transparent text-slate-600'}`}
@@ -337,7 +402,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
                                 <label className="block text-sm font-bold text-slate-700 flex items-center gap-2">
-                                    <BrainCircuit size={16} /> Kemahiran Insaniah (Soft Skills)
+                                    <BrainCircuit size={16} /> {t(language, 'profileSoftSkills')}
                                 </label>
                                 {isEditing && (
                                     <button type="button" onClick={() => addItem(setSoftSkillsList, softSkillsList, {name: '', level: 3})} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold">
@@ -372,7 +437,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
                                 <label className="block text-sm font-bold text-slate-700 flex items-center gap-2">
-                                    <Monitor size={16} /> Kemahiran Teknologi (Technical Skills)
+                                    <Monitor size={16} /> {t(language, 'profileTechSkills')}
                                 </label>
                                 {isEditing && (
                                     <button type="button" onClick={() => addItem(setTechSkillsList, techSkillsList, {name: '', level: 3})} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold">
@@ -406,7 +471,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
                                 <label className="block text-sm font-bold text-slate-700 flex items-center gap-2">
-                                    <Languages size={16} /> Bahasa
+                                    <Languages size={16} /> {language === 'ms' ? 'Bahasa' : 'Languages'}
                                 </label>
                                 {isEditing && (
                                     <button type="button" onClick={() => addItem(setLangsList, langsList, {name: '', level: 3})} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold">
@@ -453,7 +518,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
 
                         <div className="space-y-3 pt-2">
                             <div className="flex justify-between items-center">
-                                <label className="block text-sm font-bold text-slate-700">Pengalaman Kerja (Pilihan)</label>
+                                <label className="block text-sm font-bold text-slate-700">{t(language, 'profileExperience')}</label>
                                 {isEditing && (
                                     <button type="button" onClick={() => addItem(setWorkHistory, workHistory, {company: '', position: '', duration: '', desc: ''})} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold">
                                         <Plus size={14} /> Tambah Pengalaman
@@ -479,7 +544,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
 
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
-                                <label className="block text-sm font-bold text-slate-700">Sejarah Pendidikan</label>
+                                <label className="block text-sm font-bold text-slate-700">{t(language, 'profileEducation')}</label>
                                 {isEditing && (
                                     <button type="button" onClick={() => addItem(setEduHistory, eduHistory, {school: '', year: '', level: '', cgpa: ''})} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold">
                                         <Plus size={14} /> Tambah Pendidikan
@@ -505,7 +570,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
 
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
-                                <label className="block text-sm font-bold text-slate-700">Projek & Pencapaian</label>
+                                <label className="block text-sm font-bold text-slate-700">{t(language, 'profileProjects')}</label>
                                 {isEditing && (
                                     <button type="button" onClick={() => addItem(setProjHistory, projHistory, {title: '', desc: ''})} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold">
                                         <Plus size={14} /> Tambah Projek
@@ -531,9 +596,9 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                 </>
             )}
 
-            {(formData.role === UserRole.LECTURER || formData.role === UserRole.TRAINER) && (
+            {(formData.role === UserRole.TRAINER) && (
                 <section className="space-y-4">
-                <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">Maklumat Staf</h4>
+                <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'staffInfo')}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputField label="No. Staf / ID Pekerja" icon={CreditCard} value={formData.staff_id} onChange={(v: string) => setFormData({...formData, staff_id: v})} isEditing={isEditing} />
                 </div>
@@ -542,19 +607,19 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
 
             {(formData.role === UserRole.TRAINER || formData.role === UserRole.SUPERVISOR) && (
                  <section className="space-y-4">
-                 <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">Maklumat Industri</h4>
+                 <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'industryInfo')}</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <InputField label="Syarikat" icon={Building2} value={formData.company_affiliation} disabled={true} isEditing={isEditing} />
-                     <InputField label="Jawatan" icon={Briefcase} value={formData.company_position} onChange={(v: string) => setFormData({...formData, company_position: v})} isEditing={isEditing} />
-                     <InputField label="Tahap Akademik" icon={GraduationCap} value={formData.academic_level} onChange={(v: string) => setFormData({...formData, academic_level: v})} isEditing={isEditing} />
-                     <InputField label="Pengalaman (Tahun)" icon={Clock} value={String(formData.experience_years || 0)} onChange={(v: string) => setFormData({...formData, experience_years: parseInt(v) || 0})} isEditing={isEditing} type="number" />
+                     <InputField label={t(language, 'selectCompany')} icon={Building2} value={formData.company_affiliation} disabled={true} isEditing={isEditing} />
+                     <InputField label={t(language, 'position')} icon={Briefcase} value={formData.company_position} onChange={(v: string) => setFormData({...formData, company_position: v})} isEditing={isEditing} />
+                     <InputField label={t(language, 'academicLevel')} icon={GraduationCap} value={formData.academic_level} onChange={(v: string) => setFormData({...formData, academic_level: v})} isEditing={isEditing} />
+                     <InputField label={t(language, 'experienceYears')} icon={Clock} value={String(formData.experience_years || 0)} onChange={(v: string) => setFormData({...formData, experience_years: parseInt(v) || 0})} isEditing={isEditing} type="number" />
                  </div>
                  </section>
             )}
 
             {isEditing && (
               <div className="flex justify-end pt-4">
-                <button type="submit" className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold transition-transform active:scale-95 shadow-lg shadow-green-200"><Save size={20} /> Simpan Perubahan</button>
+                <button type="submit" className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold transition-transform active:scale-95 shadow-lg shadow-green-200"><Save size={20} /> {t(language, 'save')}</button>
               </div>
             )}
           </form>

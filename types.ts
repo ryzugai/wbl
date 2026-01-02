@@ -32,6 +32,8 @@ export interface User {
   faculty_supervisor_id?: string;
   faculty_supervisor_name?: string;
   faculty_supervisor_staff_id?: string;
+  // Teaching Subjects (for Lecturers)
+  teaching_subjects?: string; // JSON string array
   // Resume Data Fields
   resume_about?: string;
   resume_skills_soft?: string; // Stored as JSON string [{name, level}]

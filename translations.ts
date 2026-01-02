@@ -60,6 +60,14 @@ export const translations = {
     resetPassword: "Set Semula Kata Laluan",
     newPassword: "Kata Laluan Baru",
 
+    // Teaching Subjects
+    teachingExp: "Pengalaman Mengajar",
+    teachingSubjectsHint: "Sila tanda subjek yang anda pernah atau boleh mengajar (WBL Mode):",
+    subAnalitik: "BTMT 3283(i) Analitik Perniagaan",
+    subOperasi: "BTMU 2103(i) Pengurusan Operasi",
+    subDigital: "BTMT 3273(i) Keusahawanan Digital",
+    subJenama: "BTMT 2113(i) Pengurusan Jenama",
+
     // Applications
     appTitle: "Senarai Permohonan",
     appStudent: "Pelajar",
@@ -194,6 +202,14 @@ export const translations = {
     noRecords: "No records found.",
     resetPassword: "Reset Password",
     newPassword: "New Password",
+
+    // Teaching Subjects
+    teachingExp: "Teaching Experience",
+    teachingSubjectsHint: "Please check subjects you have taught or can teach (WBL Mode):",
+    subAnalitik: "BTMT 3283(i) Business Analytics",
+    subOperasi: "BTMU 2103(i) Operations Management",
+    subDigital: "BTMT 3273(i) Digital Entrepreneurship",
+    subJenama: "BTMT 2113(i) Brand Management",
 
     // Applications
     appTitle: "Application List",
