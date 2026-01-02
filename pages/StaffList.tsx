@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole, Application } from '../types';
-import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, CheckCircle, Edit, Trash2, Users, ShieldCheck, Key } from 'lucide-react';
+import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, CheckCircle, Edit, Trash2, Users, ShieldCheck, Key, BookOpen } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { Modal } from '../components/Modal';
 import { toast } from 'react-hot-toast';
@@ -102,6 +102,13 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
     }
   };
 
+  const subjectLabels: Record<string, string> = {
+    analitik: t(language, 'subAnalitik'),
+    operasi: t(language, 'subOperasi'),
+    digital: t(language, 'subDigital'),
+    jenama: t(language, 'subJenama'),
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-800">{language === 'ms' ? 'Senarai Staf & Industri' : 'Staff & Industry List'}</h2>
@@ -137,75 +144,92 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                   <td colSpan={3} className="p-8 text-center text-slate-500 italic">{t(language, 'noRecords')}</td>
                 </tr>
               ) : (
-                (activeTab === 'lecturers' ? lecturers : industryStaff).map(user => (
-                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4">
-                      <div className="font-bold text-slate-900 flex items-center gap-2">
-                          {user.name}
-                          {user.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
-                      </div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1"><Mail size={12} /> {user.email}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm font-medium text-slate-700">
-                        {activeTab === 'lecturers' ? user.staff_id : user.company_affiliation}
-                      </div>
-                      <div className="text-[10px] uppercase font-bold text-slate-400">
-                          {ROLE_LABELS[user.role]}
-                          {user.is_jkwbl && <span className="ml-1 text-indigo-600">(JKWBL)</span>}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-center gap-2">
-                        {(isCoordinator || isJKWBLViewer) && user.is_approved === false && (
-                          <button 
-                            onClick={() => handleApproveUser(user)} 
-                            className="p-1.5 bg-green-50 text-green-600 rounded border border-green-200 hover:bg-green-100"
-                            title={language === 'ms' ? 'Luluskan Akaun' : 'Approve Account'}
-                          >
-                            <CheckCircle size={16} />
-                          </button>
-                        )}
-                        
-                        {isCoordinator && user.role === UserRole.LECTURER && (
-                            <button 
-                                onClick={() => handleToggleJKWBL(user)} 
-                                className={`p-1.5 rounded border ${user.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
-                                title={user.is_jkwbl ? (language === 'ms' ? "Tarik Akses JKWBL" : "Remove JKWBL Access") : (language === 'ms' ? "Beri Akses JKWBL" : "Grant JKWBL Access")}
-                            >
-                                <ShieldCheck size={16} />
-                            </button>
-                        )}
+                (activeTab === 'lecturers' ? lecturers : industryStaff).map(user => {
+                  const teachingSubjects = user.role === UserRole.LECTURER 
+                    ? JSON.parse(user.teaching_subjects || '[]') as string[]
+                    : [];
 
-                        {isCoordinator && (
-                          <>
-                            <button 
-                                onClick={() => { setResettingUser({...user}); setIsPasswordModalOpen(true); }} 
-                                className="p-1.5 bg-slate-100 text-slate-600 rounded border border-slate-200 hover:bg-slate-200"
-                                title={t(language, 'resetPassword')}
-                            >
-                                <Key size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleEditClick(user)} 
-                              className="p-1.5 bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100"
-                              title={t(language, 'editUser')}
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteClick(user.id)} 
-                              className="p-1.5 bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100"
-                              title={t(language, 'deleteUser')}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
+                  return (
+                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 align-top">
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                            {user.name}
+                            {user.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1 mb-2"><Mail size={12} /> {user.email}</div>
+                        
+                        {/* TEACHING SUBJECTS DISPLAY */}
+                        {user.role === UserRole.LECTURER && teachingSubjects.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {teachingSubjects.map(subKey => (
+                              <span key={subKey} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                <BookOpen size={10} /> {subjectLabels[subKey] || subKey}
+                              </span>
+                            ))}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="p-4 align-top">
+                        <div className="text-sm font-medium text-slate-700">
+                          {activeTab === 'lecturers' ? user.staff_id : user.company_affiliation}
+                        </div>
+                        <div className="text-[10px] uppercase font-bold text-slate-400">
+                            {ROLE_LABELS[user.role]}
+                            {user.is_jkwbl && <span className="ml-1 text-indigo-600">(JKWBL)</span>}
+                        </div>
+                      </td>
+                      <td className="p-4 align-top">
+                        <div className="flex items-center justify-center gap-2">
+                          {(isCoordinator || isJKWBLViewer) && user.is_approved === false && (
+                            <button 
+                              onClick={() => handleApproveUser(user)} 
+                              className="p-1.5 bg-green-50 text-green-600 rounded border border-green-200 hover:bg-green-100"
+                              title={language === 'ms' ? 'Luluskan Akaun' : 'Approve Account'}
+                            >
+                              <CheckCircle size={16} />
+                            </button>
+                          )}
+                          
+                          {isCoordinator && user.role === UserRole.LECTURER && (
+                              <button 
+                                  onClick={() => handleToggleJKWBL(user)} 
+                                  className={`p-1.5 rounded border ${user.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                                  title={user.is_jkwbl ? (language === 'ms' ? "Tarik Akses JKWBL" : "Remove JKWBL Access") : (language === 'ms' ? "Beri Akses JKWBL" : "Grant JKWBL Access")}
+                              >
+                                  <ShieldCheck size={16} />
+                              </button>
+                          )}
+
+                          {isCoordinator && (
+                            <>
+                              <button 
+                                  onClick={() => { setResettingUser({...user}); setIsPasswordModalOpen(true); }} 
+                                  className="p-1.5 bg-slate-100 text-slate-600 rounded border border-slate-200 hover:bg-slate-200"
+                                  title={t(language, 'resetPassword')}
+                              >
+                                  <Key size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleEditClick(user)} 
+                                className="p-1.5 bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100"
+                                title={t(language, 'editUser')}
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteClick(user.id)} 
+                                className="p-1.5 bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100"
+                                title={t(language, 'deleteUser')}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
