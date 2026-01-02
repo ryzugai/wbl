@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, ShieldCheck } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
+import * as XLSX from 'xlsx';
+import { toast } from 'react-hot-toast';
 
 interface StudentsProps {
   users: User[];
@@ -41,10 +43,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
     
     // STRICT FILTERING for Industry Users
     if (currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) {
-        // If user is from Industry, they MUST have a company affiliation
         if (!currentUser.company_affiliation) return null;
-
-        // If student has no approved app, or approved app is NOT for this user's company, hide them
         if (!app || app.company_name !== currentUser.company_affiliation) {
             return null;
         }
@@ -54,7 +53,55 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
       ...student,
       placement: app
     };
-  }).filter(Boolean); // Remove nulls (filtered out students)
+  }).filter(Boolean) as (User & { placement?: Application })[];
+
+  const handleToggleJKWBL = async (student: User) => {
+    if (!isCoordinator) {
+        toast.error("Hanya Penyelaras boleh menukar status JKWBL.");
+        return;
+    }
+    try {
+      await onUpdateUser({ 
+        ...student, 
+        is_jkwbl: !student.is_jkwbl 
+      });
+      toast.success(`Akses JKWBL bagi ${student.name} telah ${!student.is_jkwbl ? 'diberikan' : 'ditarik balik'}`);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const exportToExcel = () => {
+    try {
+      const dataToExport = studentList.map(s => ({
+        'Nama Pelajar': s.name,
+        'No. Matrik': s.matric_no,
+        'No. KP': s.ic_no,
+        'Program': s.program,
+        'Email': s.email,
+        'Telefon': s.phone,
+        'Ahli JKWBL': s.is_jkwbl ? 'YA' : 'TIDAK',
+        'Status Penempatan': s.placement ? 'Sudah Ditempatkan' : 'Belum Ditempatkan',
+        'Syarikat': s.placement?.company_name || '-',
+        'Daerah (Syarikat)': s.placement?.company_district || '-',
+        'Negeri (Syarikat)': s.placement?.company_state || '-',
+        'Tarikh Mula': s.placement?.start_date || '-',
+        'Penyelia Fakulti': s.placement?.faculty_supervisor_name || '-',
+        'ID Staf Penyelia': s.placement?.faculty_supervisor_staff_id || '-'
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Senarai Pelajar WBL');
+      
+      const fileName = `Senarai_Pelajar_WBL_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      toast.success('Senarai pelajar berjaya dieksport!');
+    } catch (error) {
+      toast.error('Gagal mengeksport senarai pelajar.');
+      console.error(error);
+    }
+  };
 
   const handleAssignClick = (app: Application) => {
     setSelectedApp(app);
@@ -89,13 +136,27 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Senarai Pelajar</h2>
-        {(currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
-            <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-100">
-                Syarikat: <strong>{currentUser.company_affiliation}</strong>
-            </div>
-        )}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Senarai Pelajar</h2>
+          <p className="text-sm text-slate-500 mt-1">Menguruskan profil dan penempatan pelajar WBL.</p>
+        </div>
+        
+        <div className="flex gap-3 w-full md:w-auto">
+          {hasSystemAccess && (
+            <button 
+              onClick={exportToExcel}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm transition-all font-bold text-sm"
+            >
+              <FileSpreadsheet size={18} /> Eksport Excel
+            </button>
+          )}
+          {(currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
+              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-100 font-bold flex items-center gap-2">
+                  <Download size={16} /> Syarikat: {currentUser.company_affiliation}
+              </div>
+          )}
+        </div>
       </div>
       
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -122,53 +183,67 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 </tr>
               )}
               {studentList.map((item: any) => (
-                <tr key={item.id} className="hover:bg-slate-50 group">
+                <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
                   <td className="p-4">
-                    <div className="font-medium text-slate-900">{item.name}</div>
-                    <div className="text-xs text-slate-500">{item.matric_no}</div>
+                    <div className="font-bold text-slate-900 flex items-center gap-2">
+                        {item.name}
+                        {item.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
+                    </div>
+                    <div className="text-xs text-slate-500 font-medium">{item.matric_no}</div>
                     <div className="text-xs text-slate-400 mt-1">{item.email}</div>
                   </td>
                   <td className="p-4 text-sm text-slate-700 max-w-xs truncate" title={item.program}>{item.program}</td>
                   <td className="p-4">
                     {item.placement ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">
                         {item.placement.company_name}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                         Belum ditempatkan
                       </span>
                     )}
                   </td>
-                  <td className="p-4 text-sm text-slate-600">
+                  <td className="p-4 text-sm text-slate-600 font-medium">
                       {item.placement?.start_date || '-'}
                   </td>
                   <td className="p-4 text-sm text-slate-600">
                       {item.placement?.faculty_supervisor_name ? (
                           <div className="flex items-center gap-2 text-blue-700">
                               <UserCheck size={16} />
-                              <span className="font-medium">{item.placement.faculty_supervisor_name}</span>
+                              <span className="font-bold text-xs">{item.placement.faculty_supervisor_name}</span>
                           </div>
                       ) : (
                           <span className="text-slate-400 italic text-xs">Belum ditugaskan</span>
                       )}
                   </td>
                   <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                        {/* Resume View for Staff */}
+                      <div className="flex items-center justify-center gap-2">
+                        {/* Resume View for Staff / Coordinator */}
                         <button 
                             onClick={() => generateResume(item)}
-                            className="p-2 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors"
-                            title="Lihat Resume Infografik"
+                            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all border border-indigo-100 shadow-sm"
+                            title="Lihat Resume Pelajar"
                         >
                             <FileText size={18} />
                         </button>
 
+                        {/* JKWBL Toggle - ONLY Coordinator */}
+                        {isCoordinator && (
+                            <button 
+                                onClick={() => handleToggleJKWBL(item)} 
+                                className={`p-2 rounded-lg border transition-all shadow-sm ${item.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
+                                title={item.is_jkwbl ? "Tarik Akses JKWBL" : "Beri Akses JKWBL"}
+                            >
+                                <ShieldCheck size={18} />
+                            </button>
+                        )}
+
                         {hasSystemAccess && item.placement && (
                             <button 
                                 onClick={() => handleAssignClick(item.placement)}
-                                className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                                title="Assign Penyelia"
+                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all border border-blue-100 shadow-sm"
+                                title="Tugaskan Penyelia"
                             >
                                 <UserPlus size={18} />
                             </button>
@@ -178,19 +253,18 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                             <>
                                 <button 
                                     onClick={() => { 
-                                        // IMPORTANT: Strip 'placement' field before editing to avoid DB schema errors
                                         const { placement, ...userData } = item;
                                         setEditingStudent(userData); 
                                         setIsEditModalOpen(true); 
                                     }}
-                                    className="p-2 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
+                                    className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-all border border-yellow-100 shadow-sm"
                                     title="Edit Pelajar"
                                 >
                                     <Edit size={18} />
                                 </button>
                                 <button 
                                     onClick={() => { if(confirm('Adakah anda pasti mahu memadam pelajar ini?')) onDeleteUser(item.id); }}
-                                    className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all border border-red-100 shadow-sm"
                                     title="Padam Pelajar"
                                 >
                                     <Trash2 size={18} />
@@ -235,7 +309,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 <button 
                     onClick={handleSaveSupervisor}
                     disabled={!supervisorId}
-                    className={`w-full py-2 rounded text-white ${!supervisorId ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                    className={`w-full py-2 rounded text-white font-bold transition-all ${!supervisorId ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md active:scale-95'}`}
                 >
                     Simpan
                 </button>
@@ -314,7 +388,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                             />
                         </div>
                     </div>
-                    <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4">
+                    <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 mt-4 shadow-md transition-all active:scale-95">
                         Simpan Perubahan
                     </button>
                 </form>
