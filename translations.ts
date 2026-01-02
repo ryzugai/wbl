@@ -57,6 +57,8 @@ export const translations = {
     editUser: "Kemaskini Maklumat",
     deleteUser: "Padam Pengguna",
     noRecords: "Tiada rekod dijumpai.",
+    resetPassword: "Set Semula Kata Laluan",
+    newPassword: "Kata Laluan Baru",
 
     // Applications
     appTitle: "Senarai Permohonan",
@@ -190,12 +192,14 @@ export const translations = {
     editUser: "Update Information",
     deleteUser: "Delete User",
     noRecords: "No records found.",
+    resetPassword: "Reset Password",
+    newPassword: "New Password",
 
     // Applications
     appTitle: "Application List",
     appStudent: "Student",
     appCompany: "Company",
-    appFacultySup: "Faculty Supervisor",
+    appFacultySupervisor: "Faculty Supervisor",
     appJanaSurat: "Generate Letter",
     appJanaSuratMohon: "Gen. Request Letter",
     appSemakBorang: "Verify Form",

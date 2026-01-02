@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -21,11 +21,15 @@ interface StudentsProps {
 
 export const Students: React.FC<StudentsProps> = ({ users, applications, currentUser, onUpdateApplication, onUpdateUser, onDeleteUser, language }) => {
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
-  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [supervisorId, setSupervisorId] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<User | null>(null);
+  
+  // Password Reset State
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resettingUser, setResettingUser] = useState<User | null>(null);
 
   const students = users.filter(u => u.role === UserRole.STUDENT);
   const lecturers = users.filter(u => u.role === UserRole.LECTURER);
@@ -78,7 +82,6 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         return;
     }
     setSelectedStudent(student);
-    setSelectedApp(student.placement || null);
     const currentSupId = student.placement?.faculty_supervisor_id || student.faculty_supervisor_id || '';
     setSupervisorId(currentSupId);
     setIsAssignModalOpen(true);
@@ -112,6 +115,19 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         setIsAssignModalOpen(false);
     } catch (e: any) {
         toast.error(e.message);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resettingUser || !newPassword) return;
+    try {
+      await onUpdateUser({ ...resettingUser, password: newPassword });
+      toast.success(language === 'ms' ? 'Kata laluan berjaya dikemaskini' : 'Password updated successfully');
+      setIsPasswordModalOpen(false);
+      setNewPassword('');
+      setResettingUser(null);
+    } catch (e: any) {
+      toast.error(e.message);
     }
   };
 
@@ -154,7 +170,6 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 const isApproved = item.placement?.application_status === 'Diluluskan';
                 const isPending = item.placement?.application_status === 'Menunggu';
                 
-                // Cek jika resume sudah diisi
                 const hasResume = !!(item.resume_about || item.resume_education || item.resume_skills_soft);
                 
                 return (
@@ -206,6 +221,9 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                           )}
                           {isCoordinator && (
                               <>
+                                  <button onClick={() => { setResettingUser({...item}); setIsPasswordModalOpen(true); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title={t(language, 'resetPassword')}>
+                                      <Key size={18} />
+                                  </button>
                                   <button onClick={() => { setEditingStudent({...item}); setIsEditModalOpen(true); }} className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100" title={t(language, 'editUser')}>
                                       <Edit size={18} />
                                   </button>
@@ -223,6 +241,33 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
           </table>
         </div>
       </div>
+
+      {/* Password Reset Modal */}
+      <Modal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} title={t(language, 'resetPassword')}>
+        <div className="space-y-4">
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <p className="text-sm text-slate-600">{t(language, 'fullName')}: <strong>{resettingUser?.name}</strong></p>
+                <p className="text-xs text-slate-500">{t(language, 'username')}: {resettingUser?.username}</p>
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'newPassword')}</label>
+                <input 
+                  type="text" 
+                  className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900" 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                  placeholder="********"
+                />
+            </div>
+            <button 
+              onClick={handleResetPassword} 
+              disabled={!newPassword} 
+              className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:bg-slate-300"
+            >
+                {t(language, 'save')}
+            </button>
+        </div>
+      </Modal>
 
       <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={t(language, 'assignSup')}>
           <div className="space-y-4">
