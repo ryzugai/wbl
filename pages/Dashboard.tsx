@@ -3,14 +3,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Application, Company, User, UserRole, AdConfig } from '../types';
 import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer } from 'lucide-react';
 import { StorageService } from '../services/storage';
+import { Language, t } from '../translations';
 
 interface DashboardProps {
   applications: Application[];
   companies: Company[];
   users: User[];
+  language: Language;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users, language }) => {
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [showAd, setShowAd] = useState(true);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
@@ -23,7 +25,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     return () => unsubscribe();
   }, []);
 
-  // Timer untuk Karusel Iklan
   useEffect(() => {
     if (adConfig.isEnabled && adConfig.items.length > 1 && showAd) {
       const timer = setInterval(() => {
@@ -33,7 +34,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     }
   }, [adConfig.isEnabled, adConfig.items.length, showAd]);
 
-  // Logik Countdown ke 5 Oktober 2026
   useEffect(() => {
     const targetDate = new Date('2026-10-05T00:00:00').getTime();
 
@@ -59,11 +59,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     return () => clearInterval(interval);
   }, []);
 
-  // Logik Pengiraan Garis Masa
   const timelineProgress = useMemo(() => {
     const now = new Date();
-    const start = new Date('2026-06-01'); // Mula fasa persediaan
-    const end = new Date('2027-10-01');   // Tamat WBL
+    const start = new Date('2026-06-01'); 
+    const end = new Date('2027-10-01');   
     
     if (now < start) return 0;
     if (now > end) return 100;
@@ -83,11 +82,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
   const totalIndustryStaff = users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR).length;
 
   const milestones = [
-    { date: 'Jun 2026', label: 'Persediaan', icon: ClipboardCheck, desc: 'Taklimat' },
-    { date: '5 Okt 2026', label: 'Mula WBL', icon: Flag, desc: 'Lapor Diri' },
-    { date: 'Mac 2027', label: 'Pantau', icon: MapPin, desc: 'Lawatan' },
-    { date: 'Ogos 2027', label: 'Penilaian', icon: CheckCircle2, desc: 'Prestasi' },
-    { date: '1 Okt 2027', label: 'Tamat', icon: Award, desc: 'Penyerahan' },
+    { date: 'Jun 2026', label: language === 'ms' ? 'Persediaan' : 'Preparation', icon: ClipboardCheck },
+    { date: '5 Okt 2026', label: language === 'ms' ? 'Mula WBL' : 'WBL Start', icon: Flag },
+    { date: 'Mac 2027', label: language === 'ms' ? 'Pantau' : 'Monitoring', icon: MapPin },
+    { date: 'Ogos 2027', label: language === 'ms' ? 'Penilaian' : 'Evaluation', icon: CheckCircle2 },
+    { date: '1 Okt 2027', label: language === 'ms' ? 'Tamat' : 'Finish', icon: Award },
   ];
 
   const StatCard = ({ label, value, icon: Icon, colorClass, bgClass }: any) => (
@@ -105,14 +104,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
+        <h2 className="text-2xl font-bold text-slate-800">{t(language, 'dashboard')}</h2>
         <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
             <Calendar size={16} className="text-blue-600" />
-            <span className="text-sm font-bold text-slate-600">Sesi: 2026/2027</span>
+            <span className="text-sm font-bold text-slate-600">{t(language, 'wblSession')}: 2026/2027</span>
         </div>
       </div>
       
-      {/* CSS Animasi Khusus */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes slideInUp {
           from { transform: translateY(100px); opacity: 0; }
@@ -129,7 +127,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}} />
 
-      {/* Mini Floating Ad Popup */}
       {showAd && adConfig.isEnabled && activeAd && (
         <div className="fixed bottom-6 right-6 z-[100] hidden md:block animate-slideInUp group">
             <div className="relative w-[280px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden transition-all hover:shadow-[0_25px_60px_rgba(0,0,0,0.2)]">
@@ -138,10 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                 </div>
                 <div className="relative bg-slate-100 min-h-[100px]">
                     <a key={activeAd.id} href={activeAd.destinationUrl || '#'} target="_blank" rel="noopener noreferrer" className="block w-full transition-opacity duration-500 animate-fadeIn">
-                      <img src={activeAd.imageUrl} alt="Iklan" className="w-full h-auto object-contain max-h-[400px]" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/400x200?text=Imej+Tidak+Sah'; }} />
-                      <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors flex items-center justify-center">
-                        <ExternalLink className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" size={24} />
-                      </div>
+                      <img src={activeAd.imageUrl} alt="Iklan" className="w-full h-auto object-contain max-h-[400px]" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/400x200?text=Invalid+Image'; }} />
                     </a>
                 </div>
                 <div className="p-3 bg-white border-t border-slate-100">
@@ -160,21 +154,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         </div>
       )}
 
-      {/* INFOGRAFIK GARIS MASA (TIMELINE) & COUNTDOWN */}
+      {/* TIMELINE */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between mb-4">
             <div>
-                <h3 className="text-base font-bold text-slate-800 leading-none">Garis Masa WBL 2026/2027</h3>
-                <p className="text-[11px] text-slate-500 mt-1">Perjalanan program mengikut fasa.</p>
+                <h3 className="text-base font-bold text-slate-800 leading-none">{t(language, 'timelineTitle')} 2026/2027</h3>
+                <p className="text-[11px] text-slate-500 mt-1">{t(language, 'timelineDesc')}</p>
             </div>
             <div className="text-right">
-                <span className="text-[9px] font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Status Semasa</span>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                <span className="text-[9px] font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{language === 'ms' ? 'Status Semasa' : 'Current Status'}</span>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{new Date().toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
             </div>
         </div>
 
         <div className="relative pt-6 pb-12 px-2">
-            {/* Track Line */}
             <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 -translate-y-1/2 rounded-full overflow-hidden">
                 <div 
                     className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-out" 
@@ -182,7 +175,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                 />
             </div>
 
-            {/* Today Indicator */}
             <div 
                 className="absolute top-1/2 -translate-y-1/2 z-20 transition-all duration-1000 ease-out"
                 style={{ left: `${timelineProgress}%` }}
@@ -190,13 +182,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                 <div className="relative -translate-x-1/2">
                     <div className="w-4 h-4 bg-blue-600 rounded-full border-[3px] border-white shadow-md animate-pulse-custom" />
                     <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap shadow-sm">
-                        HARI INI
+                        {t(language, 'today')}
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rotate-45" />
                     </div>
                 </div>
             </div>
 
-            {/* Milestones */}
             <div className="relative flex justify-between">
                 {milestones.map((m, idx) => {
                     const milestoneDateString = m.date === 'Jun 2026' ? '2026-06-01' : 
@@ -225,7 +216,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
             </div>
         </div>
 
-        {/* Countdown Section - More Compact */}
         <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2 animate-fadeIn">
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -233,17 +223,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                         <Timer size={18} />
                     </div>
                     <div>
-                        <h4 className="text-xs font-bold text-slate-800 leading-none">Berbaki ke 5 Okt 2026</h4>
-                        <p className="text-[10px] text-slate-500 mt-1">Lapor Diri Industri.</p>
+                        <h4 className="text-xs font-bold text-slate-800 leading-none">{t(language, 'countdownTitle')} 5 Okt 2026</h4>
+                        <p className="text-[10px] text-slate-500 mt-1">{t(language, 'laporDiri')}</p>
                     </div>
                 </div>
 
                 <div className="flex gap-2">
                     {[
-                        { label: 'Hari', value: timeLeft.days },
-                        { label: 'Jam', value: timeLeft.hours },
-                        { label: 'Min', value: timeLeft.minutes },
-                        { label: 'Saat', value: timeLeft.seconds }
+                        { label: t(language, 'days'), value: timeLeft.days },
+                        { label: t(language, 'hours'), value: timeLeft.hours },
+                        { label: t(language, 'mins'), value: timeLeft.minutes },
+                        { label: t(language, 'secs'), value: timeLeft.seconds }
                     ].map((unit, idx) => (
                         <div key={idx} className="flex flex-col items-center">
                             <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center text-sm font-black text-blue-600 tabular-nums">
@@ -257,27 +247,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         </div>
       </div>
 
-      {/* User Stats Row */}
+      {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Pelajar" value={totalStudents} icon={GraduationCap} colorClass="text-indigo-600" bgClass="bg-indigo-50" />
-        <StatCard label="Pensyarah" value={totalLecturers} icon={BookOpen} colorClass="text-teal-600" bgClass="bg-teal-50" />
-        <StatCard label="Industri" value={totalIndustryStaff} icon={Briefcase} colorClass="text-orange-600" bgClass="bg-orange-50" />
+        <StatCard label={t(language, 'students')} value={totalStudents} icon={GraduationCap} colorClass="text-indigo-600" bgClass="bg-indigo-50" />
+        <StatCard label={language === 'ms' ? 'Pensyarah' : 'Lecturers'} value={totalLecturers} icon={BookOpen} colorClass="text-teal-600" bgClass="bg-teal-50" />
+        <StatCard label={language === 'ms' ? 'Industri' : 'Industry'} value={totalIndustryStaff} icon={Briefcase} colorClass="text-orange-600" bgClass="bg-orange-50" />
       </div>
 
-      {/* System Stats Row */}
-      <div>
-        <h3 className="text-base font-bold text-slate-700 mb-3">Ringkasan Permohonan</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Permohonan" value={applications.length} icon={Users} colorClass="text-blue-600" bgClass="bg-blue-50" />
-            <StatCard label="Syarikat" value={companies.length} icon={Building2} colorClass="text-purple-600" bgClass="bg-purple-50" />
-            <StatCard label="Menunggu" value={pending} icon={Clock} colorClass="text-yellow-600" bgClass="bg-yellow-50" />
-            <StatCard label="Lulus" value={approved} icon={CheckCircle2} colorClass="text-green-600" bgClass="bg-green-50" />
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label={t(language, 'applications')} value={applications.length} icon={Users} colorClass="text-blue-600" bgClass="bg-blue-50" />
+          <StatCard label={t(language, 'companies')} value={companies.length} icon={Building2} colorClass="text-purple-600" bgClass="bg-purple-50" />
+          <StatCard label={language === 'ms' ? 'Menunggu' : 'Pending'} value={pending} icon={Clock} colorClass="text-yellow-600" bgClass="bg-yellow-50" />
+          <StatCard label={language === 'ms' ? 'Lulus' : 'Approved'} value={approved} icon={CheckCircle2} colorClass="text-green-600" bgClass="bg-green-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="font-bold text-base mb-3 text-slate-800">Status Terkini</h3>
+          <h3 className="font-bold text-base mb-3 text-slate-800">{t(language, 'recentStatus')}</h3>
           {applications.length > 0 ? (
             <div className="space-y-3">
               {applications.slice(0, 5).map(app => (
@@ -297,20 +283,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
               ))}
             </div>
           ) : (
-            <p className="text-slate-500 text-xs italic">Tiada permohonan terkini.</p>
+            <p className="text-slate-500 text-xs italic">{language === 'ms' ? 'Tiada permohonan terkini.' : 'No recent applications.'}</p>
           )}
         </div>
 
         <div className="bg-blue-600 p-5 rounded-xl shadow-md text-white relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10">
                 <h3 className="font-bold text-base mb-1">WBL System 2026/2027</h3>
-                <p className="text-blue-100 text-xs mb-3">Pengurusan latihan industri yang efisien dan sistematik.</p>
+                <p className="text-blue-100 text-xs mb-3">{language === 'ms' ? 'Pengurusan latihan industri yang efisien.' : 'Efficient industrial training management.'}</p>
                 <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm">
                     <p className="text-[11px] leading-relaxed italic text-white/90">"Memacu Kecemerlangan Teknousahawanan melalui Pembelajaran Berasaskan Kerja."</p>
                 </div>
             </div>
             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-16 h-16 bg-blue-400/20 rounded-full blur-xl"></div>
         </div>
       </div>
     </div>

@@ -4,13 +4,15 @@ import { StorageService } from '../services/storage';
 import { User } from '../types';
 import { Building2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { Language, t } from '../translations';
 
 interface LoginProps {
   onLoginSuccess: (user: User) => void;
   onGoToRegister: () => void;
+  language: Language;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister }) => {
+export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, language }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,11 +24,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister }) 
         if (user) {
             onLoginSuccess(user);
         } else {
-            toast.error('Username atau password salah');
+            toast.error(language === 'ms' ? 'Username atau password salah' : 'Invalid username or password');
         }
     } catch (e: any) {
-        // Handle specific login errors (like Pending Approval)
-        toast.error(e.message || 'Ralat log masuk');
+        toast.error(e.message || 'Error logging in');
     }
   };
 
@@ -38,27 +39,27 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister }) 
             <Building2 size={32} />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">WBL System</h1>
-          <p className="text-slate-500">Sistem Latihan Industri</p>
+          <p className="text-slate-500">{language === 'ms' ? 'Sistem Latihan Industri' : 'Industry Training System'}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'username')}</label>
             <input
               type="text"
               required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'password')}</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 required
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white pr-10"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white pr-10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -75,7 +76,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister }) 
             type="submit"
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
           >
-            Log Masuk
+            {t(language, 'login')}
           </button>
         </form>
 
@@ -84,7 +85,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister }) 
             onClick={onGoToRegister}
             className="text-sm text-blue-600 font-medium hover:underline"
           >
-            Daftar Akaun Baru
+            {t(language, 'register')}
           </button>
         </div>
       </div>

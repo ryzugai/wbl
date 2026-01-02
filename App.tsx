@@ -16,16 +16,24 @@ import { Guidebook } from './pages/Guidebook';
 import { SystemData } from './pages/SystemData';
 import { Statistics } from './pages/Statistics';
 import { Toaster, toast } from 'react-hot-toast';
+import { Language } from './translations';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState('dashboard');
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('wbl_lang') as Language) || 'ms';
+  });
 
   // Data State
   const [companies, setCompanies] = useState<Company[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem('wbl_lang', language);
+  }, [language]);
 
   const refreshData = () => {
     setCompanies(StorageService.getCompanies());
@@ -51,28 +59,28 @@ function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setCurrentView('dashboard');
-    refreshData(); // Refresh data on login to get latest registered users
-    toast.success(`Selamat datang, ${user.name}!`);
+    refreshData(); 
+    toast.success(language === 'ms' ? `Selamat datang, ${user.name}!` : `Welcome, ${user.name}!`);
   };
 
   const handleLogout = () => {
     StorageService.logout();
     setCurrentUser(null);
     setCurrentView('login');
-    toast('Telah log keluar');
+    toast(language === 'ms' ? 'Telah log keluar' : 'Logged out');
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
     try {
         const savedUser = await StorageService.updateUser(updatedUser);
         if (currentUser && currentUser.id === savedUser.id) {
-            setCurrentUser(savedUser); // Update session state if updating self
+            setCurrentUser(savedUser); 
         }
         refreshData();
-        toast.success('Profil berjaya dikemaskini');
+        toast.success(language === 'ms' ? 'Profil berjaya dikemaskini' : 'Profile updated');
     } catch (error: any) {
-        toast.error(`Gagal mengemaskini profil: ${error.message}`);
-        throw error; // Re-throw so modal stays open
+        toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${error.message}`);
+        throw error;
     }
   };
 
@@ -80,9 +88,9 @@ function App() {
       try {
         await StorageService.deleteUser(id);
         refreshData();
-        toast.success('Pengguna berjaya dipadam');
+        toast.success(language === 'ms' ? 'Pengguna berjaya dipadam' : 'User deleted');
       } catch(e) {
-        toast.error('Gagal memadam pengguna');
+        toast.error(language === 'ms' ? 'Gagal memadam' : 'Delete failed');
       }
   };
 
@@ -90,9 +98,9 @@ function App() {
       try {
           await StorageService.createCompany(companyData);
           refreshData();
-          toast.success('Syarikat berjaya ditambah');
+          toast.success(language === 'ms' ? 'Syarikat berjaya ditambah' : 'Company added');
       } catch (e: any) {
-          toast.error(`Gagal menambah syarikat: ${e.message}`);
+          toast.error(`${language === 'ms' ? 'Gagal menambah' : 'Add failed'}: ${e.message}`);
           throw e;
       }
   };
@@ -101,10 +109,10 @@ function App() {
       try {
           await StorageService.updateCompany(company);
           refreshData();
-          toast.success('Maklumat syarikat dikemaskini');
+          toast.success(language === 'ms' ? 'Maklumat syarikat dikemaskini' : 'Company info updated');
       } catch (e: any) {
-          toast.error(`Gagal mengemaskini syarikat: ${e.message}`);
-          throw e; // PENTING: Melempar ralat semula supaya modal tidak tutup
+          toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${e.message}`);
+          throw e;
       }
   };
 
@@ -112,9 +120,9 @@ function App() {
       try {
           await StorageService.deleteCompany(id);
           refreshData();
-          toast.success('Syarikat dipadam');
+          toast.success(language === 'ms' ? 'Syarikat dipadam' : 'Company deleted');
       } catch (e: any) {
-          toast.error(`Gagal memadam: ${e.message}`);
+          toast.error(`${language === 'ms' ? 'Gagal memadam' : 'Delete failed'}: ${e.message}`);
       }
   };
 
@@ -125,12 +133,12 @@ function App() {
       const myApps = currentApps.filter(a => a.created_by === currentUser.username);
       
       if(myApps.length >= 4) {
-          toast.error('Anda telah mencapai had maksimum 4 permohonan.');
+          toast.error(language === 'ms' ? 'Anda telah mencapai had maksimum 4 permohonan.' : 'You have reached the maximum limit of 4 applications.');
           return;
       }
       
       if(myApps.find(a => a.company_name === company.company_name)) {
-          toast.error('Anda sudah memohon ke syarikat ini.');
+          toast.error(language === 'ms' ? 'Anda sudah memohon ke syarikat ini.' : 'You have already applied to this company.');
           return;
       }
 
@@ -152,10 +160,10 @@ function App() {
       try {
         await StorageService.createApplication(newApp);
         refreshData();
-        toast.success('Permohonan berjaya dihantar!');
+        toast.success(language === 'ms' ? 'Permohonan berjaya dihantar!' : 'Application sent successfully!');
       } catch (error: any) {
         console.error(error);
-        toast.error(`Ralat menghantar permohonan: ${error.message}`);
+        toast.error(`${language === 'ms' ? 'Ralat menghantar permohonan' : 'Error sending application'}: ${error.message}`);
       }
   };
 
@@ -177,16 +185,13 @@ function App() {
                     application_status: 'Ditolak'
                 });
             }
-            if (otherPendingApps.length > 0) {
-                toast(`${otherPendingApps.length} permohonan lain telah ditolak secara automatik.`);
-            }
         }
 
         refreshData();
-        toast.success('Status permohonan dikemaskini');
+        toast.success(language === 'ms' ? 'Status dikemaskini' : 'Status updated');
       } catch (error: any) {
         console.error(error);
-        toast.error(`Gagal mengemaskini permohonan: ${error.message}`);
+        toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${error.message}`);
         throw error;
       }
   };
@@ -198,8 +203,8 @@ function App() {
       <>
         <Toaster position="top-right" />
         {currentView === 'register' 
-          ? <Register onRegisterSuccess={() => setCurrentView('login')} onBack={() => setCurrentView('login')} /> 
-          : <Login onLoginSuccess={handleLogin} onGoToRegister={() => setCurrentView('register')} />
+          ? <Register language={language} onRegisterSuccess={() => setCurrentView('login')} onBack={() => setCurrentView('login')} /> 
+          : <Login language={language} onLoginSuccess={handleLogin} onGoToRegister={() => setCurrentView('register')} />
         }
       </>
     );
@@ -213,11 +218,14 @@ function App() {
         currentView={currentView}
         onNavigate={setCurrentView}
         onLogout={handleLogout}
+        language={language}
+        onLanguageChange={setLanguage}
       >
-        {currentView === 'dashboard' && <Dashboard applications={applications} companies={companies} users={users} />}
+        {currentView === 'dashboard' && <Dashboard language={language} applications={applications} companies={companies} users={users} />}
         
         {(currentView === 'companies' || currentView === 'addCompany') && (
             <Companies 
+                language={language}
                 companies={companies} 
                 applications={applications}
                 currentUser={currentUser}
@@ -230,6 +238,7 @@ function App() {
 
         {currentView === 'students' && (
             <Students 
+                language={language}
                 users={users} 
                 applications={applications} 
                 currentUser={currentUser}
@@ -241,6 +250,7 @@ function App() {
 
         {currentView === 'applications' && (
             <Applications 
+                language={language}
                 currentUser={currentUser}
                 applications={applications}
                 users={users}
@@ -249,10 +259,11 @@ function App() {
             />
         )}
 
-        {currentView === 'profile' && <Profile user={currentUser} onUpdateUser={handleUpdateUser} />}
+        {currentView === 'profile' && <Profile language={language} user={currentUser} onUpdateUser={handleUpdateUser} />}
         
         {currentView === 'staff' && (
             <StaffList 
+                language={language}
                 users={users} 
                 currentUser={currentUser}
                 applications={applications}
@@ -264,17 +275,18 @@ function App() {
 
         {currentView === 'statistics' && (
           <Statistics 
+            language={language}
             applications={applications} 
             companies={companies} 
             users={users} 
           />
         )}
         
-        {currentView === 'uploadExcel' && <UploadExcel onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}
+        {currentView === 'uploadExcel' && <UploadExcel language={language} onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}
         
-        {currentView === 'systemData' && <SystemData onDataRestored={refreshData} />}
+        {currentView === 'systemData' && <SystemData language={language} onDataRestored={refreshData} />}
         
-        {currentView === 'guidebook' && <Guidebook />}
+        {currentView === 'guidebook' && <Guidebook language={language} />}
       </Layout>
     </>
   );

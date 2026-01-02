@@ -1,9 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3 } from 'lucide-react';
-import { ROLE_LABELS } from '../constants';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages } from 'lucide-react';
+import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
+import { Language, t } from '../translations';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,9 +12,11 @@ interface LayoutProps {
   currentView: string;
   onNavigate: (view: string) => void;
   onLogout: () => void;
+  language: Language;
+  onLanguageChange: (lang: Language) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentView, onNavigate, onLogout }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentView, onNavigate, onLogout, language, onLanguageChange }) => {
   const [isCloud, setIsCloud] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const currentYear = new Date().getFullYear();
@@ -26,7 +29,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const isJKWBL = currentUser.is_jkwbl === true;
   const hasSystemAccess = isCoordinator || isJKWBL;
 
-  // Close mobile menu when view changes
   const handleNavigate = (view: string) => {
     onNavigate(view);
     setIsMobileMenuOpen(false);
@@ -63,7 +65,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
         </button>
       </div>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
             className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
@@ -96,56 +97,70 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           </div>
         </div>
 
-        {/* Mobile Sidebar Header */}
-        <div className="p-6 border-b border-slate-100 md:hidden flex justify-between items-center bg-slate-50">
-            <span className="font-bold text-slate-700">Menu</span>
-            <button onClick={() => setIsMobileMenuOpen(false)}>
-                <X size={20} className="text-slate-500"/>
-            </button>
-        </div>
-
         <div className="p-4 flex-1 space-y-1 overflow-y-auto">
-          <NavItem view="dashboard" label="Dashboard" icon={Home} />
+          {/* Language Switcher */}
+          <div className="flex items-center justify-between px-4 py-2 bg-slate-50 rounded-lg mb-4 border border-slate-200">
+             <div className="flex items-center gap-2 text-slate-500">
+                <Languages size={16} />
+                <span className="text-[10px] font-bold uppercase">Language</span>
+             </div>
+             <div className="flex gap-1">
+                <button 
+                    onClick={() => onLanguageChange('ms')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${language === 'ms' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-200'}`}
+                >
+                    MS
+                </button>
+                <button 
+                    onClick={() => onLanguageChange('en')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${language === 'en' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-200'}`}
+                >
+                    EN
+                </button>
+             </div>
+          </div>
+
+          <NavItem view="dashboard" label={t(language, 'dashboard')} icon={Home} />
           
           <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Menu Utama
+            {t(language, 'mainMenu')}
           </div>
           
-          <NavItem view="companies" label="Senarai Syarikat" icon={Building2} />
+          <NavItem view="companies" label={t(language, 'companies')} icon={Building2} />
           
           {(hasSystemAccess || currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
-            <NavItem view="students" label="Senarai Pelajar" icon={Users} />
+            <NavItem view="students" label={t(language, 'students')} icon={Users} />
           )}
 
           {hasSystemAccess && (
-            <NavItem view="staff" label="Senarai Staf" icon={UserCog} />
+            <NavItem view="staff" label={t(language, 'staff')} icon={UserCog} />
           )}
           
-          <NavItem view="applications" label="Permohonan" icon={FileText} />
+          <NavItem view="applications" label={t(language, 'applications')} icon={FileText} />
           
           {hasSystemAccess && (
-            <NavItem view="statistics" label="Statistik" icon={BarChart3} />
+            <NavItem view="statistics" label={t(language, 'statistics')} icon={BarChart3} />
           )}
 
           <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-             Rujukan
+             {t(language, 'references')}
           </div>
-          <NavItem view="guidebook" label="Buku Panduan" icon={Book} />
+          <NavItem view="guidebook" label={t(language, 'guidebook')} icon={Book} />
           
           {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
              <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-             Pengurusan
+             {t(language, 'management')}
            </div>
           )}
 
            {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
-             <NavItem view="addCompany" label="Tambah Syarikat" icon={Upload} />
+             <NavItem view="addCompany" label={t(language, 'addCompany')} icon={Upload} />
            )}
 
            {hasSystemAccess && (
              <>
-               <NavItem view="uploadExcel" label="Upload Excel" icon={FileSpreadsheet} />
-               <NavItem view="systemData" label="Sistem & Data" icon={Database} />
+               <NavItem view="uploadExcel" label={t(language, 'uploadExcel')} icon={FileSpreadsheet} />
+               <NavItem view="systemData" label={t(language, 'systemData')} icon={Database} />
              </>
            )}
         </div>
@@ -163,7 +178,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
             <div className="flex-1 text-left overflow-hidden">
               <div className="text-sm font-semibold truncate">{currentUser.name}</div>
               <div className="text-xs text-slate-500 truncate flex items-center gap-1">
-                  {ROLE_LABELS[currentUser.role]}
+                  {getRoleLabels(language)[currentUser.role]}
                   {isJKWBL && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1 rounded">JKWBL</span>}
               </div>
             </div>
@@ -173,12 +188,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
             className="mt-3 w-full flex items-center justify-center gap-2 text-red-600 text-sm py-2 hover:bg-red-50 rounded transition-colors"
           >
             <LogOut size={16} />
-            Log Keluar
+            {t(language, 'logout')}
           </button>
           
           <div className="mt-4 pt-4 border-t border-slate-200 text-center">
              <p className="text-[9px] text-slate-400 leading-tight">
-                Hak Cipta © {currentYear}<br/>Dr. Mohd Guzairy bin Abd Ghani
+                {language === 'ms' ? 'Hak Cipta' : 'Copyright'} © {currentYear}<br/>Dr. Mohd Guzairy bin Abd Ghani
              </p>
           </div>
         </div>
@@ -193,7 +208,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           
           <footer className="mt-12 py-6 border-t border-slate-200 text-center no-print">
             <p className="text-[10px] md:text-xs text-slate-400">
-              Hak Cipta © {currentYear} Dr. Mohd Guzairy bin Abd Ghani. Hak Cipta Terpelihara.
+              {language === 'ms' ? 'Hak Cipta' : 'Copyright'} © {currentYear} Dr. Mohd Guzairy bin Abd Ghani. {language === 'ms' ? 'Hak Cipta Terpelihara' : 'All Rights Reserved'}.
             </p>
           </footer>
         </div>
