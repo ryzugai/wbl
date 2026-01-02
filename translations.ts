@@ -3,7 +3,7 @@ export type Language = 'ms' | 'en';
 
 export const translations = {
   ms: {
-    // Nav
+    // Nav & Common
     dashboard: "Dashboard",
     companies: "Senarai Syarikat",
     students: "Senarai Pelajar",
@@ -17,8 +17,20 @@ export const translations = {
     systemData: "Sistem & Data",
     profile: "Profil",
     logout: "Log Keluar",
+    // Fix: Add missing login and register keys
+    login: "Log Masuk",
+    register: "Daftar",
     mainMenu: "Menu Utama",
     references: "Rujukan",
+    save: "Simpan",
+    cancel: "Batal",
+    delete: "Padam",
+    confirm: "Sahkan",
+    loading: "Memproses...",
+    back: "Kembali",
+    actions: "Tindakan",
+    search: "Cari...",
+    status: "Status",
 
     // Dashboard
     wblSession: "Sesi WBL",
@@ -35,33 +47,79 @@ export const translations = {
     successRate: "Kadar Kejayaan",
     averageApps: "Purata Mohon/Pelajar",
 
-    // Companies
-    searchPlaceholder: "Cari syarikat...",
-    sortBy: "Susun",
-    nameAZ: "Nama (A-Z)",
-    latest: "Terkini",
-    allStates: "Semua Negeri",
-    industry: "Industri",
-    location: "Lokasi",
-    applicants: "Pemohon",
-    actions: "Tindakan",
-    apply: "Mohon",
-    noCompanies: "Tiada syarikat dijumpai.",
+    // Students & Staff
+    studentTitle: "Senarai Pelajar",
+    studentDesc: "Menguruskan profil dan penempatan pelajar WBL.",
+    staffTitle: "Senarai Staf & Industri",
+    lecturers: "Pensyarah",
+    industryStaff: "Staf Industri",
+    exportExcel: "Eksport Excel",
+    assignSup: "Tugaskan Penyelia",
+    editUser: "Kemaskini Maklumat",
+    deleteUser: "Padam Pengguna",
+    noRecords: "Tiada rekod dijumpai.",
 
-    // Common
-    save: "Simpan",
-    cancel: "Batal",
-    delete: "Padam",
-    confirm: "Sahkan",
-    loading: "Memproses...",
-    back: "Kembali",
-    register: "Daftar Akaun Baru",
-    login: "Log Masuk",
+    // Applications
+    appTitle: "Senarai Permohonan",
+    appStudent: "Pelajar",
+    appCompany: "Syarikat",
+    appFacultySup: "Penyelia Fakulti",
+    appJanaSurat: "Jana Surat",
+    appJanaSuratMohon: "Jana Surat Permohonan",
+    appSemakBorang: "Semak Borang",
+    appHantarBorang: "Hantar Borang Maklum Balas",
+    appLihatStatus: "Lihat Status Borang",
+
+    // Statistics
+    statsTitle: "Analisa Statistik WBL",
+    statsDesc: "Visualisasi data pelajar dan penempatan secara masa nyata.",
+    statsResumeRate: "Kadar Pengisian Resume",
+    statsPlaced: "Sudah Ditempatkan",
+    statsResumeReady: "Lengkap Resume",
+    statsNotApplied: "Belum Memohon",
+    statsPlacementDist: "Agihan Status Pelajar",
+    statsResumeReadiness: "Tahap Kesiapsediaan Resume",
+    statsTopStates: "Top 5 Penempatan (Negeri)",
+    statsTopCompanies: "Top 5 Syarikat Paling Diminati",
+    statsSummary: "Ringkasan Analisa Keseluruhan",
+    statsProgramBreakdown: "Pecahan Statistik Mengikut Program",
+
+    // Profile & Resume
+    profileTitle: "Profil Pengguna",
+    profileGenResume: "Jana Resume Infografik",
+    profileAccountInfo: "Maklumat Akaun",
+    profilePersonalInfo: "Maklumat Peribadi",
+    profileStudentInfo: "Maklumat Pelajar",
+    profileResumeDetails: "Butiran Resume Infografik",
+    profileAbout: "Tentang Saya",
+    profileSoftSkills: "Kemahiran Insaniah",
+    profileTechSkills: "Kemahiran Teknologi",
+    profileEducation: "Pendidikan",
+    profileExperience: "Pengalaman Kerja",
+    profileProjects: "Projek & Pencapaian",
+
+    // System Data
+    sysDataTitle: "Sistem & Data",
+    sysDataDesc: "Pengurusan pangkalan data dan sinkronisasi.",
+    sysAdMgmt: "Pengurusan Iklan Karusel",
+    sysCloudSync: "WBL Cloud Database",
+    sysBackup: "Simpan Fail Backup",
+    sysRestore: "Import Fail Backup",
+
+    // Login & Register
+    loginTitle: "Log Masuk",
+    registerTitle: "Daftar Akaun Baru",
     username: "Username",
     password: "Password",
+    fullName: "Nama Penuh",
+    role: "Peranan",
+    program: "Program",
+    matricNo: "No. Matrik",
+    icNo: "No. Kad Pengenalan",
+    address: "Alamat",
   },
   en: {
-    // Nav
+    // Nav & Common
     dashboard: "Dashboard",
     companies: "Company List",
     students: "Student List",
@@ -75,8 +133,20 @@ export const translations = {
     systemData: "System & Data",
     profile: "Profile",
     logout: "Logout",
+    // Fix: Add missing login and register keys
+    login: "Login",
+    register: "Register",
     mainMenu: "Main Menu",
     references: "References",
+    save: "Save",
+    cancel: "Cancel",
+    delete: "Delete",
+    confirm: "Confirm",
+    loading: "Processing...",
+    back: "Back",
+    actions: "Actions",
+    search: "Search...",
+    status: "Status",
 
     // Dashboard
     wblSession: "WBL Session",
@@ -93,30 +163,76 @@ export const translations = {
     successRate: "Success Rate",
     averageApps: "Avg Apps/Student",
 
-    // Companies
-    searchPlaceholder: "Search companies...",
-    sortBy: "Sort By",
-    nameAZ: "Name (A-Z)",
-    latest: "Latest",
-    allStates: "All States",
-    industry: "Industry",
-    location: "Location",
-    applicants: "Applicants",
-    actions: "Actions",
-    apply: "Apply",
-    noCompanies: "No companies found.",
+    // Students & Staff
+    studentTitle: "Student List",
+    studentDesc: "Manage WBL student profiles and placements.",
+    staffTitle: "Staff & Industry List",
+    lecturers: "Lecturers",
+    industryStaff: "Industry Staff",
+    exportExcel: "Export Excel",
+    assignSup: "Assign Supervisor",
+    editUser: "Update Information",
+    deleteUser: "Delete User",
+    noRecords: "No records found.",
 
-    // Common
-    save: "Save",
-    cancel: "Cancel",
-    delete: "Delete",
-    confirm: "Confirm",
-    loading: "Processing...",
-    back: "Back",
-    register: "Register New Account",
-    login: "Login",
+    // Applications
+    appTitle: "Application List",
+    appStudent: "Student",
+    appCompany: "Company",
+    appFacultySup: "Faculty Supervisor",
+    appJanaSurat: "Generate Letter",
+    appJanaSuratMohon: "Gen. Request Letter",
+    appSemakBorang: "Verify Form",
+    appHantarBorang: "Submit Feedback Form",
+    appLihatStatus: "View Form Status",
+
+    // Statistics
+    statsTitle: "WBL Statistical Analysis",
+    statsDesc: "Real-time visualization of student and placement data.",
+    statsResumeRate: "Resume Completion Rate",
+    statsPlaced: "Successfully Placed",
+    statsResumeReady: "Resume Complete",
+    statsNotApplied: "Not Yet Applied",
+    statsPlacementDist: "Student Status Distribution",
+    statsResumeReadiness: "Resume Readiness Level",
+    statsTopStates: "Top 5 Placements (States)",
+    statsTopCompanies: "Top 5 Most Interested Companies",
+    statsSummary: "Overall Analysis Summary",
+    statsProgramBreakdown: "Statistical Breakdown by Program",
+
+    // Profile & Resume
+    profileTitle: "User Profile",
+    profileGenResume: "Generate Infographic Resume",
+    profileAccountInfo: "Account Information",
+    profilePersonalInfo: "Personal Information",
+    profileStudentInfo: "Student Information",
+    profileResumeDetails: "Infographic Resume Details",
+    profileAbout: "About Me",
+    profileSoftSkills: "Soft Skills",
+    profileTechSkills: "Technical Skills",
+    profileEducation: "Education",
+    profileExperience: "Work Experience",
+    profileProjects: "Projects & Achievements",
+
+    // System Data
+    sysDataTitle: "System & Data",
+    sysDataDesc: "Database management and synchronization.",
+    sysAdMgmt: "Carousel Ad Management",
+    sysCloudSync: "WBL Cloud Database",
+    sysBackup: "Save Backup File",
+    sysRestore: "Import Backup File",
+
+    // Login & Register
+    loginTitle: "Login",
+    registerTitle: "Register New Account",
     username: "Username",
     password: "Password",
+    fullName: "Full Name",
+    role: "Role",
+    program: "Program",
+    matricNo: "Matric No.",
+    icNo: "Identity Card No.",
+    address: "Address",
   }
 };
 
