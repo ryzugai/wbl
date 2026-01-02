@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Application, Company, User, UserRole } from '../types';
-import { BarChart3, PieChart as PieIcon, CheckCircle2, Clock, XCircle, Building2, GraduationCap, MapPin } from 'lucide-react';
+import { BarChart3, PieChart as PieIcon, CheckCircle2, Clock, XCircle, Building2, GraduationCap, MapPin, TrendingUp } from 'lucide-react';
 
 interface StatisticsProps {
   applications: Application[];
@@ -45,7 +45,23 @@ export const Statistics: React.FC<StatisticsProps> = ({ applications, companies,
 
   const maxStateCount = Math.max(...stateData.map(d => d.count), 1);
 
-  // 3. Data Processing for Programs (Table)
+  // 3. Data Processing for Top 5 Companies (Most Chosen)
+  const companyStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    applications.forEach(app => {
+      const name = app.company_name || 'Tidak Diketahui';
+      counts[name] = (counts[name] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [applications]);
+
+  const maxCompanyCount = Math.max(...companyStats.map(d => d.count), 1);
+
+  // 4. Data Processing for Programs (Table)
   const programStats = useMemo(() => {
     const stats: Record<string, { total: number, approved: number }> = {};
     
@@ -206,6 +222,60 @@ export const Statistics: React.FC<StatisticsProps> = ({ applications, companies,
               </div>
             )}
           </div>
+        </div>
+
+        {/* NEW CHART: TOP 5 COMPANIES */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center gap-2 mb-6">
+            <Building2 size={20} className="text-indigo-600" />
+            <h3 className="font-bold text-slate-800">Top 5 Syarikat Paling Diminati</h3>
+          </div>
+          
+          <div className="space-y-5">
+            {companyStats.length > 0 ? (
+              companyStats.map((data, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-slate-700 truncate max-w-[80%]">{data.name}</span>
+                    <span className="text-indigo-600">{data.count} Permohonan</span>
+                  </div>
+                  <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${(data.count / maxCompanyCount) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-48 text-slate-400 italic text-sm text-center">
+                <TrendingUp size={32} className="mb-2 opacity-20" />
+                Tiada data permohonan lagi.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* STATS INFO BOX */}
+        <div className="bg-indigo-600 p-6 rounded-2xl shadow-md text-white flex flex-col justify-center relative overflow-hidden">
+            <div className="relative z-10">
+                <h3 className="text-lg font-bold mb-2">Analisa Prestasi WBL</h3>
+                <p className="text-indigo-100 text-sm leading-relaxed">
+                    Data menunjukkan syarikat di negeri <strong>{stateData[0]?.name || '...'}</strong> mendapat penempatan paling tinggi setakat ini. 
+                    Sebanyak <strong>{statusCounts.p_approved.toFixed(1)}%</strong> permohonan telah berjaya diluluskan.
+                </p>
+                <div className="mt-4 pt-4 border-t border-indigo-500/50 flex gap-4">
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-indigo-200">Kadar Kejayaan</p>
+                        <p className="text-xl font-black">{statusCounts.p_approved.toFixed(1)}%</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-indigo-200">Purata Mohon/Pelajar</p>
+                        <p className="text-xl font-black">{(applications.length / (users.filter(u => u.role === UserRole.STUDENT).length || 1)).toFixed(1)}</p>
+                    </div>
+                </div>
+            </div>
+            <BarChart3 className="absolute -bottom-6 -right-6 text-white/10" size={120} />
         </div>
       </div>
 
