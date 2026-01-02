@@ -41,6 +41,10 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
         toast.error("Hanya Penyelaras boleh menukar status JKWBL.");
         return;
     }
+    if (user.role !== UserRole.LECTURER) {
+        toast.error("Hanya pensyarah boleh dilantik sebagai ahli JKWBL.");
+        return;
+    }
     try {
       await onUpdateUser({ ...user, is_jkwbl: !user.is_jkwbl });
       toast.success(`Status JKWBL ${user.is_jkwbl ? 'dikeluarkan' : 'diberikan'}`);
@@ -144,7 +148,7 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                           </button>
                         )}
                         
-                        {/* JKWBL Toggle - ONLY Coordinator */}
+                        {/* JKWBL Toggle - ONLY Coordinator and ONLY for Lecturers */}
                         {isCoordinator && user.role === UserRole.LECTURER && (
                             <button 
                                 onClick={() => handleToggleJKWBL(user)} 

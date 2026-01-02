@@ -257,7 +257,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               <FileText size={18} />
                           </button>
 
-                          {/* Assign Supervisor - ONLY Coordinator */}
+                          {/* Assign Supervisor - ONLY Coordinator and only if student has a placement app (Approved or Pending) */}
                           {isCoordinator && item.placement && (
                               <button 
                                   onClick={() => handleAssignClick(item)}
