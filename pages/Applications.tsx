@@ -4,6 +4,7 @@ import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter } from '../utils/letterGenerator';
 import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 interface ApplicationsProps {
   currentUser: User;
@@ -62,6 +63,11 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
 
   const handleAssignSupervisor = async () => {
     if (!selectedApp || !supervisorId) return;
+    if (!isCoordinator) {
+        toast.error("Hanya Penyelaras boleh menugaskan penyelia.");
+        return;
+    }
+
     const lecturer = lecturers.find(l => l.id === supervisorId);
     if (!lecturer) return;
 
@@ -71,6 +77,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       faculty_supervisor_name: lecturer.name,
       faculty_supervisor_staff_id: lecturer.staff_id
     });
+    
+    toast.success(`Penyelia ${lecturer.name} telah ditugaskan.`);
     setModalType(null);
     setSupervisorId('');
   };
@@ -183,8 +191,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             </>
                         )}
 
-                        {/* Assign Supervisor (Coordinator/JKWBL, if Approved) */}
-                        {hasSystemAccess && app.application_status === 'Diluluskan' && (
+                        {/* Assign Supervisor - ONLY Coordinator */}
+                        {isCoordinator && app.application_status === 'Diluluskan' && (
                             <button 
                                 onClick={() => { setSelectedApp(app); setModalType('supervisor'); }}
                                 className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"

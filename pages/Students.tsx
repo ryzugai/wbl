@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, ShieldCheck, Clock } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -57,22 +57,6 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
     };
   }).filter(Boolean) as (User & { placement?: Application })[];
 
-  const handleToggleJKWBL = async (student: User) => {
-    if (!isCoordinator) {
-        toast.error("Hanya Penyelaras boleh menukar status JKWBL.");
-        return;
-    }
-    try {
-      await onUpdateUser({ 
-        ...student, 
-        is_jkwbl: !student.is_jkwbl 
-      });
-      toast.success(`Akses JKWBL bagi ${student.name} telah ${!student.is_jkwbl ? 'diberikan' : 'ditarik balik'}`);
-    } catch (e: any) {
-      toast.error(e.message);
-    }
-  };
-
   const exportToExcel = () => {
     try {
       const dataToExport = studentList.map(s => ({
@@ -82,7 +66,6 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         'Program': s.program,
         'Email': s.email,
         'Telefon': s.phone,
-        'Ahli JKWBL': s.is_jkwbl ? 'YA' : 'TIDAK',
         'Status Penempatan': s.placement ? (s.placement.application_status === 'Diluluskan' ? 'Sudah Ditempatkan' : 'Menunggu Kelulusan') : 'Belum Ditempatkan',
         'Syarikat': s.placement?.company_name || '-',
         'Daerah (Syarikat)': s.placement?.company_district || '-',
@@ -106,6 +89,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   };
 
   const handleAssignClick = (student: any) => {
+    if (!isCoordinator) {
+        toast.error("Hanya Penyelaras boleh menugaskan penyelia.");
+        return;
+    }
     setSelectedStudent(student);
     setSelectedApp(student.placement || null);
     
@@ -117,6 +104,11 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
 
   const handleSaveSupervisor = async () => {
     if (!selectedStudent || !supervisorId) return;
+    if (!isCoordinator) {
+        toast.error("Akses Ditolak: Hanya Penyelaras boleh menugaskan penyelia.");
+        return;
+    }
+
     const lecturer = lecturers.find(l => l.id === supervisorId);
     if (!lecturer) return;
 
@@ -219,9 +211,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
                     <td className="p-4">
-                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                      <div className="font-bold text-slate-900">
                           {item.name}
-                          {item.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
                       </div>
                       <div className="text-xs text-slate-500 font-medium">{item.matric_no}</div>
                       <div className="text-xs text-slate-400 mt-1">{item.email}</div>
@@ -266,19 +257,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               <FileText size={18} />
                           </button>
 
-                          {/* JKWBL Toggle - ONLY Coordinator */}
-                          {isCoordinator && (
-                              <button 
-                                  onClick={() => handleToggleJKWBL(item)} 
-                                  className={`p-2 rounded-lg border transition-all shadow-sm ${item.is_jkwbl ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'}`}
-                                  title={item.is_jkwbl ? "Tarik Akses JKWBL" : "Beri Akses JKWBL"}
-                              >
-                                  <ShieldCheck size={18} />
-                              </button>
-                          )}
-
-                          {/* Assign Supervisor - Allowed for placements (Approved/Pending) OR JKWBL members */}
-                          {hasSystemAccess && (item.placement || item.is_jkwbl) && (
+                          {/* Assign Supervisor - ONLY Coordinator */}
+                          {isCoordinator && item.placement && (
                               <button 
                                   onClick={() => handleAssignClick(item)}
                                   className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all border border-blue-100 shadow-sm"
@@ -330,13 +310,11 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <p className="text-sm text-slate-600">Pelajar: <strong>{selectedStudent?.name}</strong></p>
                     <p className="text-xs text-slate-500">{selectedStudent?.matric_no}</p>
-                    {selectedApp ? (
+                    {selectedApp && (
                         <p className={`text-xs font-bold mt-1 ${selectedApp.application_status === 'Diluluskan' ? 'text-green-600' : 'text-orange-600'}`}>
                             {selectedApp.application_status === 'Diluluskan' ? 'Syarikat Diluluskan: ' : 'Menunggu Kelulusan Syarikat: '}
                             {selectedApp.company_name}
                         </p>
-                    ) : (
-                        <p className="text-xs text-orange-600 font-bold mt-1 italic">Penempatan belum dimuktamadkan (Mod JKWBL)</p>
                     )}
                 </div>
 
