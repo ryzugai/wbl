@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, ShieldCheck } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, ShieldCheck, Clock } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -34,25 +34,26 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const isJKWBL = currentUser.is_jkwbl === true;
   const hasSystemAccess = isCoordinator || isJKWBL;
 
-  // Get all approved applications for matching
-  const approvedApps = applications.filter(a => a.application_status === 'Diluluskan');
-
-  // Map student to their approved application (if any) and filter based on viewer role
+  // Map student to their application and filter based on viewer role
   const studentList = students.map(student => {
-    // Find if student has an approved application
-    const app = approvedApps.find(a => a.student_id === student.matric_no || a.created_by === student.username);
+    // Priority: 1. Approved App, 2. Pending App
+    const studentApps = applications.filter(a => a.student_id === student.matric_no || a.created_by === student.username);
+    const approvedApp = studentApps.find(a => a.application_status === 'Diluluskan');
+    const pendingApp = studentApps.find(a => a.application_status === 'Menunggu');
+    
+    const primaryApp = approvedApp || pendingApp;
     
     // STRICT FILTERING for Industry Users
     if (currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) {
         if (!currentUser.company_affiliation) return null;
-        if (!app || app.company_name !== currentUser.company_affiliation) {
+        if (!approvedApp || approvedApp.company_name !== currentUser.company_affiliation) {
             return null;
         }
     }
 
     return {
       ...student,
-      placement: app
+      placement: primaryApp
     };
   }).filter(Boolean) as (User & { placement?: Application })[];
 
@@ -82,7 +83,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         'Email': s.email,
         'Telefon': s.phone,
         'Ahli JKWBL': s.is_jkwbl ? 'YA' : 'TIDAK',
-        'Status Penempatan': s.placement ? 'Sudah Ditempatkan' : 'Belum Ditempatkan',
+        'Status Penempatan': s.placement ? (s.placement.application_status === 'Diluluskan' ? 'Sudah Ditempatkan' : 'Menunggu Kelulusan') : 'Belum Ditempatkan',
         'Syarikat': s.placement?.company_name || '-',
         'Daerah (Syarikat)': s.placement?.company_district || '-',
         'Negeri (Syarikat)': s.placement?.company_state || '-',
@@ -120,10 +121,15 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
     if (!lecturer) return;
 
     try {
-        // 1. Update Application if exists
-        if (selectedApp) {
+        // 1. Update ALL active Applications for this student (Approved or Pending)
+        const studentApps = applications.filter(a => 
+            (a.student_id === selectedStudent.matric_no || a.created_by === selectedStudent.username) &&
+            (a.application_status === 'Diluluskan' || a.application_status === 'Menunggu')
+        );
+
+        for (const app of studentApps) {
             await onUpdateApplication({
-                ...selectedApp,
+                ...app,
                 faculty_supervisor_id: lecturer.id,
                 faculty_supervisor_name: lecturer.name,
                 faculty_supervisor_staff_id: lecturer.staff_id
@@ -207,6 +213,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
               )}
               {studentList.map((item: any) => {
                 const displaySupName = item.placement?.faculty_supervisor_name || item.faculty_supervisor_name;
+                const isApproved = item.placement?.application_status === 'Diluluskan';
+                const isPending = item.placement?.application_status === 'Menunggu';
                 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
@@ -220,9 +228,13 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     </td>
                     <td className="p-4 text-sm text-slate-700 max-w-xs truncate" title={item.program}>{item.program}</td>
                     <td className="p-4">
-                      {item.placement ? (
+                      {isApproved ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">
                           {item.placement.company_name}
+                        </span>
+                      ) : isPending ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200 shadow-sm">
+                          <Clock size={10} /> Menunggu: {item.placement.company_name}
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
@@ -265,7 +277,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               </button>
                           )}
 
-                          {/* Assign Supervisor - Allowed for placements OR JKWBL members */}
+                          {/* Assign Supervisor - Allowed for placements (Approved/Pending) OR JKWBL members */}
                           {hasSystemAccess && (item.placement || item.is_jkwbl) && (
                               <button 
                                   onClick={() => handleAssignClick(item)}
@@ -319,7 +331,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     <p className="text-sm text-slate-600">Pelajar: <strong>{selectedStudent?.name}</strong></p>
                     <p className="text-xs text-slate-500">{selectedStudent?.matric_no}</p>
                     {selectedApp ? (
-                        <p className="text-xs text-green-600 font-bold mt-1">Syarikat: {selectedApp.company_name}</p>
+                        <p className={`text-xs font-bold mt-1 ${selectedApp.application_status === 'Diluluskan' ? 'text-green-600' : 'text-orange-600'}`}>
+                            {selectedApp.application_status === 'Diluluskan' ? 'Syarikat Diluluskan: ' : 'Menunggu Kelulusan Syarikat: '}
+                            {selectedApp.company_name}
+                        </p>
                     ) : (
                         <p className="text-xs text-orange-600 font-bold mt-1 italic">Penempatan belum dimuktamadkan (Mod JKWBL)</p>
                     )}
@@ -351,6 +366,9 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 >
                     Simpan Tugasan
                 </button>
+                <p className="text-[10px] text-slate-500 italic text-center">
+                    Nota: Maklumat penyelia akan dikemaskini pada profil pelajar dan semua permohonan aktif mereka.
+                </p>
             </div>
         </Modal>
 
