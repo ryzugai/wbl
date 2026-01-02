@@ -153,6 +153,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 const displaySupName = item.placement?.faculty_supervisor_name || item.faculty_supervisor_name;
                 const isApproved = item.placement?.application_status === 'Diluluskan';
                 const isPending = item.placement?.application_status === 'Menunggu';
+                
+                // Cek jika resume sudah diisi
+                const hasResume = !!(item.resume_about || item.resume_education || item.resume_skills_soft);
+                
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
                     <td className="p-4">
@@ -181,7 +185,18 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     </td>
                     <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => generateResume(item, language)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="View Resume">
+                          <button 
+                            onClick={() => generateResume(item, language)} 
+                            className={`p-2 rounded-lg transition-colors ${
+                                hasResume 
+                                    ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                            }`}
+                            title={hasResume 
+                                ? (language === 'ms' ? 'Lihat Resume (Lengkap)' : 'View Resume (Complete)') 
+                                : (language === 'ms' ? 'Resume Belum Lengkap' : 'Resume Incomplete')
+                            }
+                          >
                               <FileText size={18} />
                           </button>
                           {isCoordinator && item.placement && (

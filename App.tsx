@@ -203,8 +203,8 @@ function App() {
       <>
         <Toaster position="top-right" />
         {currentView === 'register' 
-          ? <Register language={language} onRegisterSuccess={() => setCurrentView('login')} onBack={() => setCurrentView('login')} /> 
-          : <Login language={language} onLoginSuccess={handleLogin} onGoToRegister={() => setCurrentView('register')} />
+          ? <Register language={language} onLanguageChange={setLanguage} onRegisterSuccess={() => setCurrentView('login')} onBack={() => setCurrentView('login')} /> 
+          : <Login language={language} onLanguageChange={setLanguage} onLoginSuccess={handleLogin} onGoToRegister={() => setCurrentView('register')} />
         }
       </>
     );

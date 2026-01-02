@@ -19,7 +19,6 @@ interface ApplicationsProps {
 export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applications, users, companies, onUpdateApplication, language }) => {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [modalType, setModalType] = useState<'supervisor' | 'upload' | 'viewReply' | 'letter' | 'statusConfirm' | null>(null);
-  const [supervisorId, setSupervisorId] = useState('');
   const [statusConfirmData, setStatusConfirmData] = useState<{ app: Application; newStatus: any } | null>(null);
   
   const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
@@ -83,12 +82,28 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         <div className="flex justify-center gap-2">
                         {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && app.application_status === 'Menunggu' && (
                             <>
-                                <button onClick={() => { setStatusConfirmData({app, newStatus: 'Diluluskan'}); setModalType('statusConfirm'); }} className="p-2 bg-green-100 text-green-600 rounded"><FileCheck size={18} /></button>
-                                <button onClick={() => { setStatusConfirmData({app, newStatus: 'Ditolak'}); setModalType('statusConfirm'); }} className="p-2 bg-red-100 text-red-600 rounded"><FileX size={18} /></button>
+                                <button 
+                                  onClick={() => { setStatusConfirmData({app, newStatus: 'Diluluskan'}); setModalType('statusConfirm'); }} 
+                                  className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
+                                  title={language === 'ms' ? "Luluskan Permohonan" : "Approve Application"}
+                                >
+                                  <FileCheck size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => { setStatusConfirmData({app, newStatus: 'Ditolak'}); setModalType('statusConfirm'); }} 
+                                  className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                                  title={language === 'ms' ? "Tolak Permohonan" : "Reject Application"}
+                                >
+                                  <FileX size={18} />
+                                </button>
                             </>
                         )}
                         {currentUser.role === UserRole.STUDENT && (
-                            <button onClick={() => { setSelectedApp(app); setModalType('letter'); }} className="p-2 bg-purple-100 text-purple-600 rounded" title={t(language, 'appJanaSurat')}>
+                            <button 
+                              onClick={() => { setSelectedApp(app); setModalType('letter'); }} 
+                              className="p-2 bg-purple-100 text-purple-600 rounded hover:bg-purple-200 transition-colors" 
+                              title={t(language, 'appJanaSurat')}
+                            >
                                 <Printer size={18} />
                             </button>
                         )}

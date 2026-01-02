@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { StorageService } from '../services/storage';
 import { User } from '../types';
-import { Building2, Eye, EyeOff } from 'lucide-react';
+import { Building2, Eye, EyeOff, Languages } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 
@@ -10,9 +10,10 @@ interface LoginProps {
   onLoginSuccess: (user: User) => void;
   onGoToRegister: () => void;
   language: Language;
+  onLanguageChange: (lang: Language) => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, language }) => {
+export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, language, onLanguageChange }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +34,24 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md animate-fadeIn">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md animate-fadeIn relative">
+        
+        {/* Inline Language Switcher */}
+        <div className="absolute top-4 right-4 flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200">
+           <button 
+                onClick={() => onLanguageChange('ms')}
+                className={`px-2 py-1 text-[10px] font-bold rounded ${language === 'ms' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+           >
+                MS
+           </button>
+           <button 
+                onClick={() => onLanguageChange('en')}
+                className={`px-2 py-1 text-[10px] font-bold rounded ${language === 'en' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+           >
+                EN
+           </button>
+        </div>
+
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 text-white shadow-lg shadow-blue-200">
             <Building2 size={32} />
