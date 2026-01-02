@@ -14,6 +14,7 @@ import { Profile } from './pages/Profile';
 import { StaffList } from './pages/StaffList';
 import { Guidebook } from './pages/Guidebook';
 import { SystemData } from './pages/SystemData';
+import { Statistics } from './pages/Statistics';
 import { Toaster, toast } from 'react-hot-toast';
 
 function App() {
@@ -259,6 +260,14 @@ function App() {
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
             />
+        )}
+
+        {currentView === 'statistics' && (
+          <Statistics 
+            applications={applications} 
+            companies={companies} 
+            users={users} 
+          />
         )}
         
         {currentView === 'uploadExcel' && <UploadExcel onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}

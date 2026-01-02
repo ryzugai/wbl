@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3 } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { StorageService } from '../services/storage';
 
@@ -123,6 +123,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           
           <NavItem view="applications" label="Permohonan" icon={FileText} />
           
+          {hasSystemAccess && (
+            <NavItem view="statistics" label="Statistik" icon={BarChart3} />
+          )}
+
           <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
              Rujukan
           </div>
