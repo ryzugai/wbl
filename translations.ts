@@ -96,8 +96,15 @@ export const translations = {
     appJanaSurat: "Jana Surat",
     appJanaSuratMohon: "Jana Surat Permohonan",
     appSemakBorang: "Semak Borang",
-    appHantarBorang: "Hantar Borang Maklum Balas",
+    appHantarBorang: "Muat Naik Borang Jawapan",
     appLihatStatus: "Lihat Status Borang",
+    appUploadPdf: "Muat Naik PDF",
+    appFileTooLarge: "Fail terlalu besar! Had maksimum ialah 20MB.",
+    appInvalidFormat: "Hanya fail PDF sahaja dibenarkan.",
+    appUploadSuccess: "Borang berjaya dimuat naik!",
+    appVerifyBorang: "Sahkan Borang",
+    appBorangVerified: "Borang Telah Disahkan",
+    appBorangMissing: "Borang Belum Dihantar",
 
     // Statistics
     statsTitle: "Analisa Statistik WBL",
@@ -259,8 +266,15 @@ export const translations = {
     appJanaSurat: "Generate Letter",
     appJanaSuratMohon: "Gen. Request Letter",
     appSemakBorang: "Verify Form",
-    appHantarBorang: "Submit Feedback Form",
+    appHantarBorang: "Upload Reply Form",
     appLihatStatus: "View Form Status",
+    appUploadPdf: "Upload PDF",
+    appFileTooLarge: "File too large! Maximum limit is 20MB.",
+    appInvalidFormat: "Only PDF files are allowed.",
+    appUploadSuccess: "Form uploaded successfully!",
+    appVerifyBorang: "Verify Form",
+    appBorangVerified: "Form Verified",
+    appBorangMissing: "Form Missing",
 
     // Statistics
     statsTitle: "WBL Statistical Analysis",
