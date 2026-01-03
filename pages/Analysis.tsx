@@ -266,7 +266,7 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg text-[10px] font-bold text-yellow-700 shadow-sm">
             <AlertTriangle size={14} />
-            <span>KUNING: Syarikat mempunyai >1 permohonan (Elakkan Spam Emel)</span>
+            <span>KUNING: Syarikat mempunyai &gt;1 permohonan (Elakkan Spam Emel)</span>
         </div>
       </div>
 
