@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole } from '../types';
-import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck, UserCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ROLE_LABELS } from '../constants';
 import { generateResume, ResumeTheme } from '../utils/resumeGenerator';
@@ -348,7 +348,15 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }
             {formData.role === UserRole.STUDENT && (
                 <>
                 <section className="space-y-4">
-                    <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'profileStudentInfo')}</h4>
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                        <h4 className="text-lg font-semibold text-slate-800">{t(language, 'profileStudentInfo')}</h4>
+                        {formData.faculty_supervisor_name && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-100 rounded-full text-[10px] font-bold text-green-700 shadow-sm animate-fadeIn">
+                                <UserCheck size={14} />
+                                <span>PENYELIA: {formData.faculty_supervisor_name}</span>
+                            </div>
+                        )}
+                    </div>
                     <div className="space-y-1">
                         <label className="text-sm font-medium text-slate-700">{t(language, 'program')}</label>
                         {isEditing ? (
@@ -377,6 +385,22 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }
                             <textarea disabled={!isEditing} className={`w-full pl-10 pr-4 py-2 border rounded-lg transition-colors ${!isEditing ? 'bg-slate-100 text-slate-600 border-transparent' : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 shadow-sm'}`} rows={3} value={formData.address || ''} onChange={(e) => setFormData({...formData, address: e.target.value})} />
                         </div>
                     </div>
+
+                    {/* Faculty Supervisor Info Box (Non-editable) */}
+                    {formData.faculty_supervisor_name && (
+                        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-4">
+                            <div className="p-3 bg-white rounded-lg shadow-sm text-blue-600 border border-slate-100">
+                                <UserCheck size={24} />
+                            </div>
+                            <div>
+                                <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Penyelia Fakulti (Assigned)</h5>
+                                <p className="font-bold text-slate-800 text-sm">{formData.faculty_supervisor_name}</p>
+                                {formData.faculty_supervisor_staff_id && (
+                                    <p className="text-[10px] text-slate-500 font-medium">No. Staf: {formData.faculty_supervisor_staff_id}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 <section className="space-y-6 bg-slate-50 p-6 rounded-xl border border-slate-200">

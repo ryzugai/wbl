@@ -7,6 +7,7 @@ export const translations = {
     dashboard: "Dashboard",
     companies: "Senarai Syarikat",
     students: "Senarai Pelajar",
+    supervisedTab: "Pelajar Seliaan",
     staff: "Senarai Staf",
     applications: "Permohonan",
     statistics: "Statistik",
@@ -32,6 +33,13 @@ export const translations = {
     actions: "Tindakan",
     search: "Cari...",
     status: "Status",
+
+    // Supervised Students
+    supervisedTitle: "Senarai Pelajar Seliaan",
+    supervisedDesc: "Senarai pelajar yang telah ditugaskan secara rasmi di bawah penyeliaan anda.",
+    supervisedViewDoc: "Semak Borang PDF",
+    supervisedNoDoc: "Borang Jawapan Tiada",
+    supervisedStudentInfo: "Maklumat Pelajar Seliaan",
 
     // Flipbook
     flipTitle: "Katalog Poster Industri",
@@ -177,6 +185,7 @@ export const translations = {
     dashboard: "Dashboard",
     companies: "Company List",
     students: "Student List",
+    supervisedTab: "My Students",
     staff: "Staff List",
     applications: "Applications",
     statistics: "Statistics",
@@ -202,6 +211,13 @@ export const translations = {
     actions: "Actions",
     search: "Search...",
     status: "Status",
+
+    // Supervised Students
+    supervisedTitle: "My Supervised Students",
+    supervisedDesc: "List of students formally assigned under your supervision.",
+    supervisedViewDoc: "Check PDF Form",
+    supervisedNoDoc: "No Reply Form",
+    supervisedStudentInfo: "Supervised Student Info",
 
     // Flipbook
     flipTitle: "Industry Poster Catalog",

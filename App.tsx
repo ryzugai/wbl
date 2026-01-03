@@ -8,6 +8,7 @@ import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { Companies } from './pages/Companies';
 import { Students } from './pages/Students';
+import { SupervisedStudents } from './pages/SupervisedStudents';
 import { Applications } from './pages/Applications';
 import { UploadExcel } from './pages/UploadExcel';
 import { Profile } from './pages/Profile';
@@ -247,6 +248,15 @@ function App() {
                 onUpdateApplication={handleUpdateApplication}
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
+            />
+        )}
+
+        {currentView === 'supervised' && (
+            <SupervisedStudents 
+                language={language}
+                currentUser={currentUser}
+                users={users}
+                applications={applications}
             />
         )}
 

@@ -51,6 +51,7 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
       designation: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
       current: 'Kini',
       coordinatorTitle: 'Penyelaras WBL (Mod Industri)',
+      supervisorTitle: 'Penyelia Fakulti (Mod Industri)',
       faculty: 'Fakulti Pengurusan Teknologi dan Teknousahawanan, UTeM'
     },
     en: {
@@ -68,6 +69,7 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
       designation: 'Bachelor of Technopreneurship with Honours',
       current: 'Present',
       coordinatorTitle: 'WBL Coordinator (Industry Mode)',
+      supervisorTitle: 'Faculty Supervisor (Industry Mode)',
       faculty: 'Faculty of Technology Management and Technopreneurship, UTeM'
     }
   };
@@ -126,7 +128,8 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
         .courses-grid { display: grid; grid-template-columns: 1fr; gap: 4px; margin-top: 5px; }
         .course-tag { font-size: 11px; color: #334155; }
         .ref-section { margin-top: auto; padding-top: 15px; border-top: 1px solid #e2e8f0; }
-        .ref-card { font-size: 10.5px; }
+        .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .ref-card { font-size: 10.5px; line-height: 1.3; }
         .ref-name { font-weight: bold; color: ${colors.primary}; font-size: 11.5px; }
         .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: ${colors.secondary}; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 100; font-size: 13px; }
         @media print { .print-btn { display: none; } }
@@ -244,11 +247,21 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
           </div>
           <div class="ref-section">
             <div class="section-title">${t.ref}</div>
-            <div class="ref-card">
-              <div class="ref-name">Dr. Mohd Guzairy bin Abd Ghani</div>
-              <div>${t.coordinatorTitle}</div>
-              <div>${t.faculty}</div>
-              <div>Email: guzairy@utem.edu.my | Tel: 06-2708134</div>
+            <div class="ref-grid">
+                <div class="ref-card">
+                  <div class="ref-name">Dr. Mohd Guzairy bin Abd Ghani</div>
+                  <div>${t.coordinatorTitle}</div>
+                  <div>${t.faculty}</div>
+                  <div>Email: guzairy@utem.edu.my</div>
+                </div>
+                ${student.faculty_supervisor_name ? `
+                <div class="ref-card">
+                  <div class="ref-name">${student.faculty_supervisor_name}</div>
+                  <div>${t.supervisorTitle}</div>
+                  <div>${t.faculty}</div>
+                  <div style="font-style: italic;">No. Staf: ${student.faculty_supervisor_staff_id || '-'}</div>
+                </div>
+                ` : ''}
             </div>
           </div>
         </div>

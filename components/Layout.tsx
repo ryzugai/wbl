@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -27,6 +27,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR;
   const isJKWBL = currentUser.is_jkwbl === true;
+  const isLecturer = currentUser.role === UserRole.LECTURER;
   const hasSystemAccess = isCoordinator || isJKWBL;
 
   const handleNavigate = (view: string) => {
@@ -129,6 +130,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           <NavItem view="companies" label={t(language, 'companies')} icon={Building2} />
           
           <NavItem view="poster" label={t(language, 'posterTab')} icon={BookCopy} />
+
+          {/* New Tab for Lecturers */}
+          {(isLecturer || hasSystemAccess) && (
+            <NavItem view="supervised" label={t(language, 'supervisedTab')} icon={UsersRound} />
+          )}
 
           {(hasSystemAccess || currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
             <NavItem view="students" label={t(language, 'students')} icon={Users} />
