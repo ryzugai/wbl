@@ -1,20 +1,20 @@
 
 import React, { useState, useCallback } from 'react';
 import { Company, User, UserRole, Application } from '../types';
-import { Search, Plus, Trash2, Edit, Loader2, Users, FileText, Printer, Download, FileJson, History, SortAsc } from 'lucide-react';
+import { 
+  Search, Plus, Trash2, Edit, Loader2, FileText, Printer, 
+  Download, History, SortAsc, Mail, Copy, Building2, Check 
+} from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { toast } from 'react-hot-toast';
-import { generateLOI, downloadLOIWord } from '../utils/letterGenerator';
+import { generateLOI, downloadLOIWord, generateInvitationLetter } from '../utils/letterGenerator';
 
 interface CompanyFormProps {
   data: Partial<Company>;
   setData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-/**
- * Komponen Borang diletakkan di luar supaya tidak hilang fokus (re-mount) semasa menaip.
- */
 const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
   const handleChange = (field: keyof Company, value: any) => {
     setData((prev: any) => ({ ...prev, [field]: value }));
@@ -28,7 +28,7 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
           required 
           type="text" 
           placeholder="Nama Syarikat"
-          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 outline-none" 
+          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 outline-none shadow-sm" 
           value={data.company_name || ''} 
           onChange={e => handleChange('company_name', e.target.value)} 
         />
@@ -70,88 +70,26 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Industri</label>
-        <input 
-          required 
-          type="text" 
-          placeholder="Sektor Industri"
-          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 outline-none" 
-          value={data.company_industry || ''} 
-          onChange={e => handleChange('company_industry', e.target.value)} 
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Pegawai Dihubungi</label>
-          <input 
-            required 
-            type="text" 
-            placeholder="Nama PIC"
-            className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 outline-none" 
-            value={data.company_contact_person || ''} 
-            onChange={e => handleChange('company_contact_person', e.target.value)} 
-          />
+          <label className="block text-sm font-medium text-slate-700 mb-1">Industri</label>
+          <input required type="text" className="w-full px-3 py-2 border rounded bg-white" value={data.company_industry || ''} onChange={e => handleChange('company_industry', e.target.value)} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
-          <input 
-            required 
-            type="text" 
-            placeholder="No. Telefon"
-            className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 outline-none" 
-            value={data.company_contact_phone || ''} 
-            onChange={e => handleChange('company_contact_phone', e.target.value)} 
-          />
+          <label className="block text-sm font-medium text-slate-700 mb-1">Pegawai PIC</label>
+          <input required type="text" className="w-full px-3 py-2 border rounded bg-white" value={data.company_contact_person || ''} onChange={e => handleChange('company_contact_person', e.target.value)} />
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-        <input 
-          required 
-          type="email" 
-          placeholder="email@syarikat.com"
-          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 outline-none" 
-          value={data.company_contact_email || ''} 
-          onChange={e => handleChange('company_contact_email', e.target.value)} 
-        />
-      </div>
-
-      <div className="flex flex-col gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input 
-            type="checkbox" 
-            className="w-4 h-4 text-blue-600 rounded cursor-pointer" 
-            checked={data.has_mou || false} 
-            onChange={e => handleChange('has_mou', e.target.checked)} 
-          />
-          <span className="text-sm font-medium text-slate-700">Ada MoU / LOI?</span>
-        </label>
-        
-        {data.has_mou && (
-          <select 
-            className="px-2 py-1 border border-slate-300 rounded text-sm bg-white text-slate-900 outline-none" 
-            value={data.mou_type || 'MoU'} 
-            onChange={e => handleChange('mou_type', e.target.value)}
-          >
-            <option value="MoU">MoU</option>
-            <option value="LOI">LOI</option>
-          </select>
-        )}
-
-        <div className="border-t border-slate-200 my-1"></div>
-
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input 
-            type="checkbox" 
-            className="w-4 h-4 text-blue-600 rounded cursor-pointer" 
-            checked={data.has_previous_wbl_students || false} 
-            onChange={e => handleChange('has_previous_wbl_students', e.target.checked)} 
-          />
-          <span className="text-sm font-medium text-slate-700">Pernah mengambil pelajar WBL?</span>
-        </label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">E-mel</label>
+          <input required type="email" className="w-full px-3 py-2 border rounded bg-white" value={data.company_contact_email || ''} onChange={e => handleChange('company_contact_email', e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">No. Telefon</label>
+          <input required type="text" className="w-full px-3 py-2 border rounded bg-white" value={data.company_contact_phone || ''} onChange={e => handleChange('company_contact_phone', e.target.value)} />
+        </div>
       </div>
     </div>
   );
@@ -165,177 +103,71 @@ interface CompaniesProps {
   onUpdateCompany: (c: Company) => Promise<void>;
   onDeleteCompany: (id: string) => Promise<void>;
   onApply: (company: Company) => Promise<void>;
+  language: 'ms' | 'en';
 }
 
-export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply }) => {
+export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply, language }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
   const [sortOrder, setSortOrder] = useState<'alphabetical' | 'latest'>('alphabetical');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isLOIModalOpen, setIsLOIModalOpen] = useState(false);
-  const [confirmingCompany, setConfirmingCompany] = useState<Company | null>(null);
-  const [selectedCompanyForLOI, setSelectedCompanyForLOI] = useState<Company | null>(null);
-  
-  const [newCompany, setNewCompany] = useState<Partial<Company>>({
-      company_state: 'Melaka',
-      has_mou: false,
-      mou_type: 'MoU',
-      has_previous_wbl_students: false
-  });
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [selectedCompanyForEmail, setSelectedCompanyForEmail] = useState<Company | null>(null);
+  const [newCompany, setNewCompany] = useState<Partial<Company>>({ company_state: 'Melaka' });
   const [editingCompany, setEditingCompany] = useState<any>(null);
 
-  const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.username === 'guzairy' || currentUser.is_jkwbl;
-  const myApplications = applications.filter(a => a.created_by === currentUser.username);
-  const isLimitReached = myApplications.length >= 4;
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
 
-  const filteredAndSortedCompanies = companies
+  const filteredCompanies = companies
     .filter(c => {
-      const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            c.company_district.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesState = filterState === 'all' || c.company_state === filterState;
       return matchesSearch && matchesState;
     })
     .sort((a, b) => {
-      if (sortOrder === 'alphabetical') {
-        return a.company_name.localeCompare(b.company_name);
-      } else {
-        // Sort by created_at descending (latest first)
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA;
-      }
+      if (sortOrder === 'alphabetical') return a.company_name.localeCompare(b.company_name);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.checked) setSelectedIds(filteredAndSortedCompanies.map(c => c.id));
-      else setSelectedIds([]);
+  const getEmailBody = () => {
+    const jawatan = currentUser.role === UserRole.COORDINATOR ? 'Penyelaras' : 'Ahli Jawatankuasa (JK)';
+    return `Assalamualaikum dan salam sejahtera Tuan/Puan. Saya ${currentUser.name}, ${jawatan} program BTEC WBL ingin mempelawa pihak Tuan/Puan sebagai rakan Kerjasama industri seperti terkandung didalam surat yang dilampirkan.\n\nMohon jasa baik tuan untuk berikan respon pada pautan berikut https://forms.office.com/r/Z1QEaXM6RR\n\nSekian terima kasih atas perhatian dan kerjasama.`;
   };
 
-  const handleSelectOne = (id: string) => {
-      if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(sid => sid !== id));
-      else setSelectedIds([...selectedIds, id]);
-  };
-
-  const handleAddSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!isCoordinator || !newCompany.company_name || isSubmitting) return;
-      setIsSubmitting(true);
-      try {
-        await onAddCompany({
-          company_name: newCompany.company_name!,
-          company_state: newCompany.company_state || 'Melaka',
-          company_district: newCompany.company_district || '',
-          company_address: newCompany.company_address || '',
-          company_industry: newCompany.company_industry || '',
-          company_contact_person: newCompany.company_contact_person || '',
-          company_contact_email: newCompany.company_contact_email || '',
-          company_contact_phone: newCompany.company_contact_phone || '',
-          has_mou: !!newCompany.has_mou,
-          mou_type: newCompany.has_mou ? (newCompany.mou_type || 'MoU') : null as any,
-          has_previous_wbl_students: !!newCompany.has_previous_wbl_students,
-          created_at: new Date().toISOString()
-        });
-        setIsAddModalOpen(false);
-        setNewCompany({ company_state: 'Melaka', has_mou: false, mou_type: 'MoU', has_previous_wbl_students: false });
-      } catch (err: any) {
-          // Error handling by App.tsx
-      } finally {
-        setIsSubmitting(false);
-      }
-  };
-
-  const handleEditClick = (company: Company) => {
-      setEditingCompany({ ...company });
-      setIsEditModalOpen(true);
-  };
-
-  const handleLOIClick = (company: Company) => {
-      setSelectedCompanyForLOI(company);
-      setIsLOIModalOpen(true);
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!isCoordinator || !editingCompany || isSubmitting) return;
-      setIsSubmitting(true);
-      
-      try {
-        await onUpdateCompany(editingCompany);
-        setIsEditModalOpen(false);
-        setEditingCompany(null);
-      } catch (err: any) {
-          console.error('Update error in component:', err);
-      } finally {
-          setIsSubmitting(false);
-      }
-  };
-
-  const handleConfirmApply = async () => {
-      if (confirmingCompany) {
-          await onApply(confirmingCompany);
-          setConfirmingCompany(null);
-      }
+  const handleLaunchEmail = () => {
+    if (!selectedCompanyForEmail?.company_contact_email) return;
+    const subject = encodeURIComponent(`Pelawaan Kerjasama Industri WBL UTeM - ${selectedCompanyForEmail.company_name}`);
+    const body = encodeURIComponent(getEmailBody());
+    window.location.href = `mailto:${selectedCompanyForEmail.company_contact_email}?subject=${subject}&body=${body}`;
+    setIsEmailModalOpen(false);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-800">Senarai Syarikat</h2>
-            {currentUser.role === UserRole.STUDENT && (
-                <p className="text-sm text-slate-500 mt-1">
-                    Had Permohonan: <span className={`font-bold ${isLimitReached ? 'text-red-600' : 'text-blue-600'}`}>{myApplications.length}/4</span>
-                </p>
-            )}
-        </div>
-        
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-slate-800">Senarai Syarikat</h2>
         {isCoordinator && (
-            <button 
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-sm transition-all"
-            >
-                <Plus size={20} /> Tambah Syarikat
-            </button>
+          <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-md">
+            <Plus size={18} /> Tambah Syarikat
+          </button>
         )}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 items-center">
-        <div className="flex-1 relative w-full">
-          <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl border border-slate-200">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
           <input 
-            type="text" 
-            placeholder="Cari syarikat..." 
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-900"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            type="text" placeholder="Cari syarikat..." 
+            className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white"
+            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        
-        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-                <SortAsc size={18} className="text-slate-400" />
-                <select 
-                    className="bg-transparent text-sm text-slate-700 outline-none font-medium"
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as any)}
-                >
-                    <option value="alphabetical">Susun: Nama (A-Z)</option>
-                    <option value="latest">Susun: Terkini</option>
-                </select>
-            </div>
-
-            <select 
-                className="p-2 border border-slate-300 rounded-lg bg-white text-sm text-slate-800 outline-none font-medium min-w-[150px]"
-                value={filterState}
-                onChange={(e) => setFilterState(e.target.value)}
-            >
-                <option value="all">Semua Negeri</option>
-                {MALAYSIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
-            </select>
-        </div>
+        <select className="p-2 border rounded-lg bg-white" value={filterState} onChange={e => setFilterState(e.target.value)}>
+          <option value="all">Semua Negeri</option>
+          {MALAYSIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -343,143 +175,139 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {isCoordinator && <th className="p-4 w-10 text-center"><input type="checkbox" onChange={handleSelectAll} /></th>}
-                <th className="p-4 font-semibold text-sm text-slate-600">Syarikat</th>
-                <th className="p-4 font-semibold text-sm text-slate-600">Lokasi</th>
-                <th className="p-4 font-semibold text-sm text-slate-600">Pemohon</th>
-                <th className="p-4 font-semibold text-sm text-slate-600 text-center">Tindakan</th>
+                <th className="p-4 font-bold text-sm text-slate-600">Nama Syarikat</th>
+                <th className="p-4 font-bold text-sm text-slate-600">Lokasi</th>
+                <th className="p-4 font-bold text-sm text-slate-600 text-center">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredAndSortedCompanies.length === 0 ? (
-                <tr><td colSpan={isCoordinator ? 5 : 4} className="p-8 text-center text-slate-500 italic">Tiada syarikat dijumpai.</td></tr>
-              ) : (
-                filteredAndSortedCompanies.map(company => {
-                  const companyApps = applications.filter(a => a.company_name === company.company_name);
-
-                  return (
-                    <tr key={company.id} className="hover:bg-slate-50 transition-colors group">
-                      {isCoordinator && <td className="p-4 text-center"><input type="checkbox" checked={selectedIds.includes(company.id)} onChange={() => handleSelectOne(company.id)} /></td>}
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                            <div className="font-bold text-slate-800">{company.company_name}</div>
-                            {company.has_previous_wbl_students && (
-                                <History size={14} className="text-orange-500" title="Pernah mengambil pelajar WBL" />
-                            )}
-                        </div>
-                        <div className="text-xs text-slate-500 flex items-center gap-1">
-                          {company.company_industry} 
-                          {company.has_mou && <span className="bg-blue-100 text-blue-700 px-1 rounded text-[10px] font-bold">{company.mou_type}</span>}
-                          {company.has_previous_wbl_students && <span className="bg-orange-100 text-orange-700 px-1 rounded text-[10px] font-bold">ALUMNI WBL</span>}
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-slate-700">
-                        <div className="font-medium">{company.company_district}</div>
-                        <div className="text-xs text-slate-400">{company.company_state}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {companyApps.length > 0 ? (
-                            companyApps.map(app => (
-                              <span 
-                                key={app.id} 
-                                title={app.application_status}
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
-                                  app.application_status === 'Diluluskan' 
-                                    ? 'bg-green-50 text-green-700 border-green-200' 
-                                    : app.application_status === 'Ditolak'
-                                    ? 'bg-red-50 text-red-700 border-red-200'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                                }`}
-                              >
-                                {app.student_name}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-slate-400 text-xs italic">Tiada pemohon</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex justify-center gap-2">
-                            {currentUser.role === UserRole.STUDENT && !myApplications.some(a => a.company_name === company.company_name) && !isLimitReached && (
-                                <button onClick={() => setConfirmingCompany(company)} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-blue-700 shadow-sm transition-all active:scale-95">Mohon</button>
-                            )}
-                            {isCoordinator && (
-                                <>
-                                  <button onClick={() => handleLOIClick(company)} className="p-1.5 bg-purple-50 text-purple-600 rounded border border-purple-100 hover:bg-purple-100 transition-colors" title="Jana LOI"><FileText size={16} /></button>
-                                  <button onClick={() => handleEditClick(company)} className="p-1.5 bg-blue-50 text-blue-600 rounded border border-blue-100 hover:bg-blue-100 transition-colors" title="Edit"><Edit size={16} /></button>
-                                  <button onClick={() => { if(confirm('Adakah anda pasti mahu memadam syarikat ini?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded border border-red-100 hover:bg-red-100 transition-colors" title="Padam"><Trash2 size={16} /></button>
-                                </>
-                            )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+              {filteredCompanies.map(company => (
+                <tr key={company.id} className="hover:bg-slate-50">
+                  <td className="p-4">
+                    <div className="font-bold text-slate-800">{company.company_name}</div>
+                    <div className="text-xs text-slate-500">{company.company_industry}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-sm text-slate-700">{company.company_district}</div>
+                    <div className="text-xs text-slate-400">{company.company_state}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex justify-center gap-2">
+                      {isCoordinator && (
+                        <button 
+                          onClick={() => { setSelectedCompanyForEmail(company); setIsEmailModalOpen(true); }}
+                          className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                        >
+                          <Mail size={14} /> <span className="text-[10px] font-bold pr-1 uppercase">Emel</span>
+                        </button>
+                      )}
+                      {currentUser.role === UserRole.STUDENT && (
+                        <button onClick={() => onApply(company)} className="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-indigo-700 shadow-sm">Mohon</button>
+                      )}
+                      {isCoordinator && (
+                        <>
+                          <button onClick={() => { setEditingCompany({...company}); setIsEditModalOpen(true); }} className="p-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"><Edit size={14}/></button>
+                          <button onClick={() => { if(confirm('Hapus?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100"><Trash2 size={14}/></button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Jana LOI */}
-      <Modal isOpen={isLOIModalOpen} onClose={() => setIsLOIModalOpen(false)} title="Jana Letter of Intent (LOI)">
-        <div className="space-y-4">
-            <div className="p-4 bg-purple-50 border border-purple-100 rounded-lg text-center">
-                <p className="text-sm text-slate-600 mb-1">Syarikat Terpilih:</p>
-                <p className="font-bold text-purple-800 text-lg">{selectedCompanyForLOI?.company_name}</p>
-            </div>
-            <p className="text-sm text-slate-500 text-center">Pilih format untuk menjana draf surat hasrat kerjasama.</p>
-            <div className="grid grid-cols-2 gap-4">
-                <button 
-                    onClick={() => { if(selectedCompanyForLOI) generateLOI(selectedCompanyForLOI); setIsLOIModalOpen(false); }}
-                    className="flex flex-col items-center gap-2 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-                >
-                    <div className="p-3 bg-red-100 text-red-600 rounded-full"><Printer size={24} /></div>
-                    <span className="font-bold text-sm text-slate-700">PDF (Browser)</span>
-                </button>
-                <button 
-                    onClick={() => { if(selectedCompanyForLOI) downloadLOIWord(selectedCompanyForLOI); setIsLOIModalOpen(false); }}
-                    className="flex flex-col items-center gap-2 p-4 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-                >
-                    <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Download size={24} /></div>
-                    <span className="font-bold text-sm text-slate-700">Microsoft Word</span>
-                </button>
-            </div>
+      {/* EMAIL PREPARATION MODAL */}
+      <Modal isOpen={isEmailModalOpen} onClose={() => setIsEmailModalOpen(false)} title="Persediaan Emel Industri">
+        <div className="space-y-6">
+          <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 relative overflow-hidden">
+              <div className="relative z-10">
+                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Rakan Industri</p>
+                  <p className="font-black text-blue-900 text-xl leading-tight">{selectedCompanyForEmail?.company_name}</p>
+                  <p className="text-xs text-blue-600 mt-1 font-medium italic">{selectedCompanyForEmail?.company_contact_email || 'Tiada Alamat Emel'}</p>
+              </div>
+              <div className="absolute top-0 right-0 p-4 opacity-10"><Building2 size={80} /></div>
+          </div>
+
+          <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-black">1</div>
+                  <h5 className="text-xs font-black text-slate-800 uppercase tracking-widest">Muat Turun Lampiran</h5>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-8">
+                  <button 
+                      onClick={() => { if(selectedCompanyForEmail) generateInvitationLetter(selectedCompanyForEmail, " "); }}
+                      className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all group shadow-sm"
+                  >
+                      <Printer size={18} className="text-red-500 group-hover:scale-110 transition-transform" />
+                      <div className="text-left">
+                        <span className="font-bold text-[10px] text-slate-700 block">Surat Pelawaan</span>
+                        <span className="text-[8px] text-slate-400 uppercase">Klik untuk Jana PDF</span>
+                      </div>
+                  </button>
+                  <button 
+                      onClick={() => { if(selectedCompanyForEmail) generateLOI(selectedCompanyForEmail); }}
+                      className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all group shadow-sm"
+                  >
+                      <FileText size={18} className="text-purple-500 group-hover:scale-110 transition-transform" />
+                      <div className="text-left">
+                        <span className="font-bold text-[10px] text-slate-700 block">Dokumen LOI</span>
+                        <span className="text-[8px] text-slate-400 uppercase">Klik untuk Jana PDF</span>
+                      </div>
+                  </button>
+              </div>
+          </div>
+
+          <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center text-[10px] font-black">2</div>
+                  <h5 className="text-xs font-black text-slate-800 uppercase tracking-widest">Salin Draf Teks Emel</h5>
+              </div>
+              <div className="pl-8 space-y-2">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-[11px] text-slate-600 leading-relaxed italic shadow-inner">
+                      {getEmailBody()}
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(getEmailBody()); toast.success('Draf disalin!'); }} className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:underline">
+                      <Copy size={12} /> Salin Teks Sekarang
+                  </button>
+              </div>
+          </div>
+
+          <div className="pt-2">
+              <button 
+                  onClick={handleLaunchEmail}
+                  disabled={!selectedCompanyForEmail?.company_contact_email}
+                  className="w-full flex items-center justify-center gap-3 p-5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 group active:scale-95 disabled:bg-slate-300"
+              >
+                  <Mail size={28} className="group-hover:rotate-12 transition-transform" />
+                  <div className="text-left">
+                    <span className="font-black text-base block">Langkah 3: Buka Emel</span>
+                    <span className="text-[10px] opacity-90 font-medium tracking-tight">Auto-fill Receiver, Subject & Body</span>
+                  </div>
+              </button>
+              <p className="text-[9px] text-center text-slate-400 px-8 mt-4 leading-relaxed italic">
+                 *PENTING: Jangan lupa untuk muat naik (attach) fail PDF dari Langkah 1 di dalam aplikasi emel anda.
+              </p>
+          </div>
         </div>
       </Modal>
 
-      {/* Modal Tambah Syarikat */}
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Tambah Syarikat Baru">
-          <form onSubmit={handleAddSubmit} className="space-y-6">
-            <CompanyForm data={newCompany} setData={setNewCompany} />
-            <button disabled={isSubmitting} type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
-                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : 'Tambah Syarikat'}
-            </button>
+        <form onSubmit={async (e) => { e.preventDefault(); await onAddCompany(newCompany as any); setIsAddModalOpen(false); }} className="space-y-4">
+          <CompanyForm data={newCompany} setData={setNewCompany} />
+          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg">Simpan Syarikat</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Syarikat">
+        {editingCompany && (
+          <form onSubmit={async (e) => { e.preventDefault(); await onUpdateCompany(editingCompany); setIsEditModalOpen(false); }} className="space-y-4">
+            <CompanyForm data={editingCompany} setData={setEditingCompany} />
+            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg">Simpan Perubahan</button>
           </form>
-      </Modal>
-
-      {/* Modal Kemaskini Syarikat */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Kemaskini Maklumat Syarikat">
-          {editingCompany && (
-              <form onSubmit={handleEditSubmit} className="space-y-6">
-                <CompanyForm data={editingCompany} setData={setEditingCompany} />
-                <button disabled={isSubmitting} type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
-                    {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : 'Simpan Perubahan'}
-                </button>
-              </form>
-          )}
-      </Modal>
-
-      <Modal isOpen={!!confirmingCompany} onClose={() => setConfirmingCompany(null)} title="Pengesahan Permohonan">
-        <div className="space-y-4">
-            <p className="text-slate-600 text-center">Anda pasti mahu memohon ke <strong>{confirmingCompany?.company_name}</strong>?</p>
-            <div className="flex gap-3">
-                <button onClick={() => setConfirmingCompany(null)} className="flex-1 px-4 py-2 border border-slate-300 rounded text-slate-700 font-medium hover:bg-slate-50 transition-all">Batal</button>
-                <button onClick={handleConfirmApply} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition-all shadow-md">Ya, Mohon</button>
-            </div>
-        </div>
+        )}
       </Modal>
     </div>
   );

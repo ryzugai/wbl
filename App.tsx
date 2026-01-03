@@ -290,6 +290,7 @@ function App() {
             applications={applications} 
             users={users} 
             companies={companies}
+            currentUser={currentUser}
           />
         )}
 
