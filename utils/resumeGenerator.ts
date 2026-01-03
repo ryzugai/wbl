@@ -32,7 +32,7 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
   
   if (lang === 'en') {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const prompt = `
         Translate the following Malaysian student resume details into professional English. 
         Maintain the structure and professional tone.
@@ -49,11 +49,14 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: prompt,
         config: { responseMimeType: "application/json" }
       });
 
-      const translatedData = JSON.parse(response.text || "{}");
+      const text = response.text || "{}";
+      const cleanedJson = text.trim().replace(/^```json/, '').replace(/```$/, '').trim();
+      const translatedData = JSON.parse(cleanedJson);
+      
       if (translatedData.about) about = translatedData.about;
       if (translatedData.courses) coursesRaw = translatedData.courses;
       if (translatedData.education) education = translatedData.education;

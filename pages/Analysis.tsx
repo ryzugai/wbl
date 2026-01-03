@@ -45,7 +45,7 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
     setLoadingAi(prev => ({ ...prev, [studentId]: true }));
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const companiesList = companies.map(c => ({
         name: c.company_name,
         location: `${c.company_district}, ${c.company_state}`
@@ -67,17 +67,25 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
       });
 
       const text = response.text || "[]";
-      const cleanedJson = text.replace(/```json|```/g, "").trim();
+      // Ensure we only have the JSON content even if wrapped in markdown
+      const cleanedJson = text.trim().replace(/^```json/, '').replace(/```$/, '').trim();
       const suggestions = JSON.parse(cleanedJson);
 
-      setAiSuggestions(prev => ({ ...prev, [studentId]: suggestions }));
+      if (Array.isArray(suggestions)) {
+        setAiSuggestions(prev => ({ ...prev, [studentId]: suggestions }));
+      } else {
+        throw new Error("Invalid format from AI");
+      }
     } catch (error) {
       console.error("AI Error:", error);
-      toast.error(language === 'ms' ? 'Gagal menjana cadangan AI.' : 'Failed to generate AI suggestions.');
+      toast.error(language === 'ms' ? 'Gagal menjana cadangan AI. Sila cuba lagi.' : 'Failed to generate AI suggestions. Please try again.');
     } finally {
       setLoadingAi(prev => ({ ...prev, [studentId]: false }));
     }
