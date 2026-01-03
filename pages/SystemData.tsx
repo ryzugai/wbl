@@ -58,8 +58,8 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
   };
 
   const addNewAdRow = () => {
-    if (adConfig.items.length >= 10) {
-      toast.error('Had maksimum 10 iklan sahaja.');
+    if (adConfig.items.length >= 50) {
+      toast.error('Had maksimum 50 iklan sahaja.');
       return;
     }
     const newItem: AdItem = {
@@ -144,7 +144,7 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-800">Pengurusan Iklan Karusel</h3>
-              <p className="text-xs text-slate-500">Iklan akan bertukar secara automatik setiap 10 saat (Maks 10).</p>
+              <p className="text-xs text-slate-500">Iklan akan bertukar secara automatik setiap 10 saat (Maks 50).</p>
             </div>
           </div>
           <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-xl border">

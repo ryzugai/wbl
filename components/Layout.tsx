@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -128,6 +128,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           
           <NavItem view="companies" label={t(language, 'companies')} icon={Building2} />
           
+          <NavItem view="poster" label={t(language, 'posterTab')} icon={BookCopy} />
+
           {(hasSystemAccess || currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
             <NavItem view="students" label={t(language, 'students')} icon={Users} />
           )}
@@ -139,7 +141,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           <NavItem view="applications" label={t(language, 'applications')} icon={FileText} />
           
           {hasSystemAccess && (
-            <NavItem view="statistics" label={t(language, 'statistics')} icon={BarChart3} />
+            <>
+                <NavItem view="statistics" label={t(language, 'statistics')} icon={BarChart3} />
+                <NavItem view="analysis" label={t(language, 'analysisTab')} icon={Map} />
+            </>
           )}
 
           <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">

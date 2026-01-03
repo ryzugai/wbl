@@ -10,6 +10,8 @@ export const translations = {
     staff: "Senarai Staf",
     applications: "Permohonan",
     statistics: "Statistik",
+    analysisTab: "Analisis Padanan",
+    posterTab: "Tawaran Poster",
     guidebook: "Buku Panduan",
     management: "Pengurusan",
     addCompany: "Tambah Syarikat",
@@ -30,6 +32,14 @@ export const translations = {
     actions: "Tindakan",
     search: "Cari...",
     status: "Status",
+
+    // Flipbook
+    flipTitle: "Katalog Poster Industri",
+    flipDesc: "Selak halaman untuk melihat poster tawaran daripada rakan industri kami.",
+    flipViewOffer: "Lihat Tawaran",
+    flipNext: "Seterusnya",
+    flipPrev: "Sebelumnya",
+    flipEmpty: "Tiada poster iklan aktif buat masa ini.",
 
     // Dashboard
     wblSession: "Sesi WBL",
@@ -59,6 +69,16 @@ export const translations = {
     noRecords: "Tiada rekod dijumpai.",
     resetPassword: "Set Semula Kata Laluan",
     newPassword: "Kata Laluan Baru",
+
+    // Analysis
+    analysisTitle: "Analisis Padanan Lokasi",
+    analysisDesc: "Padanan syarikat yang dimohon dengan alamat tempat tinggal pelajar.",
+    studentResidence: "Alamat Pelajar (Tempat Tinggal)",
+    companyLocation: "Lokasi Syarikat",
+    aiSuggestBtn: "Jana Cadangan AI",
+    aiSuggestTitle: "Cadangan Syarikat Berhampiran (AI)",
+    aiProcessing: "AI sedang menganalisis lokasi...",
+    aiNoSuggest: "Klik untuk jana cadangan.",
 
     // Teaching Subjects
     teachingExp: "Pengalaman Mengajar",
@@ -153,6 +173,8 @@ export const translations = {
     staff: "Staff List",
     applications: "Applications",
     statistics: "Statistics",
+    analysisTab: "Matching Analysis",
+    posterTab: "Poster Offers",
     guidebook: "Guidebook",
     management: "Management",
     addCompany: "Add Company",
@@ -173,6 +195,14 @@ export const translations = {
     actions: "Actions",
     search: "Search...",
     status: "Status",
+
+    // Flipbook
+    flipTitle: "Industry Poster Catalog",
+    flipDesc: "Flip pages to view offer posters from our industry partners.",
+    flipViewOffer: "View Offer",
+    flipNext: "Next",
+    flipPrev: "Previous",
+    flipEmpty: "No active posters at this time.",
 
     // Dashboard
     wblSession: "WBL Session",
@@ -202,6 +232,16 @@ export const translations = {
     noRecords: "No records found.",
     resetPassword: "Reset Password",
     newPassword: "New Password",
+
+    // Analysis
+    analysisTitle: "Location Matching Analysis",
+    analysisDesc: "Matching applied companies with student residence addresses.",
+    studentResidence: "Student Address (Residence)",
+    companyLocation: "Company Location",
+    aiSuggestBtn: "Generate AI Suggestions",
+    aiSuggestTitle: "Nearby Company Suggestions (AI)",
+    aiProcessing: "AI is analyzing locations...",
+    aiNoSuggest: "Click to generate suggestions.",
 
     // Teaching Subjects
     teachingExp: "Teaching Experience",
