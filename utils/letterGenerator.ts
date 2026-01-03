@@ -41,18 +41,27 @@ export const generateLetter = (application: Application, company: Company | unde
         .coordinator-table td { padding: 1px; }
         .footer { margin-top: 30px; font-size: 10pt; }
         .computer-gen { font-style: italic; font-size: 9pt; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px; }
+        
+        /* Reply Form Styles */
         .page-break { page-break-before: always; }
-        .reply-header { text-align: center; font-weight: bold; margin-bottom: 20px; }
-        .input-line { border-bottom: 1px solid black; display: inline-block; width: 100%; min-height: 18px; }
-        .reply-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
-        .reply-table td { padding: 5px; vertical-align: bottom; }
-        .acceptance-box { border: 1px dashed #000; padding: 10px; margin-top: 20px; font-size: 10pt; }
-        .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; cursor: pointer; border-radius: 5px; z-index: 1000; }
+        .reply-header { text-align: center; font-weight: bold; margin-bottom: 20px; border: 1px solid black; padding: 10px; text-transform: uppercase; }
+        .input-box { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; }
+        .checkbox-container { display: flex; gap: 20px; margin: 15px 0; }
+        .checkbox-item { display: flex; align-items: center; gap: 10px; }
+        .box { width: 20px; height: 20px; border: 1px solid black; display: inline-block; }
+        .underline { border-bottom: 1px solid black; display: inline-block; min-width: 250px; padding-bottom: 2px; }
+        .full-underline { border-bottom: 1px solid black; display: block; width: 100%; height: 20px; margin-top: 10px; }
+        .signature-area { display: flex; justify-content: space-between; margin-top: 40px; }
+        .sig-col { width: 45%; }
+        
+        .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; cursor: pointer; border-radius: 5px; z-index: 1000; font-weight: bold; }
         @media print { .print-btn { display: none; } }
       </style>
     </head>
     <body>
       <button class="print-btn" onclick="window.print()">Cetak / Simpan PDF</button>
+      
+      <!-- PAGE 1: SUPPORT LETTER -->
       <table class="header-table">
         <tr>
             <td><img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" class="logo" alt="UTeM Logo"></td>
@@ -81,12 +90,78 @@ export const generateLetter = (application: Application, company: Company | unde
         <tr><td class="label-col">Matric No.</td><td class="sep-col">:</td><td>${student.matric_no}</td></tr>
         <tr><td class="label-col">Programme</td><td class="sep-col">:</td><td>${programName}</td></tr>
       </table>
-      <p>3. Should the company agree to accept or not this student, please complete the attached "Reply Form"...</p>
+      <p>3. Should the company agree to accept or not this student, please complete the attached "Reply Form" (on the next page) and return it to us via e-mail at guzairy@utem.edu.my at your earliest convenience.</p>
       <div class="footer">
         Your Sincerely,<br><br><br>
         <strong>PROF. DR. MOHD. SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>Dean<br>FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP
         <div class="computer-gen">This letter is computer generated, no signature is required / Surat ini adalah cetakan komputer dan tidak memerlukan tandatangan.</div>
       </div>
+
+      <!-- PAGE 2: REPLY FORM -->
+      <div class="page-break"></div>
+      <table class="header-table">
+        <tr>
+            <td><img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" class="logo" alt="UTeM Logo"></td>
+            <td class="uni-details">
+                <strong>Universiti Teknikal Malaysia Melaka</strong><br>
+                FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP<br>
+                Hang Tuah Jaya, 76100 Durian Tunggal, Melaka.<br>
+                Tel: +606 270 8002 | Email: guzairy@utem.edu.my
+            </td>
+        </tr>
+      </table>
+
+      <div class="reply-header">
+        STUDENT WORK-BASED LEARNING (WBL) PROGRAMME<br>REPLY FORM (BORANG MAKLUM BALAS)
+      </div>
+
+      <p>Dean,<br>Faculty of Technology Management and Technopreneurship,<br>Universiti Teknikal Malaysia Melaka.</p>
+      
+      <p>Dear Sir/Madam,</p>
+      <p>With reference to your letter Ref: <strong>${refNumber}</strong> regarding the WBL placement for the following student:</p>
+      
+      <div style="background: #f9fafb; padding: 10px; border: 1px solid #eee; margin-bottom: 20px;">
+        <table style="width: 100%; font-size: 10pt;">
+            <tr><td width="150"><strong>Student Name:</strong></td><td>${student.name.toUpperCase()}</td></tr>
+            <tr><td><strong>Matric No:</strong></td><td>${student.matric_no}</td></tr>
+            <tr><td><strong>Programme:</strong></td><td>${programName}</td></tr>
+        </table>
+      </div>
+
+      <p>We wish to inform you that our company:</p>
+      <div class="checkbox-container">
+          <div class="checkbox-item"><div class="box"></div> <strong>AGREE</strong> to accept this student</div>
+          <div class="checkbox-item"><div class="box"></div> <strong>DO NOT AGREE</strong> to accept this student</div>
+      </div>
+
+      <p>If accepted, the student is required to report for duty on (Date): <span class="underline"></span></p>
+      
+      <p><strong>Industrial Supervisor Details:</strong></p>
+      <div style="margin-left: 20px; font-size: 10pt;">
+          <div style="margin-bottom: 8px;">Name: <span class="underline" style="min-width: 400px;"></span></div>
+          <div style="margin-bottom: 8px;">Designation: <span class="underline" style="min-width: 370px;"></span></div>
+          <div style="margin-bottom: 8px;">Department: <span class="underline" style="min-width: 380px;"></span></div>
+          <div style="margin-bottom: 8px;">Tel/Fax No: <span class="underline" style="min-width: 388px;"></span></div>
+          <div style="margin-bottom: 8px;">E-mail: <span class="underline" style="min-width: 403px;"></span></div>
+      </div>
+
+      <div class="signature-area">
+          <div class="sig-col">
+              <br><br><br>
+              <div class="full-underline"></div>
+              <p style="font-size: 9pt; text-align: center;">Authorized Signature & Company Stamp</p>
+          </div>
+          <div class="sig-col">
+              <br><br><br>
+              <div style="margin-bottom: 8px;">Name: <span class="underline" style="min-width: 200px;"></span></div>
+              <div style="margin-bottom: 8px;">Date: <span class="underline" style="min-width: 205px;"></span></div>
+          </div>
+      </div>
+
+      <div style="margin-top: 30px; padding: 10px; border: 1px dashed #666; font-size: 9pt; background-color: #fffbeb;">
+          <strong>Instructions:</strong> Please scan and return this completed form to <strong>guzairy@utem.edu.my</strong> or pass it to the student. Thank you.
+      </div>
+      
     </body>
     </html>
   `;
@@ -251,7 +326,7 @@ export const generateLOI = (company: Company) => {
       return;
   }
   const currentDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const signatureBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAAAyCAYAAAC+jCIaAAAACXBIWXMAAAsTAAALEwEAmpwYAAADmElEQVR4nO2bMW4TURBF3x8REiUKKKgCNyA6WqCgC1S0QAm5AglR0gFuwA1Q0AFR0gEFHRAVHRAVJUD8z4w1Xq/XeD22Z73J+0mn2X32vTszb+bN7HjXWmtFEXAFnAIHwB1wD5wAl8Ap8A64B94C74G3wFvgrf09B94A74D3wAf7+xT4CHwCPgOfgM/AZ+Ar8A34BnwDvgHfgO/AD+An8BP4CfwEfgE/gV/AT+A38Bv4A/wB/gB/gD/AH+Av8Bf4C/wF/gJ/gb/A38x+V/1/9f/V/1f/X/1/9f/V/1f/X/1/9f/V/1f/X/1/9f/V/1f/X/1/HwFf7M818CXwJfAl8CXwBfAZ8BnwGfAZ8CnwKfAJ8AnwEfAR8BHwIfAB8AHwAfAB8B7wHvAe8B7wDvAO8A7wDvAW8BbwFvAG8AbwBvAG8AbwGvAa8BrwGvAK8ArwCvAK8ALwAvAC8ALwvNnvqv+v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/+v/r//Ad2BDkAHoKP5fxP4GWgJtAdaAu8DvwPvA78D7wMtgV7A781+E/gZaAm0B1oCLYDmQAugOdAC2ADsBfy/AfYDewG/t9l/N7AT2AFsB7YBW4EtwBbge+A74FvgG+Ar4EvgC+Az4FPgE+AT4CPgQ+AD4D3gHeAt4A3gDeAV4BXgBeB5s99V/1/9f/X/1/9f/X/1/9X/V/9f/X/1/9X/V/9f/X/1/9f/X/1/9f/X/1/9f/X/1f9X//f78A7YFeQG/+3wFhaQ60sPnfBH4GWgLtgeb/G/Ar8AvwC/Az8BPwE/AT8CPwI/A98B3wHfAd8B3wLfAt8C3wFfAV8CXwJfAl8AXwOfAZ8BnwKfAJ8AnwCfAJ8AnwEfAR8BHwIfAB8AHwAfAB8AHwHvAe8B7wHvAe8A7wDvAO8A7wFvAW8BbwBvAG8AbwBvAG8BrwGvAa8BrwCvAK8ArwCvAC8ALwAvAC8LzZ76r/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/+B3QHOgAdgI5W/xUwBNgP+AUIAf4Hg72d7K93u/kAAAAASUVORK5CYII=";
+  const signatureBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAAAyCAYAAAC+jCIaAAAACXBIWXMAAAsTAAALEwEAmpwYAAADmElEQVR4nO2bMW4TURBF3x8REiUKKKgCNyA6WqCgC1S0QAm5AglR0gFuwA1Q0AFR0gEFHRAVHRAVJUD8z4w1Xq/XeD22Z73J+0mn2X32vTszb+bN7HjXWmtFEXAFnAIHwB1wD5wAl8Ap8A64B94C74G3wFvgrf09B94A74D3wAf7+xT4CHwCPgOfgM/AZ+Ar8A34BnwDvgHfgO/AD+An8BP4CfwEfgE/gV/AT+A38Bv4A/wB/gB/gD/AH+Av8Bf4C/wF/gJ/gb/A38x+V/1/9f/V/1f/X/1/9f/V/1f/X/1/9f/V/1f/X/1/9f/V/1f/X/1/HwFf7M818CXwJfAl8CXwBfAZ8BnwGfAZ8CnwKfAJ8AnwEfAR8BHwIfAB8AHwAfAB8B7wHvAe8B7wDvAO8A7wDvAW8BbwFvAG8AbwBvAG8AbwGvAa8BrwGvAK8ArwCvAK8ALwAvAC8ALwvNnvqv+v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/+v/r//Ad2BDkAHoKP5fxP4GWgJtAdaAu8DvwPvA78D7wMtgV7A781+E/gZaAm0B1oCLYDmQAugOdAC2ADsBfy/AfYDewG/t9l/N7AT2AFsB7YBW4EtwBbge+A74FvgG+Ar4EvgC+Az4FPgE+AT4CPgQ+AD4D3gHeAt4A3gDeAV4BXgBeB5s99V/1/9f/X/1/9f/X/1/9X/V/9f/X/1/9f/V/1f/X/1/9f/X/1/9f/X/1/9f/X/1/9f/X/1/9f/X/1f9X//f78A7YFeQG/+3wFhaQ60sPnfBH4GWgLtgeb/G/Ar8AvwC/Az8BPwE/AT8CPwI/A98B3wHfAd8B3wLfAt8C3wFfAV8CXwJfAl8AXwOfAZ8BnwKfAJ8AnwCfAJ8AnwEfAR8BHwIfAB8AHwAfAB8AHwHvAe8B7wHvAe8A7wDvAO8A7wFvAW8BbwBvAG8AbwBvAG8BrwGvAa8BrwCvAK8ArwCvAC8ALwAvAC8LzZ76r/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/q/6v/r/6/+v/+B3QHOgAdgI5W/xUwBNgP+AUIAf4Hg72d7K93u/kAAAAASUVORK5CYII=";
   
   const htmlContent = `
     <!DOCTYPE html>
