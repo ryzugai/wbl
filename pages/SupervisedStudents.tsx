@@ -99,8 +99,12 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
               <div className="p-5 border-b border-slate-50 bg-slate-50/50">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold shrink-0">
-                      {student.name.charAt(0)}
+                    <div className="w-12 h-12 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center text-blue-700 font-bold shrink-0 shadow-sm border border-white">
+                      {student.profile_image ? (
+                          <img src={student.profile_image} className="w-full h-full object-cover" alt={student.name} />
+                      ) : (
+                          student.name.charAt(0)
+                      )}
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 leading-tight">{student.name}</h3>

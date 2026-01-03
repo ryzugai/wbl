@@ -280,6 +280,7 @@ function App() {
                 language={language}
                 currentUser={currentUser}
                 applications={applications}
+                users={users}
             />
         )}
 

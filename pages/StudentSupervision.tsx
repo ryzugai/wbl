@@ -7,10 +7,11 @@ import { Language, t } from '../translations';
 interface StudentSupervisionProps {
   currentUser: User;
   applications: Application[];
+  users: User[];
   language: Language;
 }
 
-export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentUser, applications, language }) => {
+export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentUser, applications, users, language }) => {
   // Maklumat penyelia biasanya ada dalam profile currentUser jika Penyelaras dah assign.
   // Tetapi kita juga semak dalam applications untuk redundancy.
   const myApprovedApp = useMemo(() => {
@@ -22,6 +23,17 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
 
   const supervisorName = currentUser.faculty_supervisor_name || myApprovedApp?.faculty_supervisor_name;
   const supervisorStaffId = currentUser.faculty_supervisor_staff_id || myApprovedApp?.faculty_supervisor_staff_id;
+  const supervisorId = currentUser.faculty_supervisor_id || myApprovedApp?.faculty_supervisor_id;
+
+  // Cari profil lengkap penyelia untuk dapatkan gambar
+  const supervisorProfile = useMemo(() => {
+    if (!supervisorId && !supervisorStaffId && !supervisorName) return null;
+    return users.find(u => 
+      (supervisorId && u.id === supervisorId) || 
+      (supervisorStaffId && u.staff_id === supervisorStaffId) ||
+      (supervisorName && u.name === supervisorName)
+    );
+  }, [users, supervisorId, supervisorStaffId, supervisorName]);
 
   if (!supervisorName) {
     return (
@@ -56,9 +68,13 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
                 <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
                 <div className="px-8 pb-8 -mt-12">
                     <div className="flex flex-col md:flex-row items-end gap-6 mb-6">
-                        <div className="w-24 h-24 bg-white rounded-3xl p-1 shadow-xl flex items-center justify-center text-blue-600 border border-slate-100">
-                             <div className="w-full h-full bg-blue-50 rounded-2xl flex items-center justify-center">
-                                <UserCheck size={48} />
+                        <div className="w-24 h-24 bg-white rounded-3xl p-1 shadow-xl flex items-center justify-center text-blue-600 border border-slate-100 overflow-hidden">
+                             <div className="w-full h-full bg-blue-50 rounded-2xl flex items-center justify-center overflow-hidden">
+                                {supervisorProfile?.profile_image ? (
+                                    <img src={supervisorProfile.profile_image} className="w-full h-full object-cover" alt={supervisorName} />
+                                ) : (
+                                    <UserCheck size={48} />
+                                )}
                              </div>
                         </div>
                         <div className="mb-2">
@@ -92,7 +108,7 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Hubungan Rasmi</p>
-                                <p className="text-sm font-bold text-slate-700">Sistem Pesanan WBL</p>
+                                <p className="text-sm font-bold text-slate-700">{supervisorProfile?.email || 'Sistem Pesanan WBL'}</p>
                             </div>
                         </div>
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
