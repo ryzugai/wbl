@@ -155,10 +155,30 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [selectedCompanyForEmail, setSelectedCompanyForEmail] = useState<Company | null>(null);
-  const [newCompany, setNewCompany] = useState<Partial<Company>>({ company_state: 'Melaka', has_mou: false, has_previous_wbl_students: false, agreed_wbl: false });
+  
+  const initialNewCompanyState = { 
+    company_name: '',
+    company_district: '',
+    company_state: 'Melaka', 
+    company_address: '',
+    company_industry: '',
+    company_contact_person: '',
+    company_contact_email: '',
+    company_contact_phone: '',
+    has_mou: false, 
+    has_previous_wbl_students: false, 
+    agreed_wbl: false 
+  };
+
+  const [newCompany, setNewCompany] = useState<Partial<Company>>(initialNewCompanyState);
   const [editingCompany, setEditingCompany] = useState<any>(null);
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
+
+  const handleOpenAddModal = () => {
+    setNewCompany(initialNewCompanyState);
+    setIsAddModalOpen(true);
+  };
 
   const filteredCompanies = companies
     .filter(c => {
@@ -191,7 +211,10 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Senarai Syarikat</h2>
         {isCoordinator && (
-          <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-md">
+          <button 
+            onClick={handleOpenAddModal} 
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-md transition-all active:scale-95"
+          >
             <Plus size={18} /> Tambah Syarikat
           </button>
         )}
