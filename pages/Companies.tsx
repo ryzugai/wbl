@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { Company, User, UserRole, Application } from '../types';
 import { 
   Search, Plus, Trash2, Edit, Loader2, FileText, Printer, 
-  Download, History, SortAsc, Mail, Copy, Building2, Check 
+  Download, History, SortAsc, Mail, Copy, Building2, Check, Star, Handshake, BadgeCheck, Info
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
@@ -91,6 +91,46 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
           <input required type="text" className="w-full px-3 py-2 border rounded bg-white" value={data.company_contact_phone || ''} onChange={e => handleChange('company_contact_phone', e.target.value)} />
         </div>
       </div>
+
+      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" 
+                checked={!!data.has_previous_wbl_students}
+                onChange={e => handleChange('has_previous_wbl_students', e.target.checked)}
+              />
+              <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition-colors">Pernah menawarkan tempat WBL / Mempunyai alumni WBL</span>
+          </label>
+          
+          <label className="flex items-center gap-3 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" 
+                checked={!!data.has_mou}
+                onChange={e => handleChange('has_mou', e.target.checked)}
+              />
+              <div className="flex-1">
+                  <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700 transition-colors">Mempunyai MoU / LOI aktif</span>
+                  {data.has_mou && (
+                      <div className="mt-1 flex gap-2">
+                        <button type="button" onClick={() => handleChange('mou_type', 'MoU')} className={`text-[10px] px-2 py-0.5 rounded font-bold border ${data.mou_type === 'MoU' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}>MoU</button>
+                        <button type="button" onClick={() => handleChange('mou_type', 'LOI')} className={`text-[10px] px-2 py-0.5 rounded font-bold border ${data.mou_type === 'LOI' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}>LOI</button>
+                      </div>
+                  )}
+              </div>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer group border-t border-slate-200 pt-3">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 rounded text-green-600 focus:ring-green-500" 
+                checked={!!data.agreed_wbl}
+                onChange={e => handleChange('agreed_wbl', e.target.checked)}
+              />
+              <span className="text-sm font-bold text-green-700 group-hover:text-green-800 transition-colors">Telah bersetuju menjalankan kerjasama WBL</span>
+          </label>
+      </div>
     </div>
   );
 };
@@ -109,13 +149,13 @@ interface CompaniesProps {
 export const Companies: React.FC<CompaniesProps> = ({ companies, applications, currentUser, onAddCompany, onUpdateCompany, onDeleteCompany, onApply, language }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
-  const [sortOrder, setSortOrder] = useState<'alphabetical' | 'latest'>('alphabetical');
+  const [sortOrder, setSortOrder] = useState<'alphabetical' | 'latest'>('latest');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [selectedCompanyForEmail, setSelectedCompanyForEmail] = useState<Company | null>(null);
-  const [newCompany, setNewCompany] = useState<Partial<Company>>({ company_state: 'Melaka' });
+  const [newCompany, setNewCompany] = useState<Partial<Company>>({ company_state: 'Melaka', has_mou: false, has_previous_wbl_students: false, agreed_wbl: false });
   const [editingCompany, setEditingCompany] = useState<any>(null);
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
@@ -128,7 +168,9 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
     })
     .sort((a, b) => {
       if (sortOrder === 'alphabetical') return a.company_name.localeCompare(b.company_name);
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const dateA = new Date(a.updated_at || a.created_at).getTime();
+      const dateB = new Date(b.updated_at || b.created_at).getTime();
+      return dateB - dateA;
     });
 
   const getEmailBody = () => {
@@ -164,10 +206,16 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <select className="p-2 border rounded-lg bg-white" value={filterState} onChange={e => setFilterState(e.target.value)}>
-          <option value="all">Semua Negeri</option>
-          {MALAYSIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="flex gap-2">
+            <select className="p-2 border rounded-lg bg-white text-sm" value={filterState} onChange={e => setFilterState(e.target.value)}>
+                <option value="all">Semua Negeri</option>
+                {MALAYSIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select className="p-2 border rounded-lg bg-white text-sm" value={sortOrder} onChange={e => setSortOrder(e.target.value as any)}>
+                <option value="latest">Terbaru Dikemaskini</option>
+                <option value="alphabetical">Susunan A-Z</option>
+            </select>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -184,12 +232,37 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
               {filteredCompanies.map(company => (
                 <tr key={company.id} className="hover:bg-slate-50">
                   <td className="p-4">
-                    <div className="font-bold text-slate-800">{company.company_name}</div>
-                    <div className="text-xs text-slate-500">{company.company_industry}</div>
+                    <div className="flex items-start gap-2">
+                        <div className="pt-1">
+                            <Building2 size={16} className="text-slate-400" />
+                        </div>
+                        <div>
+                            <div className="font-bold text-slate-800 leading-tight">{company.company_name}</div>
+                            <div className="text-[10px] text-slate-500 mb-2 uppercase font-medium">{company.company_industry}</div>
+                            
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                                {company.has_previous_wbl_students && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-bold" title="Pernah menawarkan tempat WBL">
+                                        <History size={10} /> PERNAH WBL
+                                    </span>
+                                )}
+                                {company.has_mou && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100 text-[9px] font-bold" title={company.mou_type || 'MoU'}>
+                                        <BadgeCheck size={10} /> {company.mou_type || 'MoU'}
+                                    </span>
+                                )}
+                                {company.agreed_wbl && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-100 text-[9px] font-bold" title="Bersetuju Kerjasama WBL">
+                                        <Handshake size={10} /> BERSETUJU WBL
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                   </td>
                   <td className="p-4">
-                    <div className="text-sm text-slate-700">{company.company_district}</div>
-                    <div className="text-xs text-slate-400">{company.company_state}</div>
+                    <div className="text-sm text-slate-700 font-medium">{company.company_district}</div>
+                    <div className="text-[11px] text-slate-400">{company.company_state}</div>
                   </td>
                   <td className="p-4">
                     <div className="flex justify-center gap-2">

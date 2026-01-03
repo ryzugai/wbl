@@ -59,7 +59,9 @@ export interface Company {
   has_mou: boolean;
   mou_type?: 'MoU' | 'LOI';
   has_previous_wbl_students?: boolean;
+  agreed_wbl?: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Application {

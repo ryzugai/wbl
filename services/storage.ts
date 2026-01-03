@@ -263,7 +263,8 @@ export const StorageService = {
   
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
     if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh menambah syarikat.');
-    const newCompany = { ...company, id: generateId() };
+    const timestamp = new Date().toISOString();
+    const newCompany = { ...company, id: generateId(), created_at: timestamp, updated_at: timestamp };
     if (db) {
       await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
     } else {
@@ -279,12 +280,14 @@ export const StorageService = {
     if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh melakukan upload pukal.');
     if (companies.length === 0) return;
     
+    const timestamp = new Date().toISOString();
     const sanitizedCompanies = companies.map(c => ({
       ...c,
       id: generateId(),
       has_mou: !!c.has_mou,
       mou_type: c.has_mou ? (c.mou_type || 'MoU') : null,
-      created_at: c.created_at || new Date().toISOString()
+      created_at: c.created_at || timestamp,
+      updated_at: timestamp
     }));
 
     if (db) {
@@ -315,7 +318,9 @@ export const StorageService = {
         throw new Error('Akses Ditolak: Anda tidak mempunyai kebenaran untuk menyimpan data ke database.');
     }
 
-    const { id, ...dataToUpdate } = updatedCompany;
+    const timestamp = new Date().toISOString();
+    const dataToSave = { ...updatedCompany, updated_at: timestamp };
+    const { id, ...dataToUpdate } = dataToSave;
     const sanitizedData = sanitizeForFirebase(dataToUpdate);
 
     if (db) {
@@ -327,18 +332,18 @@ export const StorageService = {
         if (e.code === 'permission-denied') {
             throw new Error("Ralat Firebase: Insufficient Permissions. Sila pastikan Rules di Console telah ditetapkan kepada 'allow read, write: if true' untuk sementara waktu.");
         }
-        await setDoc(doc(db, 'companies', id), sanitizeForFirebase(updatedCompany), { merge: true });
+        await setDoc(doc(db, 'companies', id), sanitizeForFirebase(dataToSave), { merge: true });
       }
     } else {
       const companies = StorageService.getCompanies();
       const index = companies.findIndex(c => c.id === id);
       if (index !== -1) {
-        companies[index] = updatedCompany;
+        companies[index] = dataToSave;
         localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
         notifyListeners();
       }
     }
-    return updatedCompany;
+    return dataToSave;
   },
 
   deleteCompany: async (id: string): Promise<void> => {
