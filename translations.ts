@@ -8,6 +8,7 @@ export const translations = {
     companies: "Senarai Syarikat",
     students: "Senarai Pelajar",
     supervisedTab: "Pelajar Seliaan",
+    menuSeliaan: "Menu Seliaan",
     staff: "Senarai Staf",
     applications: "Permohonan",
     statistics: "Statistik",
@@ -34,12 +35,20 @@ export const translations = {
     search: "Cari...",
     status: "Status",
 
-    // Supervised Students
+    // Supervised Students (Lecturer View)
     supervisedTitle: "Senarai Pelajar Seliaan",
     supervisedDesc: "Senarai pelajar yang telah ditugaskan secara rasmi di bawah penyeliaan anda.",
     supervisedViewDoc: "Semak Borang PDF",
     supervisedNoDoc: "Borang Jawapan Tiada",
     supervisedStudentInfo: "Maklumat Pelajar Seliaan",
+
+    // Student Supervision (Student View)
+    studentSupTitle: "Maklumat Penyeliaan Saya",
+    studentSupDesc: "Maklumat penyelia fakulti yang telah ditugaskan untuk memantau latihan WBL anda.",
+    studentSupNoAssigned: "Penyelia Belum Ditugaskan",
+    studentSupNoAssignedDesc: "Sila tunggu sehingga Penyelaras WBL menugaskan penyelia fakulti kepada anda.",
+    studentSupInfo: "Maklumat Penyelia",
+    studentSupDocStatus: "Status Dokumen",
 
     // Flipbook
     flipTitle: "Katalog Poster Industri",
@@ -186,6 +195,7 @@ export const translations = {
     companies: "Company List",
     students: "Student List",
     supervisedTab: "My Students",
+    menuSeliaan: "Supervision Menu",
     staff: "Staff List",
     applications: "Applications",
     statistics: "Statistics",
@@ -218,6 +228,14 @@ export const translations = {
     supervisedViewDoc: "Check PDF Form",
     supervisedNoDoc: "No Reply Form",
     supervisedStudentInfo: "Supervised Student Info",
+
+    // Student Supervision
+    studentSupTitle: "My Supervision Information",
+    studentSupDesc: "Details of the faculty supervisor assigned to monitor your WBL training.",
+    studentSupNoAssigned: "No Supervisor Assigned",
+    studentSupNoAssignedDesc: "Please wait until the WBL Coordinator assigns a faculty supervisor to you.",
+    studentSupInfo: "Supervisor Info",
+    studentSupDocStatus: "Document Status",
 
     // Flipbook
     flipTitle: "Industry Poster Catalog",

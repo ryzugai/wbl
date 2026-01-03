@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole } from '../types';
-import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck, UserCheck } from 'lucide-react';
+import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck, UserCheck, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ROLE_LABELS } from '../constants';
 import { generateResume, ResumeTheme } from '../utils/resumeGenerator';
@@ -207,6 +207,8 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }
     { key: 'jenama', label: t(language, 'subJenama') },
   ];
 
+  const hasSupervisor = !!formData.faculty_supervisor_name;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -350,14 +352,39 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }
                 <section className="space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                         <h4 className="text-lg font-semibold text-slate-800">{t(language, 'profileStudentInfo')}</h4>
-                        {formData.faculty_supervisor_name && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-100 rounded-full text-[10px] font-bold text-green-700 shadow-sm animate-fadeIn">
-                                <UserCheck size={14} />
-                                <span>PENYELIA: {formData.faculty_supervisor_name}</span>
+                        {hasSupervisor && (
+                            <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-100 rounded-full text-[10px] font-black text-green-700 shadow-sm animate-pulse">
+                                <ShieldCheck size={14} />
+                                <span>PENYELIA DITUGASKAN</span>
                             </div>
                         )}
                     </div>
-                    <div className="space-y-1">
+
+                    {/* Faculty Supervisor Banner (Large) */}
+                    {hasSupervisor && (
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-2xl text-white shadow-xl shadow-blue-100 flex items-center justify-between group overflow-hidden relative">
+                            <div className="relative z-10 flex items-center gap-5">
+                                <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md border border-white/30 shadow-inner group-hover:rotate-6 transition-transform">
+                                    <UserCheck size={32} />
+                                </div>
+                                <div>
+                                    <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100 opacity-80 mb-1">Penyelia Fakulti WBL</h5>
+                                    <p className="text-xl font-black tracking-tight leading-none mb-2">{formData.faculty_supervisor_name}</p>
+                                    <div className="flex gap-3">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold bg-white/10 px-2 py-1 rounded-lg">
+                                            <CreditCard size={12} /> ID: {formData.faculty_supervisor_staff_id || '-'}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold bg-white/10 px-2 py-1 rounded-lg">
+                                            <Building2 size={12} /> FPTT UTeM
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <UserCheck size={120} className="absolute -right-8 -bottom-8 opacity-10 rotate-12" />
+                        </div>
+                    )}
+
+                    <div className="space-y-1 pt-2">
                         <label className="text-sm font-medium text-slate-700">{t(language, 'program')}</label>
                         {isEditing ? (
                             <div className="space-y-2">
@@ -385,22 +412,6 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }
                             <textarea disabled={!isEditing} className={`w-full pl-10 pr-4 py-2 border rounded-lg transition-colors ${!isEditing ? 'bg-slate-100 text-slate-600 border-transparent' : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900 shadow-sm'}`} rows={3} value={formData.address || ''} onChange={(e) => setFormData({...formData, address: e.target.value})} />
                         </div>
                     </div>
-
-                    {/* Faculty Supervisor Info Box (Non-editable) */}
-                    {formData.faculty_supervisor_name && (
-                        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-4">
-                            <div className="p-3 bg-white rounded-lg shadow-sm text-blue-600 border border-slate-100">
-                                <UserCheck size={24} />
-                            </div>
-                            <div>
-                                <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Penyelia Fakulti (Assigned)</h5>
-                                <p className="font-bold text-slate-800 text-sm">{formData.faculty_supervisor_name}</p>
-                                {formData.faculty_supervisor_staff_id && (
-                                    <p className="text-[10px] text-slate-500 font-medium">No. Staf: {formData.faculty_supervisor_staff_id}</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </section>
 
                 <section className="space-y-6 bg-slate-50 p-6 rounded-xl border border-slate-200">

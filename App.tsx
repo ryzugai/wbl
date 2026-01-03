@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Companies } from './pages/Companies';
 import { Students } from './pages/Students';
 import { SupervisedStudents } from './pages/SupervisedStudents';
+import { StudentSupervision } from './pages/StudentSupervision';
 import { Applications } from './pages/Applications';
 import { UploadExcel } from './pages/UploadExcel';
 import { Profile } from './pages/Profile';
@@ -39,9 +40,22 @@ function App() {
   }, [language]);
 
   const refreshData = () => {
+    const latestUsers = StorageService.getUsers();
     setCompanies(StorageService.getCompanies());
     setApplications(StorageService.getApplications());
-    setUsers(StorageService.getUsers());
+    setUsers(latestUsers);
+
+    // Sync current user with latest data from user list
+    // This handles updates made by coordinators (like assigning a supervisor)
+    if (currentUser) {
+        const updatedMe = latestUsers.find(u => u.id === currentUser.id);
+        if (updatedMe) {
+            // Check if any critical field changed before triggering re-render
+            if (JSON.stringify(updatedMe) !== JSON.stringify(currentUser)) {
+                setCurrentUser(updatedMe);
+            }
+        }
+    }
   };
 
   // Load Initial Data & Subscribe to changes
@@ -52,7 +66,7 @@ function App() {
     refreshData();
     setIsAuthChecking(false);
 
-    // Subscribe to cross-tab updates
+    // Subscribe to cross-tab or Firebase updates
     const unsubscribe = StorageService.subscribe(() => {
         refreshData();
     });
@@ -114,6 +128,7 @@ function App() {
           refreshData();
           toast.success(language === 'ms' ? 'Maklumat syarikat dikemaskini' : 'Company info updated');
       } catch (e: any) {
+          // Fix: Use 'e' instead of 'error' which is not defined in this scope
           toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${e.message}`);
           throw e;
       }
@@ -256,6 +271,14 @@ function App() {
                 language={language}
                 currentUser={currentUser}
                 users={users}
+                applications={applications}
+            />
+        )}
+
+        {currentView === 'studentSupervision' && (
+            <StudentSupervision 
+                language={language}
+                currentUser={currentUser}
                 applications={applications}
             />
         )}
