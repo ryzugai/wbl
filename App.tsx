@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { StorageService } from './services/storage';
 import { User, Company, Application } from './types';
@@ -112,7 +113,6 @@ function App() {
           refreshData();
           toast.success(language === 'ms' ? 'Maklumat syarikat dikemaskini' : 'Company info updated');
       } catch (e: any) {
-          // Changed error.message to e.message
           toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${e.message}`);
           throw e;
       }
@@ -124,7 +124,6 @@ function App() {
           refreshData();
           toast.success(language === 'ms' ? 'Syarikat dipadam' : 'Company deleted');
       } catch (e: any) {
-          // Changed error.message to e.message
           toast.error(`${language === 'ms' ? 'Gagal memadam' : 'Delete failed'}: ${e.message}`);
       }
   };
@@ -140,7 +139,6 @@ function App() {
           return;
       }
       
-      // Fix: Property 'name' does not exist on type 'Company'. Using 'company_name' instead.
       if(myApps.find(a => a.company_name === company.company_name)) {
           toast.error(language === 'ms' ? 'Anda sudah memohon ke syarikat ini.' : 'You have already applied to this company.');
           return;
@@ -289,8 +287,8 @@ function App() {
         {currentView === 'analysis' && (
           <Analysis 
             language={language}
-            applications={applications}
-            users={users}
+            applications={applications} 
+            users={users} 
             companies={companies}
           />
         )}

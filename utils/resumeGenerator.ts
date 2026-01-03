@@ -1,6 +1,5 @@
 
 import { User } from '../types';
-import { GoogleGenAI } from "@google/genai";
 
 export type ResumeTheme = 'modern-blue' | 'emerald-green' | 'royal-purple' | 'professional-slate';
 
@@ -30,43 +29,6 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
   let projects = parseJSON(student.resume_projects);
   let workExperience = parseJSON(student.resume_work_experience);
   
-  if (lang === 'en') {
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `
-        Translate the following Malaysian student resume details into professional English. 
-        Maintain the structure and professional tone.
-        Return ONLY a JSON object with these exact keys: 
-        "about", "courses", "education" (array of objects), "projects" (array of objects), "workExperience" (array of objects).
-        
-        Input Data:
-        - About: ${about}
-        - Courses: ${coursesRaw}
-        - Education: ${JSON.stringify(education)}
-        - Projects: ${JSON.stringify(projects)}
-        - Work Experience: ${JSON.stringify(workExperience)}
-      `;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
-
-      const text = response.text || "{}";
-      const cleanedJson = text.trim().replace(/^```json/, '').replace(/```$/, '').trim();
-      const translatedData = JSON.parse(cleanedJson);
-      
-      if (translatedData.about) about = translatedData.about;
-      if (translatedData.courses) coursesRaw = translatedData.courses;
-      if (translatedData.education) education = translatedData.education;
-      if (translatedData.projects) projects = translatedData.projects;
-      if (translatedData.workExperience) workExperience = translatedData.workExperience;
-    } catch (error) {
-      console.error("AI Translation failed:", error);
-    }
-  }
-
   const resumeWindow = window.open('', '_blank');
   if (!resumeWindow) {
     alert("Pop-up blocked. Sila benarkan pop-up untuk menjana resume.");
