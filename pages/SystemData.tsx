@@ -1,25 +1,24 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { StorageService } from '../services/storage';
-// Added CheckCircle to imports
-import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2, Plus, Trash2, HardDrive, FileWarning, Activity, CheckCircle } from 'lucide-react';
+import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2, Plus, Trash2, HardDrive, FileWarning, Activity, CheckCircle, RefreshCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AdConfig, AdItem, User, Company, Application } from '../types';
 
 interface SystemDataProps {
   onDataRestored: () => void;
+  language: 'ms' | 'en';
 }
 
-export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
+export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored, language }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCloudMode, setIsCloudMode] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
   
-  // Data for Quota checking
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
 
-  // Ad Management State
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [isUpdatingAd, setIsUpdatingAd] = useState(false);
 
@@ -38,17 +37,14 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
     return () => unsub();
   }, []);
 
-  // System Health Calculations
   const quotaStats = useMemo(() => {
     const totalRecords = users.length + companies.length + applications.length;
-    // Estimate data size in bytes (very rough estimate based on JSON string)
     const rawData = JSON.stringify({ users, companies, applications });
     const sizeInMB = (rawData.length / (1024 * 1024)).toFixed(2);
     
-    // Check for large documents (Firestore limit is 1MB per doc)
     const largeApps = applications.filter(app => {
         if (!app.reply_form_image) return false;
-        return app.reply_form_image.length > 800000; // ~800KB estimate
+        return app.reply_form_image.length > 800000; 
     });
 
     return {
@@ -58,6 +54,21 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
         status: parseFloat(sizeInMB) > 50 ? 'Amaran' : 'Sihat'
     };
   }, [users, companies, applications]);
+
+  const handleRepairData = async () => {
+    if (!confirm('Tindakan ini akan memaksa SEMUA syarikat di pangkalan data untuk menjadi "Aktif" secara pukal. Gunakan ini jika anda mendapati senarai syarikat tidak berpindah ke Senarai Aktif. Teruskan?')) return;
+    setIsRepairing(true);
+    const loadingToast = toast.loading('Memulihkan status syarikat...');
+    try {
+        await StorageService.repairCompanyData();
+        toast.success('Selesai! Semua syarikat kini diletakkan dalam status Aktif.', { id: loadingToast });
+        onDataRestored(); // Paksa App.tsx untuk tarik data baru dari storage
+    } catch (e: any) {
+        toast.error(`Ralat: ${e.message}`, { id: loadingToast });
+    } finally {
+        setIsRepairing(false);
+    }
+  };
 
   const handleCloudMigration = async () => {
     if (!isCloudMode) {
@@ -139,7 +150,7 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
         const json = JSON.parse(event.target?.result as string);
         if (window.confirm('Tindakan ini akan menggantikan data TEMPATAN. Teruskan?')) {
           StorageService.restoreFullSystem(json);
-          toast.success('Data tempatan berjaya dipulihkan! Sila klik "Sync ke Cloud" untuk update server.');
+          toast.success('Data tempatan berjaya dipulihkan!');
           onDataRestored();
         }
       } catch (error) {
@@ -167,7 +178,26 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
         </div>
       </div>
 
-      {/* SYSTEM HEALTH / QUOTA SECTION */}
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 text-red-600 rounded-lg">
+                  <RefreshCcw size={24} className={isRepairing ? 'animate-spin' : ''} />
+              </div>
+              <div>
+                  <h3 className="font-bold text-red-800">Pemulihan Data Syarikat (Pukal)</h3>
+                  <p className="text-xs text-red-600">Klik butang ini jika syarikat yang diupload tidak muncul di "Senarai Aktif" atau butang lulus tidak memberi kesan.</p>
+              </div>
+          </div>
+          <button 
+            disabled={isRepairing}
+            onClick={handleRepairData}
+            className="w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-md transition-all active:scale-95 disabled:bg-red-300 flex items-center justify-center gap-2"
+          >
+            {isRepairing ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+            Baiki & Aktifkan Semua Syarikat Sekarang
+          </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 p-6 rounded-2xl border bg-white border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
@@ -200,18 +230,6 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
                     </div>
                 </div>
             </div>
-
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl flex gap-3">
-                <HardDrive size={18} className="text-blue-600 shrink-0" />
-                <div className="text-xs text-blue-700 leading-relaxed">
-                    <p className="font-bold mb-1">Informasi Kouta Firebase (Spark Plan):</p>
-                    <ul className="list-disc pl-4 space-y-1">
-                        <li><strong>Storan Data:</strong> 1GB (Percuma). Penggunaan semasa: ~{quotaStats.sizeInMB}MB.</li>
-                        <li><strong>Had Dokumen:</strong> Maksimum <strong>1MB</strong> bagi setiap dokumen (Syarikat/Pelajar/Permohonan).</li>
-                        <li><strong>Syor:</strong> Elakkan memuat naik fail PDF yang melebihi 1MB untuk memastikan sistem terus berfungsi dengan lancar.</li>
-                    </ul>
-                </div>
-            </div>
         </div>
 
         <div className="p-6 rounded-2xl border bg-white border-slate-200 shadow-sm flex flex-col">
@@ -229,9 +247,6 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
                             <AlertTriangle size={14} />
                             {quotaStats.largeAppsCount} permohonan hampir mencapai had saiz!
                         </div>
-                        <p className="text-[10px] text-slate-500">
-                            Sila ingatkan pelajar untuk mengecilkan (compress) fail PDF sebelum memuat naik borang jawapan.
-                        </p>
                     </div>
                 ) : (
                     <div className="text-center py-6">
@@ -249,7 +264,6 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
         </div>
       </div>
 
-      {/* AD MANAGEMENT SECTION */}
       <div className="p-6 rounded-xl border bg-white border-slate-200 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
@@ -309,35 +323,15 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
                 </button>
               </div>
             ))}
-
-            {adConfig.items.length === 0 && (
-              <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                <p className="text-sm text-slate-500">Tiada iklan dikonfigurasi. Klik butang di bawah untuk menambah iklan.</p>
-              </div>
-            )}
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
-            <button 
-              type="button"
-              onClick={addNewAdRow}
-              className="px-6 py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center gap-2 transition-all"
-            >
-              <Plus size={18} /> Tambah Iklan
-            </button>
-            <button 
-              disabled={isUpdatingAd}
-              type="submit" 
-              className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-400"
-            >
-              {isUpdatingAd ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              Simpan Semua Tetapan Iklan
-            </button>
+            <button type="button" onClick={addNewAdRow} className="px-6 py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg font-bold hover:bg-blue-50 flex items-center justify-center gap-2 transition-all"><Plus size={18} /> Tambah Iklan</button>
+            <button disabled={isUpdatingAd} type="submit" className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-400">{isUpdatingAd ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Simpan Semua Tetapan Iklan</button>
           </div>
         </form>
       </div>
 
-      {/* CLOUD STATUS SECTION */}
       <div className="p-6 rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
         <div className="flex items-center gap-4 mb-6">
           <div className="p-4 bg-white rounded-full shadow-sm text-blue-600">
@@ -356,71 +350,32 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
                   </span>
               )}
             </h3>
-            <p className="text-sm text-slate-600 mt-1">
-              {isCloudMode 
-                ? "Sistem terhubung secara langsung. Data disegerakkan secara automatik antara semua peranti (Telefon & Komputer)." 
-                : "Sistem sedang berjalan dalam mod offline. Sila periksa sambungan internet anda."}
-            </p>
           </div>
         </div>
 
         {isCloudMode && (
           <div className="bg-white p-6 rounded-lg border border-blue-100">
-            <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                <Upload size={18} className="text-blue-600" />
-                Migrasi Data Tempatan
-            </h4>
-            <p className="text-sm text-slate-600 mb-4">
-                Jika anda baru mengimport data melalui Excel atau fail Backup, data tersebut masih berada di browser ini sahaja. 
-                Tekan butang di bawah untuk memuat naik data tersebut ke Cloud supaya ia boleh dilihat oleh pengguna lain.
-            </p>
-            
-            <div className="flex gap-4 items-center">
-                <button 
-                    onClick={handleCloudMigration}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-md flex items-center gap-2 transition-transform active:scale-95"
-                >
-                    <Globe size={18} /> Sync Data Tempatan ke Cloud
-                </button>
-                <div className="text-xs text-slate-400 hidden md:block">
-                    <Smartphone size={14} className="inline mr-1" /> 
-                    Data akan tersedia di semua peranti
-                </div>
-            </div>
+            <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Upload size={18} className="text-blue-600" /> Migrasi Data Tempatan ke Cloud</h4>
+            <p className="text-sm text-slate-600 mb-4">Gunakan butang ini jika anda baru selesai membaiki data secara tempatan dan ingin menolak data tersebut ke Cloud untuk pengguna lain.</p>
+            <button onClick={handleCloudMigration} className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-md flex items-center gap-2 transition-transform active:scale-95"><Globe size={18} /> Sync Sekarang</button>
           </div>
         )}
       </div>
 
-      <div className="border-t border-slate-200 my-6"></div>
-
-      {/* BACKUP SECTION */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-80 hover:opacity-100 transition-opacity">
         <div className="bg-white p-6 rounded-xl border border-slate-200">
-          <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2">
-            <Download size={18} /> Simpan Fail Backup
-          </h4>
-          <p className="text-xs text-slate-500 mb-4">Muat turun salinan data sebagai fail JSON untuk simpanan peribadi.</p>
-          <button onClick={handleBackup} className="w-full py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 text-sm font-medium">
-            Muat Turun
-          </button>
+          <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><Download size={18} /> Simpan Fail Backup</h4>
+          <button onClick={handleBackup} className="w-full py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 text-sm font-medium">Muat Turun</button>
         </div>
-
         <div className="bg-white p-6 rounded-xl border border-slate-200">
-          <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2">
-            <Upload size={18} /> Import Fail Backup
-          </h4>
-          <p className="text-xs text-slate-500 mb-4">Masukkan data lama dari fail JSON ke dalam sistem ini.</p>
+          <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><Upload size={18} /> Import Fail Backup</h4>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
-          <button onClick={handleRestoreClick} className="w-full py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 text-sm font-medium">
-            Pilih Fail
-          </button>
+          <button onClick={handleRestoreClick} className="w-full py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 text-sm font-medium">Pilih Fail</button>
         </div>
       </div>
 
       <div className="mt-8 text-right">
-        <button onClick={handleResetSystem} className="text-red-500 text-sm hover:underline flex items-center gap-1 ml-auto">
-          <AlertTriangle size={14} /> Kosongkan Cache Browser
-        </button>
+        <button onClick={handleResetSystem} className="text-red-500 text-sm hover:underline flex items-center gap-1 ml-auto"><AlertTriangle size={14} /> Kosongkan Cache Browser</button>
       </div>
     </div>
   );

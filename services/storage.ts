@@ -47,8 +47,11 @@ const setupRealtimeListeners = () => {
       snapshot.forEach((doc) => {
         data.push(doc.data());
       });
-      localStorage.setItem(storageKey, JSON.stringify(data));
-      notifyListeners(); 
+      // Hanya kemaskini jika snapshot mempunyai data (elakkan overwrite data tempatan dengan array kosong masa loading)
+      if (!snapshot.empty || snapshot.metadata.fromCache === false) {
+          localStorage.setItem(storageKey, JSON.stringify(data));
+          notifyListeners(); 
+      }
     }, (error) => {
         console.error(`Sync Error for ${colName}:`, error);
     });
@@ -59,7 +62,6 @@ const setupRealtimeListeners = () => {
   syncCollection('companies', STORAGE_KEYS.COMPANIES);
   syncCollection('applications', STORAGE_KEYS.APPLICATIONS);
   
-  // Sync Ad Config
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
       localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(snapshot.data()));
@@ -123,16 +125,6 @@ const init = () => {
   const rawAd = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
   if (!rawAd) {
     localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ items: [], isEnabled: false }));
-  } else {
-    try {
-      const parsed = JSON.parse(rawAd);
-      if (parsed.imageUrl !== undefined) {
-        localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ 
-          items: parsed.imageUrl ? [{ id: 'legacy', imageUrl: parsed.imageUrl, destinationUrl: parsed.destinationUrl || '' }] : [], 
-          isEnabled: parsed.isEnabled || false 
-        }));
-      }
-    } catch(e) {}
   }
 
   initFirebase();
@@ -153,38 +145,23 @@ export const StorageService = {
 
   getAdConfig: (): AdConfig => {
     const data = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
-    const defaultVal = { items: [], isEnabled: false };
-    if (!data) return defaultVal;
-    try {
-      const parsed = JSON.parse(data);
-      if (parsed.items) return parsed;
-      if (parsed.imageUrl) return { items: [{ id: 'migrated', imageUrl: parsed.imageUrl, destinationUrl: parsed.destinationUrl || '' }], isEnabled: parsed.isEnabled };
-      return defaultVal;
-    } catch(e) {
-      return defaultVal;
-    }
+    return data ? JSON.parse(data) : { items: [], isEnabled: false };
   },
 
   updateAdConfig: async (config: AdConfig): Promise<void> => {
     if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh mengemaskini iklan.');
-    if (db) {
-      await setDoc(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(config));
-    } else {
-      localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(config));
-      notifyListeners();
-    }
+    if (db) await setDoc(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(config));
+    localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(config));
+    notifyListeners();
   },
 
   uploadLocalToCloud: async () => {
-    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh memuat naik data ke Cloud.');
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak.');
     if (!db) throw new Error('Cloud tidak disambungkan');
     const batch = writeBatch(db);
     StorageService.getUsers().forEach(u => u.id && batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u)));
     StorageService.getCompanies().forEach(c => c.id && batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c)));
     StorageService.getApplications().forEach(a => a.id && batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a)));
-    
-    batch.set(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(StorageService.getAdConfig()));
-    
     await batch.commit();
   },
 
@@ -194,7 +171,7 @@ export const StorageService = {
       localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
       return user;
     }
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+    const users = StorageService.getUsers();
     const user = users.find((u: User) => u.username === username && u.password === password);
     if (user) {
       if (user.is_approved === false) throw new Error('Akaun masih menunggu kelulusan.');
@@ -212,48 +189,33 @@ export const StorageService = {
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
     const users = StorageService.getUsers();
     if (users.some(u => u.username === user.username)) throw new Error('Username sudah wujud');
-    const needsApproval = user.role === UserRole.TRAINER || (user.role === UserRole.SUPERVISOR && user.has_dual_role);
-    const newUser = { ...user, id: generateId(), is_approved: !needsApproval };
-    if (db) {
-      await setDoc(doc(db, 'users', newUser.id), sanitizeForFirebase(newUser));
-    } else {
-      users.push(newUser);
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      notifyListeners();
-    }
-    return newUser;
+    const newUser = { ...user, id: generateId(), is_approved: user.role === UserRole.STUDENT };
+    
+    users.push(newUser as User);
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    notifyListeners();
+
+    if (db) await setDoc(doc(db, 'users', newUser.id), sanitizeForFirebase(newUser));
+    return newUser as User;
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
-    const current = getCurrentUser();
-    const isSelf = current?.id === updatedUser.id;
-    
-    if (!isCoordinator() && !isSelf) {
-        throw new Error('Akses Ditolak: Hanya Penyelaras boleh mengemaskini maklumat pengguna lain.');
-    }
-    const sanitized = sanitizeForFirebase(updatedUser);
-    if (db) {
-      await setDoc(doc(db, 'users', updatedUser.id), sanitized, { merge: true });
-    } else {
-      const users = StorageService.getUsers();
-      const index = users.findIndex(u => u.id === updatedUser.id);
-      if (index !== -1) {
-        users[index] = updatedUser;
+    const users = StorageService.getUsers();
+    const idx = users.findIndex(u => u.id === updatedUser.id);
+    if (idx !== -1) {
+        users[idx] = updatedUser;
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
         notifyListeners();
-      }
     }
+    if (db) await setDoc(doc(db, 'users', updatedUser.id), sanitizeForFirebase(updatedUser), { merge: true });
     return updatedUser;
   },
 
   deleteUser: async (id: string): Promise<void> => {
-    if (!isCoordinator()) throw new Error('Akses Ditolak: Hanya Penyelaras boleh memadam akaun.');
+    const users = StorageService.getUsers().filter(u => u.id !== id);
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    notifyListeners();
     if (db) await deleteDoc(doc(db, 'users', id));
-    else {
-      const users = StorageService.getUsers().filter(u => u.id !== id);
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      notifyListeners();
-    }
   },
 
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
@@ -261,130 +223,128 @@ export const StorageService = {
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
     const user = getCurrentUser();
     const timestamp = new Date().toISOString();
-    
-    // Syarikat diluluskan secara automatik jika dibuat oleh Penyelaras/Pensyarah
-    // Jika dibuat oleh Pelajar, ia memerlukan kelulusan
-    const isAutoApproved = user?.role === UserRole.COORDINATOR || user?.role === UserRole.LECTURER || user?.is_jkwbl;
+    const isAutoApproved = user?.role === UserRole.COORDINATOR || user?.is_jkwbl;
 
     const newCompany: Company = { 
       ...company, 
       id: generateId(), 
       is_approved: isAutoApproved,
-      created_by_role: user?.role,
       created_at: timestamp, 
       updated_at: timestamp 
     } as Company;
 
-    if (db) {
-      await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
-    } else {
-      const companies = StorageService.getCompanies();
-      companies.push(newCompany);
-      localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
-      notifyListeners();
-    }
+    const companies = StorageService.getCompanies();
+    companies.push(newCompany);
+    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+    notifyListeners();
+
+    if (db) await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
     return newCompany;
   },
 
   bulkCreateCompanies: async (companies: Omit<Company, 'id'>[]): Promise<void> => {
-    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh melakukan upload pukal.');
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak.');
     if (companies.length === 0) return;
     
     const timestamp = new Date().toISOString();
-    const sanitizedCompanies = companies.map(c => ({
-      ...c,
-      id: generateId(),
-      has_mou: !!c.has_mou,
-      mou_type: c.has_mou ? (c.mou_type || 'MoU') : null,
-      is_approved: true, // Upload pukal sentiasa lulus
-      created_at: c.created_at || timestamp,
-      updated_at: timestamp
+    const existing = StorageService.getCompanies();
+    const newItems = companies.map(c => ({
+        ...c,
+        id: generateId(),
+        is_approved: true,
+        created_at: timestamp,
+        updated_at: timestamp
     }));
 
-    if (db) {
-      const chunk = (arr: any[], size: number) => {
-        const results = [];
-        for (let i = 0; i < arr.length; i += size) results.push(arr.slice(i, i + size));
-        return results;
-      };
+    // Update Local First
+    const updatedTotal = [...existing, ...newItems];
+    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updatedTotal));
+    notifyListeners();
 
-      const batches = chunk(sanitizedCompanies, 200); 
-      for (const b of batches) {
-        const writeBatchObj = writeBatch(db);
-        b.forEach(comp => {
-            const ref = doc(db, 'companies', comp.id);
-            writeBatchObj.set(ref, sanitizeForFirebase(comp));
+    // Then Sync to Cloud
+    if (db) {
+        const batch = writeBatch(db);
+        newItems.forEach(c => {
+            batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c));
         });
-        await writeBatchObj.commit();
-      }
-    } else {
-      const existing = StorageService.getCompanies();
-      localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([...existing, ...sanitizedCompanies]));
-      notifyListeners();
+        await batch.commit();
     }
+  },
+
+  bulkApproveCompanies: async (): Promise<void> => {
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak.');
+    const companies = StorageService.getCompanies();
+    const timestamp = new Date().toISOString();
+    
+    // Kemaskini LocalStorage dahulu untuk respon pantas
+    const updatedCompanies = companies.map(c => ({
+      ...c,
+      is_approved: true,
+      updated_at: timestamp
+    }));
+    
+    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updatedCompanies));
+    notifyListeners();
+
+    // Cuba kemaskini Cloud jika ada db
+    if (db) {
+        try {
+            const batch = writeBatch(db);
+            updatedCompanies.forEach(c => {
+                batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c), { merge: true });
+            });
+            await batch.commit();
+        } catch (e) {
+            console.error("Gagal sinkron kelulusan ke cloud:", e);
+        }
+    }
+  },
+
+  repairCompanyData: async (): Promise<void> => {
+    await StorageService.bulkApproveCompanies();
   },
 
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
-    const timestamp = new Date().toISOString();
-    const dataToSave = { ...updatedCompany, updated_at: timestamp };
-    const { id, ...dataToUpdate } = dataToSave;
-    const sanitizedData = sanitizeForFirebase(dataToUpdate);
-
-    if (db) {
-      try {
-        const docRef = doc(db, 'companies', id);
-        await updateDoc(docRef, sanitizedData);
-      } catch (e: any) {
-        await setDoc(doc(db, 'companies', id), sanitizeForFirebase(dataToSave), { merge: true });
-      }
-    } else {
-      const companies = StorageService.getCompanies();
-      const index = companies.findIndex(c => c.id === id);
-      if (index !== -1) {
-        companies[index] = dataToSave;
+    const companies = StorageService.getCompanies();
+    const idx = companies.findIndex(c => c.id === updatedCompany.id);
+    if (idx !== -1) {
+        companies[idx] = updatedCompany;
         localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
         notifyListeners();
-      }
     }
-    return dataToSave;
+    if (db) await setDoc(doc(db, 'companies', updatedCompany.id), sanitizeForFirebase(updatedCompany), { merge: true });
+    return updatedCompany;
   },
 
   deleteCompany: async (id: string): Promise<void> => {
-    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh memadam syarikat.');
+    const companies = StorageService.getCompanies().filter(c => c.id !== id);
+    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+    notifyListeners();
     if (db) await deleteDoc(doc(db, 'companies', id));
-    else {
-      const filtered = StorageService.getCompanies().filter(c => c.id !== id);
-      localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(filtered));
-      notifyListeners();
-    }
   },
 
   getApplications: (): Application[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
   
   createApplication: async (app: Omit<Application, 'id'>): Promise<Application> => {
     const newApp = { ...app, id: generateId() };
+    const apps = StorageService.getApplications();
+    apps.push(newApp as Application);
+    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    notifyListeners();
+
     if (db) await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
-    else {
-      const apps = StorageService.getApplications();
-      apps.push(newApp);
-      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
-      notifyListeners();
-    }
-    return newApp;
+    return newApp as Application;
   },
 
   updateApplication: async (updatedApp: Application): Promise<Application> => {
-    const sanitized = sanitizeForFirebase(updatedApp);
-    if (db) await setDoc(doc(db, 'applications', updatedApp.id), sanitized, { merge: true });
-    else {
-      const apps = StorageService.getApplications();
-      const index = apps.findIndex(a => a.id === updatedApp.id);
-      if (index !== -1) {
-        apps[index] = updatedApp;
+    const apps = StorageService.getApplications();
+    const idx = apps.findIndex(a => a.id === updatedApp.id);
+    if (idx !== -1) {
+        apps[idx] = updatedApp;
         localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
         notifyListeners();
-      }
     }
+    if (db) await setDoc(doc(db, 'applications', updatedApp.id), sanitizeForFirebase(updatedApp), { merge: true });
     return updatedApp;
   },
 
@@ -393,16 +353,14 @@ export const StorageService = {
     companies: StorageService.getCompanies(),
     applications: StorageService.getApplications(),
     adConfig: StorageService.getAdConfig(),
-    timestamp: new Date().toISOString(),
-    version: '4.0'
+    timestamp: new Date().toISOString()
   }),
 
   restoreFullSystem: (data: any) => {
-    if (!hasSystemAccess()) throw new Error('Hanya Penyelaras atau JKWBL boleh melakukan operasi Restore.');
-    if (!data.users || !data.companies || !data.applications) throw new Error('Fail tidak sah.');
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users));
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies));
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications));
+    if (!hasSystemAccess()) throw new Error('Akses Ditolak.');
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users || []));
+    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies || []));
+    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications || []));
     if (data.adConfig) localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(data.adConfig));
     notifyListeners();
   }

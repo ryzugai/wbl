@@ -105,7 +105,6 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             }
           }
 
-          // Fix: Added missing required property 'is_approved' to satisfy Omit<Company, 'id'> type definition
           const newCompany: Omit<Company, 'id'> = {
             company_name: companyName,
             company_state: state || "Melaka",
@@ -118,7 +117,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             has_mou: hasMou,
             mou_type: hasMou ? (mouType || 'MoU') : null as any,
             has_previous_wbl_students: hasPrevious,
-            is_approved: true,
+            is_approved: true, // Pastikan ini sentiasa true untuk import pukal
             created_at: new Date().toISOString()
           };
 
@@ -161,12 +160,17 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
         <div className="mb-6 bg-red-50 p-4 rounded-lg border border-red-100">
           <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
             <AlertCircle size={18} />
-            PENTING: Masalah Kebenaran Firestore?
+            PENTING: Langkah Pemulihan Data
           </h4>
           <p className="text-sm text-red-700">
-            Sila pastikan anda telah menetapkan peraturan pada tab Rules di pangkalan data Firestore kepada kod di bawah (Salin dan Tampal):
-            <code className="block mt-2 bg-white p-2 rounded border font-mono text-xs">allow read, write: if true;</code>
+            Jika data anda hilang selepas "refresh", ini bermakna Firebase Rules anda menghalang simpanan ke Cloud. Sila pastikan:
           </p>
+          <ul className="text-xs text-red-600 list-disc pl-5 mt-2 space-y-1">
+            <li>Buka <strong>Firebase Console</strong> > <strong>Firestore Database</strong>.</li>
+            <li>Pergi ke tab <strong>Rules</strong>.</li>
+            <li>Tukar kod kepada: <code className="bg-white px-1 font-mono">allow read, write: if true;</code></li>
+            <li>Selepas upload Excel, pergi ke menu <strong>Sistem & Data</strong> dan tekan <strong>"Sync Data ke Cloud"</strong>.</li>
+          </ul>
         </div>
 
         <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors relative ${isProcessing ? 'border-blue-300 bg-blue-50' : 'border-slate-300 hover:bg-slate-50'}`}>
