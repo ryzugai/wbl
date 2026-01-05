@@ -1,14 +1,13 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Company, User, UserRole, Application } from '../types';
 import { 
-  Search, Plus, Trash2, Edit, Mail, Building2, CheckCircle2, AlertTriangle, Clock, Copy, Printer, FileText, Check
+  Search, Plus, Trash2, Edit, Mail, Building2, CheckCircle2, AlertTriangle, Clock, Copy, Printer, FileText, Check, History, Handshake, FileSignature
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
 import { toast } from 'react-hot-toast';
 import { StorageService } from '../services/storage';
-import { generateLOI, generateInvitationLetter } from '../utils/letterGenerator';
 
 interface CompanyFormProps {
   data: Partial<Company>;
@@ -91,6 +90,36 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ data, setData }) => {
           <input required type="text" className="w-full px-3 py-2 border rounded bg-white" value={data.company_contact_phone || ''} onChange={e => handleChange('company_contact_phone', e.target.value)} />
         </div>
       </div>
+
+      <div className="pt-2 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Status Kerjasama</h4>
+        <div className="grid grid-cols-1 gap-2">
+            <label className="flex items-center gap-3 p-2 bg-white border rounded-lg cursor-pointer hover:border-blue-300 transition-colors shadow-sm">
+                <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={!!data.has_previous_wbl_students} onChange={e => handleChange('has_previous_wbl_students', e.target.checked)} />
+                <span className="text-xs font-bold text-slate-700">Pernah ambil pelajar WBL</span>
+            </label>
+            <label className="flex items-center gap-3 p-2 bg-white border rounded-lg cursor-pointer hover:border-blue-300 transition-colors shadow-sm">
+                <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={!!data.agreed_wbl} onChange={e => handleChange('agreed_wbl', e.target.checked)} />
+                <span className="text-xs font-bold text-slate-700">Bersetuju menyertai WBL</span>
+            </label>
+            <div className="p-2 bg-white border rounded-lg shadow-sm">
+                <div className="flex items-center gap-3">
+                    <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" checked={!!data.has_mou} onChange={e => handleChange('has_mou', e.target.checked)} />
+                    <span className="text-xs font-bold text-slate-700">Mempunyai MoU / LOI</span>
+                </div>
+                {data.has_mou && (
+                    <div className="mt-2 flex gap-4 ml-7">
+                        <label className="flex items-center gap-2 text-xs text-slate-600">
+                            <input type="radio" name="mou_type" checked={data.mou_type === 'MoU'} onChange={() => handleChange('mou_type', 'MoU')} /> MoU
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-slate-600">
+                            <input type="radio" name="mou_type" checked={data.mou_type === 'LOI'} onChange={() => handleChange('mou_type', 'LOI')} /> LOI
+                        </label>
+                    </div>
+                )}
+            </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -113,7 +142,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   
-  const [newCompany, setNewCompany] = useState<Partial<Company>>({ company_name: '', company_state: 'Melaka' });
+  const [newCompany, setNewCompany] = useState<Partial<Company>>({ company_name: '', company_state: 'Melaka', has_mou: false, has_previous_wbl_students: false, agreed_wbl: false });
   const [editingCompany, setEditingCompany] = useState<any>(null);
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
@@ -135,15 +164,16 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
 
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => {
-        // Logik: Lulus jika is_approved adalah boolean true, string "true", atau nombor 1
         const isCurrentlyApproved = c.is_approved === true || String(c.is_approved) === 'true' || Number(c.is_approved) === 1;
         
         const matchesApproval = isCoordinator 
             ? (activeTab === 'approved' ? isCurrentlyApproved : !isCurrentlyApproved)
             : isCurrentlyApproved;
         
-        const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             (c.company_district?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = c.company_name.toLowerCase().includes(searchLower) || 
+                             (c.company_district?.toLowerCase() || '').includes(searchLower) ||
+                             (c.company_industry?.toLowerCase() || '').includes(searchLower);
                              
         return matchesApproval && matchesSearch;
     });
@@ -200,7 +230,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
       <div className="relative">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
           <input 
-            type="text" placeholder="Cari syarikat atau lokasi..." 
+            type="text" placeholder="Cari syarikat, lokasi atau industri..." 
             className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white shadow-sm outline-none focus:ring-2 focus:ring-blue-500"
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -210,7 +240,8 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="p-4 font-bold text-sm text-slate-600">Syarikat</th>
+                <th className="p-4 font-bold text-sm text-slate-600">Syarikat & Industri</th>
+                <th className="p-4 font-bold text-sm text-slate-600">Status Kerjasama</th>
                 <th className="p-4 font-bold text-sm text-slate-600">Lokasi</th>
                 <th className="p-4 font-bold text-sm text-slate-600 text-center">Tindakan</th>
               </tr>
@@ -218,17 +249,44 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
             <tbody className="divide-y divide-slate-100">
               {filteredCompanies.length === 0 && (
                   <tr>
-                      <td colSpan={3} className="p-12 text-center text-slate-400 italic">Tiada syarikat dalam senarai ini.</td>
+                      <td colSpan={4} className="p-12 text-center text-slate-400 italic">Tiada syarikat dalam senarai ini.</td>
                   </tr>
               )}
               {filteredCompanies.map(company => (
                 <tr key={company.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-4">
                     <div className="font-bold text-slate-800">{company.company_name}</div>
-                    <div className="text-[10px] text-slate-500 uppercase">{company.company_industry}</div>
+                    <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                        <Building2 size={10} /> {company.company_industry}
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-wrap gap-1.5">
+                        {company.has_previous_wbl_students && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm" title="Pernah ambil pelajar WBL">
+                                <History size={10} /> PERNAH WBL
+                            </span>
+                        )}
+                        {company.agreed_wbl && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-700 border border-green-200 shadow-sm" title="Bersetuju menyertai program WBL">
+                                <Handshake size={10} /> SETUJU WBL
+                            </span>
+                        )}
+                        {company.has_mou && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200 shadow-sm" title={`Mempunyai ${company.mou_type}`}>
+                                <FileSignature size={10} /> ADA {company.mou_type || 'MoU/LOI'}
+                            </span>
+                        )}
+                        {!company.has_previous_wbl_students && !company.agreed_wbl && !company.has_mou && (
+                            <span className="text-[10px] text-slate-300 italic">Tiada Rekod</span>
+                        )}
+                    </div>
                   </td>
                   <td className="p-4 text-sm text-slate-600">
-                    {company.company_district}, {company.company_state}
+                    <div className="flex items-center gap-1.5">
+                        <MapPin size={14} className="text-slate-400" />
+                        <span>{company.company_district}, {company.company_state}</span>
+                    </div>
                   </td>
                   <td className="p-4 text-center">
                     <div className="flex justify-center gap-2">
@@ -251,8 +309,8 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                         )}
                         {isCoordinator && (
                             <>
-                                <button onClick={() => { setEditingCompany({...company}); setIsEditModalOpen(true); }} className="p-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"><Edit size={14}/></button>
-                                <button onClick={() => { if(confirm('Hapus?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100"><Trash2 size={14}/></button>
+                                <button onClick={() => { setEditingCompany({...company}); setIsEditModalOpen(true); }} className="p-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200" title="Edit Maklumat"><Edit size={14}/></button>
+                                <button onClick={() => { if(confirm('Hapus syarikat ini?')) onDeleteCompany(company.id); }} className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100" title="Hapus Syarikat"><Trash2 size={14}/></button>
                             </>
                         )}
                     </div>
@@ -281,3 +339,8 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
     </div>
   );
 };
+
+// Simple MapPin icon helper if not imported
+const MapPin = ({ size, className }: { size: number, className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+);
