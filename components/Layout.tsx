@@ -164,13 +164,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           </div>
           <NavItem view="guidebook" label={t(language, 'guidebook')} icon={Book} />
           
-          {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
+          {(hasSystemAccess || isLecturer || isStudent) && (
              <div className="pt-4 pb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
              {t(language, 'management')}
            </div>
           )}
 
-           {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && (
+           {(hasSystemAccess || isLecturer || isStudent) && (
              <NavItem view="addCompany" label={t(language, 'addCompany')} icon={Upload} />
            )}
 

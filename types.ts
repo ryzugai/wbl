@@ -60,6 +60,8 @@ export interface Company {
   mou_type?: 'MoU' | 'LOI';
   has_previous_wbl_students?: boolean;
   agreed_wbl?: boolean;
+  is_approved: boolean;
+  created_by_role?: UserRole;
   created_at: string;
   updated_at?: string;
 }

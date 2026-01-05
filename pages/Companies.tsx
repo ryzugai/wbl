@@ -1,9 +1,9 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Company, User, UserRole, Application } from '../types';
 import { 
   Search, Plus, Trash2, Edit, Loader2, FileText, Printer, 
-  Download, History, SortAsc, Mail, Copy, Building2, Check, Star, Handshake, BadgeCheck, Info
+  Download, History, SortAsc, Mail, Copy, Building2, Check, Star, Handshake, BadgeCheck, Info, Clock, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { MALAYSIAN_STATES } from '../constants';
@@ -150,7 +150,7 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
   const [sortOrder, setSortOrder] = useState<'alphabetical' | 'latest'>('latest');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'approved' | 'pending'>('approved');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -180,18 +180,36 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
     setIsAddModalOpen(true);
   };
 
-  const filteredCompanies = companies
-    .filter(c => {
-      const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesState = filterState === 'all' || c.company_state === filterState;
-      return matchesSearch && matchesState;
-    })
-    .sort((a, b) => {
-      if (sortOrder === 'alphabetical') return a.company_name.localeCompare(b.company_name);
-      const dateA = new Date(a.updated_at || a.created_at).getTime();
-      const dateB = new Date(b.updated_at || b.created_at).getTime();
-      return dateB - dateA;
-    });
+  const handleApprove = async (company: Company) => {
+    try {
+        await onUpdateCompany({ ...company, is_approved: true });
+        toast.success(language === 'ms' ? 'Syarikat diluluskan!' : 'Company approved!');
+    } catch (e: any) {
+        toast.error(e.message);
+    }
+  };
+
+  const filteredCompanies = useMemo(() => {
+    return companies
+      .filter(c => {
+        // Jika Penyelaras, boleh tukar tab. Jika Pelajar, hanya lihat yang diluluskan.
+        const matchesApproval = isCoordinator 
+            ? (activeTab === 'approved' ? c.is_approved === true : c.is_approved === false)
+            : c.is_approved === true;
+            
+        const matchesSearch = c.company_name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesState = filterState === 'all' || c.company_state === filterState;
+        return matchesApproval && matchesSearch && matchesState;
+      })
+      .sort((a, b) => {
+        if (sortOrder === 'alphabetical') return a.company_name.localeCompare(b.company_name);
+        const dateA = new Date(a.updated_at || a.created_at).getTime();
+        const dateB = new Date(b.updated_at || b.created_at).getTime();
+        return dateB - dateA;
+      });
+  }, [companies, activeTab, searchTerm, filterState, sortOrder, isCoordinator]);
+
+  const pendingCount = useMemo(() => companies.filter(c => c.is_approved === false).length, [companies]);
 
   const getEmailBody = () => {
     const jawatan = currentUser.role === UserRole.COORDINATOR ? 'Penyelaras' : 'Ahli Jawatankuasa (JK)';
@@ -208,17 +226,43 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Senarai Syarikat</h2>
-        {isCoordinator && (
-          <button 
-            onClick={handleOpenAddModal} 
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-md transition-all active:scale-95"
-          >
-            <Plus size={18} /> Tambah Syarikat
-          </button>
-        )}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h2 className="text-2xl font-bold text-slate-800">Senarai Syarikat</h2>
+            {currentUser.role === UserRole.STUDENT && (
+                <p className="text-xs text-slate-500 mt-1">Hanya syarikat yang telah diluluskan oleh Penyelaras dipaparkan di sini.</p>
+            )}
+        </div>
+        <button 
+          onClick={handleOpenAddModal} 
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-md transition-all active:scale-95"
+        >
+          <Plus size={18} /> Cadangkan Syarikat Baru
+        </button>
       </div>
+
+      {isCoordinator && (
+          <div className="flex gap-2 border-b border-slate-200">
+              <button 
+                  onClick={() => setActiveTab('approved')}
+                  className={`px-6 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === 'approved' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              >
+                  <CheckCircle2 size={16} /> Senarai Aktif
+              </button>
+              <button 
+                  onClick={() => setActiveTab('pending')}
+                  className={`px-6 py-2 text-sm font-bold border-b-2 transition-all flex items-center gap-2 relative ${activeTab === 'pending' ? 'border-orange-600 text-orange-600 bg-orange-50/50' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              >
+                  <Clock size={16} /> Permohonan Pelajar
+                  {pendingCount > 0 && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+                  )}
+                  {pendingCount > 0 && (
+                      <span className="ml-1 bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[10px]">{pendingCount}</span>
+                  )}
+              </button>
+          </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl border border-slate-200">
         <div className="flex-1 relative">
@@ -241,6 +285,13 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
         </div>
       </div>
 
+      {activeTab === 'pending' && isCoordinator && (
+          <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex gap-3 text-orange-800">
+              <AlertTriangle className="shrink-0" size={20} />
+              <p className="text-xs">Syarikat dalam senarai ini telah didaftarkan oleh pelajar. Sila semak kesahihan maklumat sebelum meluluskan untuk paparan umum.</p>
+          </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -252,6 +303,11 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {filteredCompanies.length === 0 && (
+                  <tr>
+                      <td colSpan={3} className="p-12 text-center text-slate-400 italic">Tiada syarikat ditemui dalam kategori ini.</td>
+                  </tr>
+              )}
               {filteredCompanies.map(company => (
                 <tr key={company.id} className="hover:bg-slate-50">
                   <td className="p-4">
@@ -289,7 +345,16 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                   </td>
                   <td className="p-4">
                     <div className="flex justify-center gap-2">
-                      {isCoordinator && (
+                      {isCoordinator && activeTab === 'pending' && (
+                          <button 
+                            onClick={() => handleApprove(company)}
+                            className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm"
+                          >
+                              <CheckCircle2 size={14} /> <span className="text-[10px] font-bold pr-1 uppercase">Lulus</span>
+                          </button>
+                      )}
+                      
+                      {isCoordinator && activeTab === 'approved' && (
                         <button 
                           onClick={() => { setSelectedCompanyForEmail(company); setIsEmailModalOpen(true); }}
                           className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
@@ -297,9 +362,11 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
                           <Mail size={14} /> <span className="text-[10px] font-bold pr-1 uppercase">Emel</span>
                         </button>
                       )}
-                      {currentUser.role === UserRole.STUDENT && (
+                      
+                      {currentUser.role === UserRole.STUDENT && activeTab === 'approved' && (
                         <button onClick={() => onApply(company)} className="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-indigo-700 shadow-sm">Mohon</button>
                       )}
+                      
                       {isCoordinator && (
                         <>
                           <button onClick={() => { setEditingCompany({...company}); setIsEditModalOpen(true); }} className="p-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"><Edit size={14}/></button>
@@ -390,10 +457,13 @@ export const Companies: React.FC<CompaniesProps> = ({ companies, applications, c
         </div>
       </Modal>
 
-      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Tambah Syarikat Baru">
-        <form onSubmit={async (e) => { e.preventDefault(); await onAddCompany(newCompany as any); setIsAddModalOpen(false); }} className="space-y-4">
+      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Cadangkan Syarikat Baru">
+        <form onSubmit={async (e) => { e.preventDefault(); await onAddCompany(newCompany as any); setIsAddModalOpen(false); toast.success(language === 'ms' ? 'Cadangan dihantar! Menunggu kelulusan Penyelaras.' : 'Proposal sent! Awaiting Coordinator approval.'); }} className="space-y-4">
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-2">
+              <p className="text-[10px] text-blue-700 leading-tight"><strong>Nota Pelajar:</strong> Syarikat yang anda cadangkan perlu disemak dan diluluskan oleh Penyelaras sebelum ia muncul dalam senarai permohonan utama.</p>
+          </div>
           <CompanyForm data={newCompany} setData={setNewCompany} />
-          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg">Simpan Syarikat</button>
+          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg">Simpan & Hantar Cadangan</button>
         </form>
       </Modal>
 

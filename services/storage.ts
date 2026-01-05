@@ -120,14 +120,12 @@ const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
   
-  // Migrasi data lama jika perlu atau set default baru
   const rawAd = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
   if (!rawAd) {
     localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ items: [], isEnabled: false }));
   } else {
     try {
       const parsed = JSON.parse(rawAd);
-      // Jika masih format lama (string imageUrl), tukar ke format baru
       if (parsed.imageUrl !== undefined) {
         localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ 
           items: parsed.imageUrl ? [{ id: 'legacy', imageUrl: parsed.imageUrl, destinationUrl: parsed.destinationUrl || '' }] : [], 
@@ -159,7 +157,6 @@ export const StorageService = {
     if (!data) return defaultVal;
     try {
       const parsed = JSON.parse(data);
-      // Safety check for legacy formats
       if (parsed.items) return parsed;
       if (parsed.imageUrl) return { items: [{ id: 'migrated', imageUrl: parsed.imageUrl, destinationUrl: parsed.destinationUrl || '' }], isEnabled: parsed.isEnabled };
       return defaultVal;
@@ -262,9 +259,22 @@ export const StorageService = {
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
   
   createCompany: async (company: Omit<Company, 'id'>): Promise<Company> => {
-    if (!hasSystemAccess()) throw new Error('Akses Ditolak: Hanya Penyelaras atau JKWBL boleh menambah syarikat.');
+    const user = getCurrentUser();
     const timestamp = new Date().toISOString();
-    const newCompany = { ...company, id: generateId(), created_at: timestamp, updated_at: timestamp };
+    
+    // Syarikat diluluskan secara automatik jika dibuat oleh Penyelaras/Pensyarah
+    // Jika dibuat oleh Pelajar, ia memerlukan kelulusan
+    const isAutoApproved = user?.role === UserRole.COORDINATOR || user?.role === UserRole.LECTURER || user?.is_jkwbl;
+
+    const newCompany: Company = { 
+      ...company, 
+      id: generateId(), 
+      is_approved: isAutoApproved,
+      created_by_role: user?.role,
+      created_at: timestamp, 
+      updated_at: timestamp 
+    } as Company;
+
     if (db) {
       await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
     } else {
@@ -286,6 +296,7 @@ export const StorageService = {
       id: generateId(),
       has_mou: !!c.has_mou,
       mou_type: c.has_mou ? (c.mou_type || 'MoU') : null,
+      is_approved: true, // Upload pukal sentiasa lulus
       created_at: c.created_at || timestamp,
       updated_at: timestamp
     }));
@@ -314,10 +325,6 @@ export const StorageService = {
   },
 
   updateCompany: async (updatedCompany: Company): Promise<Company> => {
-    if (!hasSystemAccess()) {
-        throw new Error('Akses Ditolak: Anda tidak mempunyai kebenaran untuk menyimpan data ke database.');
-    }
-
     const timestamp = new Date().toISOString();
     const dataToSave = { ...updatedCompany, updated_at: timestamp };
     const { id, ...dataToUpdate } = dataToSave;
@@ -328,10 +335,6 @@ export const StorageService = {
         const docRef = doc(db, 'companies', id);
         await updateDoc(docRef, sanitizedData);
       } catch (e: any) {
-        console.error("Firebase Update Error:", e);
-        if (e.code === 'permission-denied') {
-            throw new Error("Ralat Firebase: Insufficient Permissions. Sila pastikan Rules di Console telah ditetapkan kepada 'allow read, write: if true' untuk sementara waktu.");
-        }
         await setDoc(doc(db, 'companies', id), sanitizeForFirebase(dataToSave), { merge: true });
       }
     } else {

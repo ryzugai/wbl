@@ -105,6 +105,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             }
           }
 
+          // Fix: Added missing required property 'is_approved' to satisfy Omit<Company, 'id'> type definition
           const newCompany: Omit<Company, 'id'> = {
             company_name: companyName,
             company_state: state || "Melaka",
@@ -117,6 +118,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             has_mou: hasMou,
             mou_type: hasMou ? (mouType || 'MoU') : null as any,
             has_previous_wbl_students: hasPrevious,
+            is_approved: true,
             created_at: new Date().toISOString()
           };
 
@@ -194,7 +196,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
                 </div>
                 <div className="bg-red-50 p-4 rounded-lg border border-red-100 text-center">
                     <div className="text-2xl font-bold text-red-700">{summary.failed}</div>
-                    <div className="text-xs text-red-600">GAGAL</div>
+                    <div className="text-xs text-green-600">GAGAL</div>
                 </div>
             </div>
             <button 
