@@ -272,6 +272,7 @@ function App() {
                 currentUser={currentUser}
                 users={users}
                 applications={applications}
+                onUpdateApplication={handleUpdateApplication}
             />
         )}
 

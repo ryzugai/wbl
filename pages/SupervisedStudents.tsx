@@ -1,18 +1,20 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UsersRound, FileText, Eye, Building2, CheckCircle2, AlertCircle, Clock, Search, GraduationCap, Printer, ShieldCheck } from 'lucide-react';
+import { UsersRound, FileText, Eye, Building2, CheckCircle2, AlertCircle, Clock, Search, GraduationCap, Printer, ShieldCheck, FileCheck } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { Language, t } from '../translations';
+import { toast } from 'react-hot-toast';
 
 interface SupervisedStudentsProps {
   currentUser: User;
   users: User[];
   applications: Application[];
   language: Language;
+  onUpdateApplication: (app: Application) => Promise<void>;
 }
 
-export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentUser, users, applications, language }) => {
+export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentUser, users, applications, language, onUpdateApplication }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -56,6 +58,21 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
       return { ...student, activeApp };
     });
   }, [users, applications, currentUser.id, currentUser.username, searchTerm]);
+
+  const handleVerifyBorang = async (app: Application) => {
+    try {
+      await onUpdateApplication({
+        ...app,
+        reply_form_verified: true,
+        reply_form_verified_by: currentUser.name,
+        reply_form_verified_at: new Date().toISOString()
+      });
+      toast.success(language === 'ms' ? "Borang disahkan!" : "Form verified!");
+      setIsPdfModalOpen(false);
+    } catch (err) {
+      toast.error("Gagal mengesahkan borang.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -200,26 +217,38 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                 )}
             </div>
 
-            <div className="flex gap-3">
-                <button 
-                    onClick={() => {
-                        if (selectedApp?.reply_form_image) {
-                            const link = document.createElement('a');
-                            link.href = selectedApp.reply_form_image;
-                            link.download = `Borang_Jawapan_${selectedApp.student_id}.pdf`;
-                            link.click();
-                        }
-                    }}
-                    className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95"
-                >
-                    <Printer size={20} /> {language === 'ms' ? 'Muat Turun & Cetak' : 'Download & Print'}
-                </button>
-                <button 
-                    onClick={() => setIsPdfModalOpen(false)}
-                    className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200"
-                >
-                    {t(language, 'cancel')}
-                </button>
+            <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <button 
+                      onClick={() => {
+                          if (selectedApp?.reply_form_image) {
+                              const link = document.createElement('a');
+                              link.href = selectedApp.reply_form_image;
+                              link.download = `Borang_Jawapan_${selectedApp.student_id}.pdf`;
+                              link.click();
+                          }
+                      }}
+                      className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95"
+                  >
+                      <Printer size={20} /> {language === 'ms' ? 'Muat Turun & Cetak' : 'Download & Print'}
+                  </button>
+                  <button 
+                      onClick={() => setIsPdfModalOpen(false)}
+                      className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200"
+                  >
+                      {t(language, 'cancel')}
+                  </button>
+                </div>
+                
+                {selectedApp?.reply_form_image && !selectedApp.reply_form_verified && (
+                    <button 
+                        onClick={() => selectedApp && handleVerifyBorang(selectedApp)}
+                        className="w-full py-4 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-all active:scale-[0.98]"
+                    >
+                        <FileCheck size={20} />
+                        {language === 'ms' ? 'Sahkan Borang Jawapan' : 'Verify Reply Form'}
+                    </button>
+                )}
             </div>
             
             {selectedApp?.reply_form_verified && (
