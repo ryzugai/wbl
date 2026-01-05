@@ -1,9 +1,10 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { StorageService } from '../services/storage';
-import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2, Plus, Trash2 } from 'lucide-react';
+// Added CheckCircle to imports
+import { Download, Upload, AlertTriangle, Database, Cloud, Wifi, Save, Globe, Smartphone, Image, ToggleLeft, ToggleRight, Loader2, Plus, Trash2, HardDrive, FileWarning, Activity, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { AdConfig, AdItem } from '../types';
+import { AdConfig, AdItem, User, Company, Application } from '../types';
 
 interface SystemDataProps {
   onDataRestored: () => void;
@@ -13,17 +14,50 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCloudMode, setIsCloudMode] = useState(false);
   
+  // Data for Quota checking
+  const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+
   // Ad Management State
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [isUpdatingAd, setIsUpdatingAd] = useState(false);
 
   useEffect(() => {
     setIsCloudMode(StorageService.isCloudEnabled());
+    setUsers(StorageService.getUsers());
+    setCompanies(StorageService.getCompanies());
+    setApplications(StorageService.getApplications());
+
     const unsub = StorageService.subscribe(() => {
       setAdConfig(StorageService.getAdConfig());
+      setUsers(StorageService.getUsers());
+      setCompanies(StorageService.getCompanies());
+      setApplications(StorageService.getApplications());
     });
     return () => unsub();
   }, []);
+
+  // System Health Calculations
+  const quotaStats = useMemo(() => {
+    const totalRecords = users.length + companies.length + applications.length;
+    // Estimate data size in bytes (very rough estimate based on JSON string)
+    const rawData = JSON.stringify({ users, companies, applications });
+    const sizeInMB = (rawData.length / (1024 * 1024)).toFixed(2);
+    
+    // Check for large documents (Firestore limit is 1MB per doc)
+    const largeApps = applications.filter(app => {
+        if (!app.reply_form_image) return false;
+        return app.reply_form_image.length > 800000; // ~800KB estimate
+    });
+
+    return {
+        totalRecords,
+        sizeInMB,
+        largeAppsCount: largeApps.length,
+        status: parseFloat(sizeInMB) > 50 ? 'Amaran' : 'Sihat'
+    };
+  }, [users, companies, applications]);
 
   const handleCloudMigration = async () => {
     if (!isCloudMode) {
@@ -46,7 +80,6 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
     e.preventDefault();
     setIsUpdatingAd(true);
     try {
-      // Filter out empty ads
       const cleanItems = adConfig.items.filter(item => item.imageUrl.trim() !== '');
       await StorageService.updateAdConfig({ ...adConfig, items: cleanItems });
       toast.success('Sistem Iklan berjaya dikemaskini!');
@@ -81,7 +114,6 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
     setAdConfig({ ...adConfig, items: newItems });
   };
 
-  // Backup/Restore Logic
   const handleBackup = () => {
     const data = StorageService.getFullSystemBackup();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -132,6 +164,88 @@ export const SystemData: React.FC<SystemDataProps> = ({ onDataRestored }) => {
         <div>
             <h2 className="text-2xl font-bold text-slate-800">Sistem & Data</h2>
             <p className="text-slate-500">Pengurusan pangkalan data dan sinkronisasi.</p>
+        </div>
+      </div>
+
+      {/* SYSTEM HEALTH / QUOTA SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 p-6 rounded-2xl border bg-white border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <Activity size={20} />
+                </div>
+                <h3 className="font-bold text-slate-800">Semakan Kuota & Kesihatan Sistem</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Jumlah Rekod</p>
+                    <div className="flex items-end gap-2">
+                        <span className="text-2xl font-black text-slate-800">{quotaStats.totalRecords}</span>
+                        <span className="text-[10px] text-slate-400 pb-1">entri</span>
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saiz Pangkalan Data</p>
+                    <div className="flex items-end gap-2">
+                        <span className="text-2xl font-black text-slate-800">{quotaStats.sizeInMB}</span>
+                        <span className="text-[10px] text-slate-400 pb-1">MB</span>
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status Kesihatan</p>
+                    <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${quotaStats.status === 'Sihat' ? 'bg-green-500' : 'bg-yellow-500'} animate-pulse`} />
+                        <span className={`text-sm font-bold ${quotaStats.status === 'Sihat' ? 'text-green-600' : 'text-yellow-600'}`}>{quotaStats.status}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl flex gap-3">
+                <HardDrive size={18} className="text-blue-600 shrink-0" />
+                <div className="text-xs text-blue-700 leading-relaxed">
+                    <p className="font-bold mb-1">Informasi Kouta Firebase (Spark Plan):</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                        <li><strong>Storan Data:</strong> 1GB (Percuma). Penggunaan semasa: ~{quotaStats.sizeInMB}MB.</li>
+                        <li><strong>Had Dokumen:</strong> Maksimum <strong>1MB</strong> bagi setiap dokumen (Syarikat/Pelajar/Permohonan).</li>
+                        <li><strong>Syor:</strong> Elakkan memuat naik fail PDF yang melebihi 1MB untuk memastikan sistem terus berfungsi dengan lancar.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div className="p-6 rounded-2xl border bg-white border-slate-200 shadow-sm flex flex-col">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                    <FileWarning size={20} />
+                </div>
+                <h3 className="font-bold text-slate-800">Amaran Saiz Fail</h3>
+            </div>
+            
+            <div className="flex-1">
+                {quotaStats.largeAppsCount > 0 ? (
+                    <div className="space-y-3">
+                        <div className="p-3 bg-red-50 text-red-700 rounded-lg text-xs font-bold flex items-center gap-2">
+                            <AlertTriangle size={14} />
+                            {quotaStats.largeAppsCount} permohonan hampir mencapai had saiz!
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                            Sila ingatkan pelajar untuk mengecilkan (compress) fail PDF sebelum memuat naik borang jawapan.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="text-center py-6">
+                        <CheckCircle size={32} className="text-green-500 mx-auto mb-2 opacity-20" />
+                        <p className="text-xs text-slate-400">Semua saiz dokumen berada dalam julat selamat.</p>
+                    </div>
+                )}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-100">
+                <button onClick={handleBackup} className="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 transition-all flex items-center justify-center gap-2">
+                    <Download size={14} /> Backup Data Sekarang
+                </button>
+            </div>
         </div>
       </div>
 
