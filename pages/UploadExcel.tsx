@@ -166,7 +166,7 @@ export const UploadExcel: React.FC<UploadExcelProps> = ({ onUploadSuccess, onNav
             Jika data anda hilang selepas "refresh", ini bermakna Firebase Rules anda menghalang simpanan ke Cloud. Sila pastikan:
           </p>
           <ul className="text-xs text-red-600 list-disc pl-5 mt-2 space-y-1">
-            <li>Buka <strong>Firebase Console</strong> > <strong>Firestore Database</strong>.</li>
+            <li>Buka <strong>Firebase Console</strong> &gt; <strong>Firestore Database</strong>.</li>
             <li>Pergi ke tab <strong>Rules</strong>.</li>
             <li>Tukar kod kepada: <code className="bg-white px-1 font-mono">allow read, write: if true;</code></li>
             <li>Selepas upload Excel, pergi ke menu <strong>Sistem & Data</strong> dan tekan <strong>"Sync Data ke Cloud"</strong>.</li>
