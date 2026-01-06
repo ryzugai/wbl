@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter } from '../utils/letterGenerator';
-import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock } from 'lucide-react';
+import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 
@@ -13,12 +13,13 @@ interface ApplicationsProps {
   users: User[];
   companies: Company[];
   onUpdateApplication: (app: Application) => Promise<void>;
+  onDeleteApplication?: (id: string) => Promise<void>;
   language: Language;
 }
 
-export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applications, users, companies, onUpdateApplication, language }) => {
+export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applications, users, companies, onUpdateApplication, onDeleteApplication, language }) => {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [modalType, setModalType] = useState<'supervisor' | 'upload' | 'viewReply' | 'letter' | 'statusConfirm' | 'viewPdf' | null>(null);
+  const [modalType, setModalType] = useState<'supervisor' | 'upload' | 'viewReply' | 'letter' | 'statusConfirm' | 'viewPdf' | 'cancelConfirm' | null>(null);
   const [statusConfirmData, setStatusConfirmData] = useState<{ app: Application; newStatus: any } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -39,18 +40,23 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     toast.success(language === 'ms' ? 'Status dikemaskini' : 'Status updated');
   };
 
+  const handleCancelApplication = async () => {
+    if (!selectedApp || !onDeleteApplication) return;
+    await onDeleteApplication(selectedApp.id);
+    setModalType(null);
+    setSelectedApp(null);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedApp) return;
 
-    // Validation: Saiz tidak lebih 20MB
     const maxSize = 20 * 1024 * 1024; // 20MB
     if (file.size > maxSize) {
       toast.error(t(language, 'appFileTooLarge'));
       return;
     }
 
-    // Validation: Mesti PDF
     if (file.type !== 'application/pdf') {
       toast.error(t(language, 'appInvalidFormat'));
       return;
@@ -62,10 +68,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       try {
         const base64String = evt.target?.result as string;
         
-        // Simpan data dalam application object
         await onUpdateApplication({
           ...selectedApp,
-          reply_form_image: base64String, // Kita guna field sedia ada untuk simpan PDF data
+          reply_form_image: base64String,
           reply_form_uploaded_at: new Date().toISOString(),
           reply_form_verified: false
         });
@@ -160,7 +165,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                     </td>
                     <td className="p-4">
                         <div className="flex justify-center gap-2">
-                        {/* Lulus/Tolak Permohonan (Coordinator Only) */}
+                        {/* Coordinator Actions */}
                         {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && app.application_status === 'Menunggu' && (
                             <>
                                 <button 
@@ -199,18 +204,39 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                         <Upload size={18} />
                                     </button>
                                 )}
+                                {/* New Cancellation Button for Pending Apps */}
+                                {app.application_status === 'Menunggu' && (
+                                    <button 
+                                        onClick={() => { setSelectedApp(app); setModalType('cancelConfirm'); }}
+                                        className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                                        title={language === 'ms' ? "Batal Permohonan" : "Cancel Application"}
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                )}
                             </>
                         )}
 
-                        {/* Coordinator Verification Action */}
-                        {hasSystemAccess && app.reply_form_image && !app.reply_form_verified && (
-                             <button 
-                                onClick={() => { setSelectedApp(app); setModalType('viewPdf'); }}
-                                className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
-                                title="Sahkan Borang Jawapan"
-                            >
-                                <FileCheck size={18} />
-                            </button>
+                        {/* Coordinator Verification/Maintenance */}
+                        {hasSystemAccess && (
+                            <>
+                                {app.reply_form_image && !app.reply_form_verified && (
+                                     <button 
+                                        onClick={() => { setSelectedApp(app); setModalType('viewPdf'); }}
+                                        className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
+                                        title="Sahkan Borang Jawapan"
+                                    >
+                                        <FileCheck size={18} />
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => { if(confirm(language === 'ms' ? 'Padam rekod ini secara kekal?' : 'Delete this record permanently?')) onDeleteApplication?.(app.id); }}
+                                    className="p-2 bg-slate-100 text-slate-400 rounded hover:bg-red-50 hover:text-red-500 transition-colors"
+                                    title="Maintenance: Padam Rekod"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </>
                         )}
                         </div>
                     </td>
@@ -228,6 +254,21 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                 <div className="flex gap-2">
                     <button onClick={() => setModalType(null)} className="flex-1 p-2 border rounded">{t(language, 'cancel')}</button>
                     <button onClick={handleConfirmStatusChange} className="flex-1 p-2 bg-blue-600 text-white rounded font-bold">{t(language, 'confirm')}</button>
+                </div>
+            </div>
+        </Modal>
+
+        {/* MODAL: BATAL PERMOHONAN */}
+        <Modal isOpen={modalType === 'cancelConfirm'} onClose={() => setModalType(null)} title={language === 'ms' ? 'Batal Permohonan' : 'Cancel Application'}>
+            <div className="space-y-4 text-center">
+                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">{language === 'ms' ? 'Adakah anda pasti?' : 'Are you sure?'}</h3>
+                <p className="text-sm text-slate-500">{language === 'ms' ? `Permohonan anda ke syarikat ${selectedApp?.company_name} akan dipadam secara kekal dari sistem.` : `Your application to ${selectedApp?.company_name} will be permanently removed from the system.`}</p>
+                <div className="flex gap-2 mt-6">
+                    <button onClick={() => setModalType(null)} className="flex-1 p-3 border rounded-xl font-bold">{t(language, 'cancel')}</button>
+                    <button onClick={handleCancelApplication} className="flex-1 p-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">{language === 'ms' ? 'Ya, Batalkan' : 'Yes, Cancel'}</button>
                 </div>
             </div>
         </Modal>

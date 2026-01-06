@@ -47,7 +47,6 @@ const setupRealtimeListeners = () => {
       snapshot.forEach((doc) => {
         data.push(doc.data());
       });
-      // Hanya kemaskini jika snapshot mempunyai data (elakkan overwrite data tempatan dengan array kosong masa loading)
       if (!snapshot.empty || snapshot.metadata.fromCache === false) {
           localStorage.setItem(storageKey, JSON.stringify(data));
           notifyListeners(); 
@@ -256,12 +255,10 @@ export const StorageService = {
         updated_at: timestamp
     }));
 
-    // Update Local First
     const updatedTotal = [...existing, ...newItems];
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updatedTotal));
     notifyListeners();
 
-    // Then Sync to Cloud
     if (db) {
         const batch = writeBatch(db);
         newItems.forEach(c => {
@@ -276,7 +273,6 @@ export const StorageService = {
     const companies = StorageService.getCompanies();
     const timestamp = new Date().toISOString();
     
-    // Kemaskini LocalStorage dahulu untuk respon pantas
     const updatedCompanies = companies.map(c => ({
       ...c,
       is_approved: true,
@@ -286,7 +282,6 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updatedCompanies));
     notifyListeners();
 
-    // Cuba kemaskini Cloud jika ada db
     if (db) {
         try {
             const batch = writeBatch(db);
@@ -346,6 +341,13 @@ export const StorageService = {
     }
     if (db) await setDoc(doc(db, 'applications', updatedApp.id), sanitizeForFirebase(updatedApp), { merge: true });
     return updatedApp;
+  },
+
+  deleteApplication: async (id: string): Promise<void> => {
+    const apps = StorageService.getApplications().filter(a => a.id !== id);
+    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    notifyListeners();
+    if (db) await deleteDoc(doc(db, 'applications', id));
   },
 
   getFullSystemBackup: () => ({

@@ -45,12 +45,9 @@ function App() {
     setApplications(StorageService.getApplications());
     setUsers(latestUsers);
 
-    // Sync current user with latest data from user list
-    // This handles updates made by coordinators (like assigning a supervisor)
     if (currentUser) {
         const updatedMe = latestUsers.find(u => u.id === currentUser.id);
         if (updatedMe) {
-            // Check if any critical field changed before triggering re-render
             if (JSON.stringify(updatedMe) !== JSON.stringify(currentUser)) {
                 setCurrentUser(updatedMe);
             }
@@ -58,7 +55,6 @@ function App() {
     }
   };
 
-  // Load Initial Data & Subscribe to changes
   useEffect(() => {
     const user = StorageService.getCurrentUser();
     if (user) setCurrentUser(user);
@@ -66,7 +62,6 @@ function App() {
     refreshData();
     setIsAuthChecking(false);
 
-    // Subscribe to cross-tab or Firebase updates
     const unsubscribe = StorageService.subscribe(() => {
         refreshData();
     });
@@ -128,7 +123,6 @@ function App() {
           refreshData();
           toast.success(language === 'ms' ? 'Maklumat syarikat dikemaskini' : 'Company info updated');
       } catch (e: any) {
-          // Fix: Use 'e' instead of 'error' which is not defined in this scope
           toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${e.message}`);
           throw e;
       }
@@ -214,6 +208,16 @@ function App() {
       }
   };
 
+  const handleDeleteApplication = async (id: string) => {
+      try {
+        await StorageService.deleteApplication(id);
+        refreshData();
+        toast.success(language === 'ms' ? 'Permohonan telah dibatalkan.' : 'Application has been cancelled.');
+      } catch (error: any) {
+        toast.error(`${language === 'ms' ? 'Gagal membatalkan' : 'Cancellation failed'}: ${error.message}`);
+      }
+  };
+
   if (isAuthChecking) return <div className="flex justify-center items-center h-screen">Loading...</div>;
 
   if (!currentUser) {
@@ -293,6 +297,7 @@ function App() {
                 users={users}
                 companies={companies}
                 onUpdateApplication={handleUpdateApplication}
+                onDeleteApplication={handleDeleteApplication}
             />
         )}
 
