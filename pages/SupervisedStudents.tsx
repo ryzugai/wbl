@@ -67,9 +67,9 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
 
   const totalSupervised = supervisedStudents.length;
   
-  // LOGIK KUOTA: Min 2 untuk sasaran dicapai. Maks 4 untuk pensyarah biasa.
+  // LOGIK KUOTA: Min 2 untuk sasaran dicapai. Maks 5 untuk pensyarah biasa.
   const isGoalReached = totalSupervised >= 2;
-  const isMaxReached = !isCoordinator && totalSupervised >= 4;
+  const isMaxReached = !isCoordinator && totalSupervised >= 5;
 
   const handleVerifyBorang = async (app: Application) => {
     try {
@@ -149,7 +149,7 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                       <div className="w-48 h-2 bg-slate-200 rounded-full mt-1 overflow-hidden">
                           <div 
                             className={`h-full transition-all duration-1000 ${isGoalReached ? 'bg-green-500' : 'bg-orange-500'}`} 
-                            style={{ width: `${Math.min((totalSupervised / 4) * 100, 100)}%` }}
+                            style={{ width: `${Math.min((totalSupervised / 5) * 100, 100)}%` }}
                           />
                       </div>
                   </div>
@@ -157,7 +157,7 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
               <div className={`w-14 h-14 rounded-full border-4 flex items-center justify-center font-black text-lg shadow-inner ${
                 isCoordinator ? 'bg-white border-purple-200 text-purple-600' : isMaxReached ? 'bg-white border-indigo-200 text-indigo-600' : isGoalReached ? 'bg-white border-green-200 text-green-600' : 'bg-white border-orange-200 text-orange-600'
               }`}>
-                  {totalSupervised}{!isCoordinator && '/4'}
+                  {totalSupervised}{!isCoordinator && '/5'}
               </div>
           </div>
       </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Application, Company, User, UserRole, AdConfig } from '../types';
-import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer } from 'lucide-react';
+import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer, Info } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
 
@@ -127,28 +127,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}} />
 
+      {/* POP-UP POSTER / IKLAN INDUSTRI */}
       {showAd && adConfig.isEnabled && activeAd && (
         <div className="fixed bottom-6 right-6 z-[100] hidden md:block animate-slideInUp group">
-            <div className="relative w-[280px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden transition-all hover:shadow-[0_25px_60px_rgba(0,0,0,0.2)]">
+            <div className="relative w-[300px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden transition-all hover:shadow-[0_25px_60px_rgba(0,0,0,0.25)]">
                 <div className="absolute top-2 right-2 z-50 flex gap-2">
-                    <button onClick={() => setShowAd(false)} className="bg-black/40 hover:bg-red-500 text-white p-1 rounded-full backdrop-blur-sm transition-colors"><X size={14} /></button>
+                    <button onClick={() => setShowAd(false)} className="bg-black/60 hover:bg-red-500 text-white p-1.5 rounded-full backdrop-blur-md transition-colors"><X size={14} /></button>
                 </div>
-                <div className="relative bg-slate-100 min-h-[100px]">
+                <div className="relative bg-slate-50 min-h-[150px] flex items-center justify-center overflow-hidden">
                     <a key={activeAd.id} href={activeAd.destinationUrl || '#'} target="_blank" rel="noopener noreferrer" className="block w-full transition-opacity duration-500 animate-fadeIn">
-                      <img src={activeAd.imageUrl} alt="Iklan" className="w-full h-auto object-contain max-h-[400px]" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/400x200?text=Invalid+Image'; }} />
+                      <img 
+                        src={activeAd.imageUrl} 
+                        alt="Iklan Poster" 
+                        className="w-full h-auto object-contain max-h-[450px]" 
+                        onError={(e) => { 
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null; // Prevent infinite loop
+                            target.src = 'https://www.utem.edu.my/templates/yootheme/cache/a4/utem-25300x-a44e3a0d.png';
+                            target.className = "w-full h-auto p-8 opacity-20 grayscale";
+                        }} 
+                      />
                     </a>
                 </div>
-                <div className="p-3 bg-white border-t border-slate-100">
+                <div className="p-4 bg-white border-t border-slate-100">
                     <div className="flex justify-between items-center">
-                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Informasi WBL</span>
+                        <div className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                            <Info size={12} />
+                            <span>INFO WBL TERKINI</span>
+                        </div>
                         {adConfig.items.length > 1 && (
-                            <div className="flex gap-1">
+                            <div className="flex gap-1.5">
                                 {adConfig.items.map((_, idx) => (
-                                    <div key={idx} className={`h-1 rounded-full transition-all ${idx === currentAdIndex ? 'w-3 bg-blue-500' : 'w-1 bg-slate-300'}`} />
+                                    <div key={idx} className={`h-1.5 rounded-full transition-all ${idx === currentAdIndex ? 'w-4 bg-blue-500' : 'w-1.5 bg-slate-200'}`} />
                                 ))}
                             </div>
                         )}
                     </div>
+                    {activeAd.destinationUrl && (
+                        <a href={activeAd.destinationUrl} target="_blank" rel="noopener noreferrer" className="mt-3 w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors uppercase tracking-tight">
+                           Lihat Tawaran Penuh <ExternalLink size={12} />
+                        </a>
+                    )}
                 </div>
             </div>
         </div>

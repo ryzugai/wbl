@@ -138,9 +138,9 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const handleSelfAssign = async (student: any) => {
     if (!canSelfAssign) return;
 
-    // 1. Semakan Kuota (Penyelaras tiada had, JKWBL had 4)
-    if (!isCoordinator && mySupervisedCount >= 4) {
-        toast.error(language === 'ms' ? "Had kuota 4 pelajar telah dicapai." : "Maximum quota of 4 students reached.");
+    // 1. Semakan Kuota (Penyelaras tiada had, JKWBL had 5)
+    if (!isCoordinator && mySupervisedCount >= 5) {
+        toast.error(language === 'ms' ? "Had kuota 5 pelajar telah dicapai." : "Maximum quota of 5 students reached.");
         return;
     }
 
@@ -246,7 +246,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                   {isCoordinator ? (
                       <>Seliaan Saya: {mySupervisedCount} <Infinity size={14} className="inline" /></>
                   ) : (
-                      <>Kuota Anda: {mySupervisedCount}/4</>
+                      <>Kuota Anda: {mySupervisedCount}/5</>
                   )}
               </div>
           )}
@@ -338,13 +338,13 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               ) : !displaySupName && (
                                   <button 
                                     onClick={() => handleSelfAssign(item)} 
-                                    disabled={!isCoordinator && mySupervisedCount >= 4}
+                                    disabled={!isCoordinator && mySupervisedCount >= 5}
                                     className={`px-3 py-2 text-white rounded-lg shadow-sm transition-all flex items-center gap-1 active:scale-95 border-2 ${
-                                        (!isCoordinator && mySupervisedCount >= 4)
+                                        (!isCoordinator && mySupervisedCount >= 5)
                                         ? 'bg-slate-300 border-slate-400 cursor-not-allowed' 
                                         : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400'
                                     }`} 
-                                    title={!isCoordinator && mySupervisedCount >= 4 ? "Kuota Maksimum 4 Pelajar telah dipenuhi" : "Pilih Sebagai Pelajar Seliaan Saya"}
+                                    title={!isCoordinator && mySupervisedCount >= 5 ? "Kuota Maksimum 5 Pelajar telah dipenuhi" : "Pilih Sebagai Pelajar Seliaan Saya"}
                                   >
                                       <ShieldCheck size={16} />
                                       <span className="text-[10px] font-bold uppercase">{t(language, 'claimStudent')}</span>
