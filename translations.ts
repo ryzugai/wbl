@@ -41,6 +41,8 @@ export const translations = {
     supervisedViewDoc: "Semak Borang PDF",
     supervisedNoDoc: "Borang Jawapan Tiada",
     supervisedStudentInfo: "Maklumat Pelajar Seliaan",
+    supervisedQuotaTitle: "Status Kuota Seliaan",
+    supervisedQuotaHint: "Pensyarah digalakkan memilih minimum 2 pelajar seliaan.",
 
     // Student Supervision (Student View)
     studentSupTitle: "Maklumat Penyeliaan Saya",
@@ -81,6 +83,9 @@ export const translations = {
     industryStaff: "Staf Industri",
     exportExcel: "Eksport Excel",
     assignSup: "Tugaskan Penyelia",
+    claimStudent: "Pilih Sebagai Seliaan",
+    studentClaimed: "Telah Dipilih",
+    claimConfirm: "Adakah anda ingin menyelia pelajar ini?",
     editUser: "Kemaskini Maklumat",
     deleteUser: "Padam Pengguna",
     noRecords: "Tiada rekod dijumpai.",
@@ -228,6 +233,8 @@ export const translations = {
     supervisedViewDoc: "Check PDF Form",
     supervisedNoDoc: "No Reply Form",
     supervisedStudentInfo: "Supervised Student Info",
+    supervisedQuotaTitle: "Supervision Quota Status",
+    supervisedQuotaHint: "Lecturers are encouraged to select at least 2 supervised students.",
 
     // Student Supervision
     studentSupTitle: "My Supervision Information",
@@ -268,6 +275,9 @@ export const translations = {
     industryStaff: "Industry Staff",
     exportExcel: "Export Excel",
     assignSup: "Assign Supervisor",
+    claimStudent: "Select as Supervised",
+    studentClaimed: "Selected",
+    claimConfirm: "Do you want to supervise this student?",
     editUser: "Update Information",
     deleteUser: "Delete User",
     noRecords: "No records found.",

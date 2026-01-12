@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -36,7 +36,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   
   const isCoordinator = currentUser.role === UserRole.COORDINATOR;
   const isJKWBL = currentUser.is_jkwbl === true;
+  const isLecturer = currentUser.role === UserRole.LECTURER;
   const hasSystemAccess = isCoordinator || isJKWBL;
+
+  const canSelfAssign = isLecturer && isJKWBL;
 
   const studentList = students.map(student => {
     const studentApps = applications.filter(a => a.student_id === student.matric_no || a.created_by === student.username);
@@ -82,39 +85,94 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         return;
     }
     setSelectedStudent(student);
-    const currentSupId = student.placement?.faculty_supervisor_id || student.faculty_supervisor_id || '';
+    const currentSupId = student.faculty_supervisor_id || student.placement?.faculty_supervisor_id || '';
     setSupervisorId(currentSupId);
     setIsAssignModalOpen(true);
+  };
+
+  const handleSelfAssign = async (student: any) => {
+    if (!canSelfAssign) return;
+    
+    // Pastikan kita menggunakan ID terkini daripada currentUser
+    const myId = currentUser.id;
+    const myName = currentUser.name;
+    const myStaffId = currentUser.staff_id || "";
+
+    if (!confirm(t(language, 'claimConfirm'))) return;
+
+    const loadingToast = toast.loading(language === 'ms' ? "Menugaskan pelajar kepada anda..." : "Assigning student to you...");
+
+    try {
+        // 1. Bersihkan data pelajar (buang property placement yang ditambah oleh map)
+        const { placement, ...studentClean } = student;
+        
+        // 2. Kemaskini Profil Pelajar
+        const updatedStudent: User = {
+            ...studentClean,
+            faculty_supervisor_id: myId,
+            faculty_supervisor_name: myName,
+            faculty_supervisor_staff_id: myStaffId
+        };
+
+        await onUpdateUser(updatedStudent);
+
+        // 3. Kemaskini SEMUA permohonan pelajar tersebut
+        const studentApps = applications.filter(a => 
+            (a.student_id === student.matric_no || a.created_by === student.username)
+        );
+        
+        const updatePromises = studentApps.map(app => onUpdateApplication({
+            ...app,
+            faculty_supervisor_id: myId,
+            faculty_supervisor_name: myName,
+            faculty_supervisor_staff_id: myStaffId
+        }));
+
+        await Promise.all(updatePromises);
+
+        toast.success(language === 'ms' ? "Berjaya! Pelajar kini di bawah seliaan anda." : "Success! Student added to your list.", { id: loadingToast });
+    } catch (e: any) {
+        console.error(e);
+        toast.error(e.message || "Gagal kemaskini", { id: loadingToast });
+    }
   };
 
   const handleSaveSupervisor = async () => {
     if (!selectedStudent || !supervisorId) return;
     const lecturer = lecturers.find(l => l.id === supervisorId);
     if (!lecturer) return;
+    
+    const loadingToast = toast.loading(language === 'ms' ? "Menugaskan penyelia..." : "Assigning supervisor...");
+    
     try {
-        const studentApps = applications.filter(a => 
-            (a.student_id === selectedStudent.matric_no || a.created_by === selectedStudent.username) &&
-            (a.application_status === 'Diluluskan' || a.application_status === 'Menunggu')
-        );
-        for (const app of studentApps) {
-            await onUpdateApplication({
-                ...app,
-                faculty_supervisor_id: lecturer.id,
-                faculty_supervisor_name: lecturer.name,
-                faculty_supervisor_staff_id: lecturer.staff_id
-            });
-        }
-        const { placement, ...studentData } = selectedStudent as any;
-        await onUpdateUser({
-            ...studentData,
+        const { placement, ...studentClean } = selectedStudent as any;
+
+        const updatedStudent: User = {
+            ...studentClean,
             faculty_supervisor_id: lecturer.id,
             faculty_supervisor_name: lecturer.name,
-            faculty_supervisor_staff_id: lecturer.staff_id
-        });
-        toast.success(language === 'ms' ? `Penyelia ${lecturer.name} ditugaskan.` : `Supervisor ${lecturer.name} assigned.`);
+            faculty_supervisor_staff_id: lecturer.staff_id || ""
+        };
+
+        await onUpdateUser(updatedStudent);
+
+        const studentApps = applications.filter(a => 
+            (a.student_id === selectedStudent.matric_no || a.created_by === selectedStudent.username)
+        );
+        
+        const updatePromises = studentApps.map(app => onUpdateApplication({
+            ...app,
+            faculty_supervisor_id: lecturer.id,
+            faculty_supervisor_name: lecturer.name,
+            faculty_supervisor_staff_id: lecturer.staff_id || ""
+        }));
+
+        await Promise.all(updatePromises);
+
+        toast.success(language === 'ms' ? `Penyelia ${lecturer.name} ditugaskan.` : `Supervisor ${lecturer.name} assigned.`, { id: loadingToast });
         setIsAssignModalOpen(false);
     } catch (e: any) {
-        toast.error(e.message);
+        toast.error(e.message, { id: loadingToast });
     }
   };
 
@@ -166,12 +224,15 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 </tr>
               )}
               {studentList.map((item: any) => {
-                const displaySupName = item.placement?.faculty_supervisor_name || item.faculty_supervisor_name;
+                const displaySupName = item.faculty_supervisor_name || item.placement?.faculty_supervisor_name;
                 const isApproved = item.placement?.application_status === 'Diluluskan';
                 const isPending = item.placement?.application_status === 'Menunggu';
-                
                 const hasResume = !!(item.resume_about || item.resume_education || item.resume_skills_soft);
                 
+                // SEMAKAN PALING PENTING: Adakah saya penyelianya?
+                const isMyStudent = item.faculty_supervisor_id === currentUser.id || 
+                                   (item.faculty_supervisor_name === currentUser.name && currentUser.name !== "");
+
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
                     <td className="p-4">
@@ -190,9 +251,9 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     </td>
                     <td className="p-4 text-sm text-slate-600">
                         {displaySupName ? (
-                            <div className="flex items-center gap-2 text-blue-700">
+                            <div className={`flex items-center gap-2 ${isMyStudent ? 'text-green-700 font-black' : 'text-blue-700'}`}>
                                 <UserCheck size={16} />
-                                <span className="font-bold text-xs">{displaySupName}</span>
+                                <span className="text-xs">{displaySupName} {isMyStudent && '(Anda)'}</span>
                             </div>
                         ) : (
                             <span className="text-slate-400 italic text-xs">{language === 'ms' ? 'Belum ditugaskan' : 'Not assigned'}</span>
@@ -207,14 +268,34 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                                     ? 'bg-green-100 text-green-600 hover:bg-green-200' 
                                     : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
                             }`}
-                            title={hasResume 
-                                ? (language === 'ms' ? 'Lihat Resume (Lengkap)' : 'View Resume (Complete)') 
-                                : (language === 'ms' ? 'Resume Belum Lengkap' : 'Resume Incomplete')
-                            }
+                            title={hasResume ? "Lihat Resume" : "Resume Belum Lengkap"}
                           >
                               <FileText size={18} />
                           </button>
-                          {isCoordinator && item.placement && (
+
+                          {/* ACTION FOR JKWBL LECTURERS ONLY: SELF ASSIGN */}
+                          {canSelfAssign && (
+                              isMyStudent ? (
+                                  <button 
+                                    disabled
+                                    className="px-3 py-2 bg-green-600 text-white rounded-lg shadow-sm flex items-center gap-1 border-2 border-green-400 transition-all" 
+                                  >
+                                      <CheckCircle2 size={16} />
+                                      <span className="text-[10px] font-bold uppercase">{t(language, 'studentClaimed')}</span>
+                                  </button>
+                              ) : !displaySupName && (
+                                  <button 
+                                    onClick={() => handleSelfAssign(item)} 
+                                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm transition-all flex items-center gap-1 active:scale-95 border-2 border-indigo-400" 
+                                    title="Pilih Sebagai Pelajar Seliaan Saya"
+                                  >
+                                      <ShieldCheck size={16} />
+                                      <span className="text-[10px] font-bold uppercase">{t(language, 'claimStudent')}</span>
+                                  </button>
+                              )
+                          )}
+
+                          {isCoordinator && (
                               <button onClick={() => handleAssignClick(item)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title={t(language, 'assignSup')}>
                                   <UserPlus size={18} />
                               </button>
@@ -227,7 +308,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                                   <button onClick={() => { setEditingStudent({...item}); setIsEditModalOpen(true); }} className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100" title={t(language, 'editUser')}>
                                       <Edit size={18} />
                                   </button>
-                                  <button onClick={() => { if(confirm('Delete user?')) onDeleteUser(item.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title={t(language, 'deleteUser')}>
+                                  <button onClick={() => { if(confirm('Hapus pengguna?')) onDeleteUser(item.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title={t(language, 'deleteUser')}>
                                       <Trash2 size={18} />
                                   </button>
                               </>
@@ -242,7 +323,6 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
         </div>
       </div>
 
-      {/* Password Reset Modal */}
       <Modal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} title={t(language, 'resetPassword')}>
         <div className="space-y-4">
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
@@ -299,7 +379,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                       <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'matricNo')}</label>
                       <input type="text" className="w-full p-2 border border-slate-300 rounded" value={editingStudent.matric_no || ''} onChange={(e) => setEditingStudent({...editingStudent, matric_no: e.target.value})} required />
                   </div>
-                  <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-bold">{t(language, 'save')}</button>
+                  <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">{t(language, 'save')}</button>
               </form>
           )}
       </Modal>

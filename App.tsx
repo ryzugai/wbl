@@ -41,14 +41,19 @@ function App() {
 
   const refreshData = () => {
     const latestUsers = StorageService.getUsers();
-    setCompanies(StorageService.getCompanies());
-    setApplications(StorageService.getApplications());
+    const latestCompanies = StorageService.getCompanies();
+    const latestApps = StorageService.getApplications();
+
+    setCompanies(latestCompanies);
+    setApplications(latestApps);
     setUsers(latestUsers);
 
+    // Kemaskini sesi currentUser jika data profilnya berubah di storage
     if (currentUser) {
         const updatedMe = latestUsers.find(u => u.id === currentUser.id);
         if (updatedMe) {
-            if (JSON.stringify(updatedMe) !== JSON.stringify(currentUser)) {
+            const hasChanged = JSON.stringify(updatedMe) !== JSON.stringify(currentUser);
+            if (hasChanged) {
                 setCurrentUser(updatedMe);
             }
         }
@@ -85,10 +90,7 @@ function App() {
   const handleUpdateUser = async (updatedUser: User) => {
     try {
         const savedUser = await StorageService.updateUser(updatedUser);
-        if (currentUser && currentUser.id === savedUser.id) {
-            setCurrentUser(savedUser); 
-        }
-        refreshData();
+        refreshData(); // Panggil segera selepas simpan
         toast.success(language === 'ms' ? 'Profil berjaya dikemaskini' : 'Profile updated');
     } catch (error: any) {
         toast.error(`${language === 'ms' ? 'Gagal mengemaskini' : 'Update failed'}: ${error.message}`);
@@ -166,7 +168,11 @@ function App() {
           start_date: new Date().toISOString().split('T')[0],
           created_by: currentUser.username,
           created_at: new Date().toISOString(),
-          reply_form_verified: false
+          reply_form_verified: false,
+          // Bawa bersama info penyelia sedia ada (jika ada)
+          faculty_supervisor_id: currentUser.faculty_supervisor_id,
+          faculty_supervisor_name: currentUser.faculty_supervisor_name,
+          faculty_supervisor_staff_id: currentUser.faculty_supervisor_staff_id
       };
 
       try {
@@ -218,7 +224,7 @@ function App() {
       }
   };
 
-  if (isAuthChecking) return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  if (isAuthChecking) return <div className="flex justify-center items-center h-screen font-bold text-blue-600 animate-pulse">Sila tunggu...</div>;
 
   if (!currentUser) {
     return (

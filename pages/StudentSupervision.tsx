@@ -12,12 +12,12 @@ interface StudentSupervisionProps {
 }
 
 export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentUser, applications, users, language }) => {
-  // Maklumat penyelia biasanya ada dalam profile currentUser jika Penyelaras dah assign.
+  // Maklumat penyelia biasanya ada dalam profile currentUser jika Penyelaras/JKWBL dah assign.
   // Tetapi kita juga semak dalam applications untuk redundancy.
   const myApprovedApp = useMemo(() => {
     return applications.find(a => 
       (a.student_id === currentUser.matric_no || a.created_by === currentUser.username) && 
-      a.application_status === 'Diluluskan'
+      (a.application_status === 'Diluluskan' || a.application_status === 'Menunggu')
     );
   }, [applications, currentUser]);
 
@@ -25,7 +25,7 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
   const supervisorStaffId = currentUser.faculty_supervisor_staff_id || myApprovedApp?.faculty_supervisor_staff_id;
   const supervisorId = currentUser.faculty_supervisor_id || myApprovedApp?.faculty_supervisor_id;
 
-  // Cari profil lengkap penyelia untuk dapatkan gambar
+  // Cari profil lengkap penyelia untuk dapatkan gambar dan butiran lain
   const supervisorProfile = useMemo(() => {
     if (!supervisorId && !supervisorStaffId && !supervisorName) return null;
     return users.find(u => 
@@ -77,23 +77,23 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
                                 )}
                              </div>
                         </div>
-                        <div className="mb-2">
+                        <div className="mb-2 text-center md:text-left">
                             <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-none">{supervisorName}</h3>
                             <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">Penyelia Fakulti (Industrial Mode)</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 transition-colors hover:bg-slate-100">
                             <div className="p-2 bg-white rounded-xl shadow-sm text-slate-400">
                                 <CreditCard size={20} />
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">No. Staf</p>
-                                <p className="text-sm font-bold text-slate-700">{supervisorStaffId || '-'}</p>
+                                <p className="text-sm font-bold text-slate-700">{supervisorStaffId || supervisorProfile?.staff_id || '-'}</p>
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 transition-colors hover:bg-slate-100">
                             <div className="p-2 bg-white rounded-xl shadow-sm text-slate-400">
                                 <Building2 size={20} />
                             </div>
@@ -102,16 +102,16 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
                                 <p className="text-sm font-bold text-slate-700">FPTT, UTeM</p>
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 transition-colors hover:bg-slate-100">
                             <div className="p-2 bg-white rounded-xl shadow-sm text-slate-400">
                                 <Mail size={20} />
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Hubungan Rasmi</p>
-                                <p className="text-sm font-bold text-slate-700">{supervisorProfile?.email || 'Sistem Pesanan WBL'}</p>
+                                <p className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{supervisorProfile?.email || 'Sistem Pesanan WBL'}</p>
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 transition-colors hover:bg-slate-100">
                             <div className="p-2 bg-white rounded-xl shadow-sm text-slate-400">
                                 <Calendar size={20} />
                             </div>
@@ -176,14 +176,14 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
                 )}
             </div>
 
-            <div className="bg-slate-900 rounded-3xl p-6 text-white overflow-hidden relative group">
+            <div className="bg-slate-900 rounded-3xl p-6 text-white overflow-hidden relative group shadow-lg">
                 <div className="relative z-10">
                     <GraduationCap size={32} className="text-blue-400 mb-4" />
                     <h4 className="font-bold text-lg leading-tight mb-2">Penempatan Latihan</h4>
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 text-xs text-slate-400">
                             <Building2 size={12} />
-                            <span className="font-bold text-slate-200">{myApprovedApp?.company_name || 'Belum Lulus'}</span>
+                            <span className="font-bold text-slate-200">{myApprovedApp?.company_name || 'Belum Diluluskan'}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-400">
                             <MapPin size={12} />
