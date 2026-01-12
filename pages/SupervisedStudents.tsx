@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UsersRound, FileText, Eye, Building2, CheckCircle2, AlertCircle, Clock, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, TrendingUp, RefreshCcw } from 'lucide-react';
+import { UsersRound, FileText, Eye, Building2, CheckCircle2, AlertCircle, Clock, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, TrendingUp, RefreshCcw, Infinity } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
@@ -19,6 +19,8 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
+
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR;
 
   // LOGIK PENYELIAAN YANG LEBIH MANTAP
   const supervisedStudents = useMemo(() => {
@@ -65,9 +67,9 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
 
   const totalSupervised = supervisedStudents.length;
   
-  // LOGIK KUOTA BARU: Min 2 untuk bar hijau, Maks 4.
+  // LOGIK KUOTA: Min 2 untuk sasaran dicapai. Maks 4 untuk pensyarah biasa.
   const isGoalReached = totalSupervised >= 2;
-  const isMaxReached = totalSupervised >= 4;
+  const isMaxReached = !isCoordinator && totalSupervised >= 4;
 
   const handleVerifyBorang = async (app: Application) => {
     try {
@@ -116,40 +118,46 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
         </div>
       </div>
 
-      {/* STATUS KUOTA SELIAAN: UPGRADED TO MAX 4 */}
+      {/* STATUS KUOTA SELIAAN */}
       <div className={`p-6 rounded-2xl border transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm ${
-        isMaxReached ? 'bg-indigo-50 border-indigo-200' : isGoalReached ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
+        isCoordinator ? 'bg-purple-50 border-purple-200' : isMaxReached ? 'bg-indigo-50 border-indigo-200' : isGoalReached ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
       }`}>
           <div className="flex items-center gap-5">
-              <div className={`p-4 rounded-2xl shadow-sm ${isMaxReached ? 'bg-indigo-600 text-white' : isGoalReached ? 'bg-green-600 text-white' : 'bg-orange-500 text-white'}`}>
-                  <Target size={28} />
+              <div className={`p-4 rounded-2xl shadow-sm ${isCoordinator ? 'bg-purple-600 text-white' : isMaxReached ? 'bg-indigo-600 text-white' : isGoalReached ? 'bg-green-600 text-white' : 'bg-orange-500 text-white'}`}>
+                  {isCoordinator ? <Infinity size={28} /> : <Target size={28} />}
               </div>
               <div>
-                  <h3 className={`font-black text-lg ${isMaxReached ? 'text-indigo-900' : isGoalReached ? 'text-green-900' : 'text-orange-900'}`}>{t(language, 'supervisedQuotaTitle')}</h3>
-                  <p className={`text-xs font-bold ${isMaxReached ? 'text-indigo-700' : isGoalReached ? 'text-green-700' : 'text-orange-700'}`}>
-                      {totalSupervised} / 4 {language === 'ms' ? 'Pelajar dipilih' : 'Students selected'} • 
-                      {isMaxReached 
-                        ? (language === 'ms' ? ' Kuota maksimum dicapai' : ' Max quota reached') 
-                        : isGoalReached 
-                            ? (language === 'ms' ? ' Sasaran minimum dicapai' : ' Min target reached') 
-                            : (language === 'ms' ? ' Pilih sekurang-kurangnya 2 orang' : ' Select at least 2 students')}
+                  <h3 className={`font-black text-lg ${isCoordinator ? 'text-purple-900' : isMaxReached ? 'text-indigo-900' : isGoalReached ? 'text-green-900' : 'text-orange-900'}`}>
+                    {isCoordinator ? (language === 'ms' ? 'Status Seliaan Penyelaras' : 'Coordinator Supervision Status') : t(language, 'supervisedQuotaTitle')}
+                  </h3>
+                  <p className={`text-xs font-bold ${isCoordinator ? 'text-purple-700' : isMaxReached ? 'text-indigo-700' : isGoalReached ? 'text-green-700' : 'text-orange-700'}`}>
+                      {totalSupervised} {language === 'ms' ? 'Pelajar dipilih' : 'Students selected'} • 
+                      {isCoordinator 
+                        ? (language === 'ms' ? ' Tiada had kuota untuk Penyelaras' : ' No quota limit for Coordinator')
+                        : isMaxReached 
+                            ? (language === 'ms' ? ' Kuota maksimum dicapai' : ' Max quota reached') 
+                            : isGoalReached 
+                                ? (language === 'ms' ? ' Sasaran minimum dicapai' : ' Min target reached') 
+                                : (language === 'ms' ? ' Pilih sekurang-kurangnya 2 orang' : ' Select at least 2 students')}
                   </p>
               </div>
           </div>
           <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ms' ? 'Progress Seliaan' : 'Supervision Progress'}</p>
-                  <div className="w-48 h-2 bg-slate-200 rounded-full mt-1 overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-1000 ${isMaxReached ? 'bg-indigo-500' : isGoalReached ? 'bg-green-500' : 'bg-orange-500'}`} 
-                        style={{ width: `${Math.min((totalSupervised / 4) * 100, 100)}%` }}
-                      />
+              {!isCoordinator && (
+                  <div className="text-right hidden sm:block">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ms' ? 'Progress Seliaan' : 'Supervision Progress'}</p>
+                      <div className="w-48 h-2 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-1000 ${isGoalReached ? 'bg-green-500' : 'bg-orange-500'}`} 
+                            style={{ width: `${Math.min((totalSupervised / 4) * 100, 100)}%` }}
+                          />
+                      </div>
                   </div>
-              </div>
+              )}
               <div className={`w-14 h-14 rounded-full border-4 flex items-center justify-center font-black text-lg shadow-inner ${
-                isMaxReached ? 'bg-white border-indigo-200 text-indigo-600' : isGoalReached ? 'bg-white border-green-200 text-green-600' : 'bg-white border-orange-200 text-orange-600'
+                isCoordinator ? 'bg-white border-purple-200 text-purple-600' : isMaxReached ? 'bg-white border-indigo-200 text-indigo-600' : isGoalReached ? 'bg-white border-green-200 text-green-600' : 'bg-white border-orange-200 text-orange-600'
               }`}>
-                  {totalSupervised}/4
+                  {totalSupervised}{!isCoordinator && '/4'}
               </div>
           </div>
       </div>

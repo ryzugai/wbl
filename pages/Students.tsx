@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -39,7 +39,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const isLecturer = currentUser.role === UserRole.LECTURER;
   const hasSystemAccess = isCoordinator || isJKWBL;
 
-  const canSelfAssign = isLecturer && isJKWBL;
+  // Penyelaras ATAU Pensyarah JKWBL boleh pilih pelajar sendiri
+  const canSelfAssign = isCoordinator || (isLecturer && isJKWBL);
 
   // Kira kuota semasa currentUser
   const mySupervisedCount = users.filter(u => 
@@ -98,8 +99,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const handleSelfAssign = async (student: any) => {
     if (!canSelfAssign) return;
 
-    // 1. Semakan Kuota (Maks 4)
-    if (mySupervisedCount >= 4) {
+    // 1. Semakan Kuota (Penyelaras tiada had, JKWBL had 4)
+    if (!isCoordinator && mySupervisedCount >= 4) {
         toast.error(language === 'ms' ? "Had kuota 4 pelajar telah dicapai." : "Maximum quota of 4 students reached.");
         return;
     }
@@ -109,7 +110,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
     const loadingToast = toast.loading(language === 'ms' ? "Menugaskan pelajar kepada anda..." : "Assigning student to you...");
 
     try {
-        // 2. Pembersihan Data Pelajar (Buang property 'placement' sebelum simpan)
+        // 2. Pembersihan Data Pelajar
         const { placement, ...studentClean } = student;
         
         // 3. Kemaskini Profil Pelajar
@@ -200,10 +201,14 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
           <h2 className="text-2xl font-bold text-slate-800">{t(language, 'studentTitle')}</h2>
           <p className="text-sm text-slate-500 mt-1">{t(language, 'studentDesc')}</p>
         </div>
-        <div className="flex flex-col md:flex-row items-end gap-3 w-full md:w-auto">
+        <div className="flex flex-col md:flex-row items-end md:items-center gap-3 w-full md:w-auto">
           {canSelfAssign && (
-              <div className="bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 text-[10px] font-black text-blue-700 uppercase tracking-wider">
-                  Kuota Anda: {mySupervisedCount}/4
+              <div className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider flex items-center gap-2 ${isCoordinator ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                  {isCoordinator ? (
+                      <>Seliaan Saya: {mySupervisedCount} <Infinity size={14} className="inline" /></>
+                  ) : (
+                      <>Kuota Anda: {mySupervisedCount}/4</>
+                  )}
               </div>
           )}
           {hasSystemAccess && (
@@ -238,7 +243,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 const isPending = item.placement?.application_status === 'Menunggu';
                 const hasResume = !!(item.resume_about || item.resume_education || item.resume_skills_soft);
                 
-                // Semakan status pemilihan oleh CURRENT LECTURER
+                // Semakan status pemilihan oleh CURRENT USER
                 const isMyStudent = item.faculty_supervisor_id === currentUser.id;
 
                 return (
@@ -281,13 +286,12 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               <FileText size={18} />
                           </button>
 
-                          {/* ACTION FOR JKWBL LECTURERS ONLY: SELF ASSIGN / CHOOSE STUDENT */}
+                          {/* ACTION FOR COORDINATOR OR JKWBL LECTURERS: SELF ASSIGN */}
                           {canSelfAssign && (
                               isMyStudent ? (
                                   <button 
                                     disabled
                                     className="px-3 py-2 bg-green-600 text-white rounded-lg shadow-md flex items-center gap-1.5 border-2 border-green-400 transition-all scale-105" 
-                                    title="Pelajar ini sudah dalam seliaan anda"
                                   >
                                       <CheckCircle2 size={16} />
                                       <span className="text-[10px] font-black uppercase tracking-tight">{t(language, 'studentClaimed')}</span>
@@ -295,13 +299,13 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               ) : !displaySupName && (
                                   <button 
                                     onClick={() => handleSelfAssign(item)} 
-                                    disabled={mySupervisedCount >= 4}
+                                    disabled={!isCoordinator && mySupervisedCount >= 4}
                                     className={`px-3 py-2 text-white rounded-lg shadow-sm transition-all flex items-center gap-1 active:scale-95 border-2 ${
-                                        mySupervisedCount >= 4 
+                                        (!isCoordinator && mySupervisedCount >= 4)
                                         ? 'bg-slate-300 border-slate-400 cursor-not-allowed' 
                                         : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400'
                                     }`} 
-                                    title={mySupervisedCount >= 4 ? "Kuota Maksimum 4 Pelajar telah dipenuhi" : "Pilih Sebagai Pelajar Seliaan Saya"}
+                                    title={!isCoordinator && mySupervisedCount >= 4 ? "Kuota Maksimum 4 Pelajar telah dipenuhi" : "Pilih Sebagai Pelajar Seliaan Saya"}
                                   >
                                       <ShieldCheck size={16} />
                                       <span className="text-[10px] font-bold uppercase">{t(language, 'claimStudent')}</span>
@@ -310,7 +314,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                           )}
 
                           {isCoordinator && (
-                              <button onClick={() => handleAssignClick(item)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title={t(language, 'assignSup')}>
+                              <button onClick={() => handleAssignClick(item)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 shadow-sm" title={t(language, 'assignSup')}>
                                   <UserPlus size={18} />
                               </button>
                           )}
