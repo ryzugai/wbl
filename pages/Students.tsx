@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -94,6 +94,45 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
     const currentSupId = student.faculty_supervisor_id || student.placement?.faculty_supervisor_id || '';
     setSupervisorId(currentSupId);
     setIsAssignModalOpen(true);
+  };
+
+  const handleUnassignSupervisor = async (student: any) => {
+    if (!isCoordinator) return;
+    
+    if (!confirm(language === 'ms' ? `Adakah anda pasti ingin membatalkan penugasan penyelia bagi pelajar ${student.name}?` : `Are you sure you want to cancel the supervisor assignment for ${student.name}?`)) return;
+
+    const loadingToast = toast.loading(language === 'ms' ? "Membatalkan penugasan..." : "Cancelling assignment...");
+
+    try {
+        const { placement, ...studentClean } = student;
+        
+        // 1. Reset Profil Pelajar
+        await onUpdateUser({
+            ...studentClean,
+            faculty_supervisor_id: "",
+            faculty_supervisor_name: "",
+            faculty_supervisor_staff_id: ""
+        });
+
+        // 2. Reset SEMUA permohonan pelajar tersebut
+        const studentApps = applications.filter(a => 
+            (a.student_id === student.matric_no || a.created_by === student.username)
+        );
+        
+        const updatePromises = studentApps.map(app => onUpdateApplication({
+            ...app,
+            faculty_supervisor_id: "",
+            faculty_supervisor_name: "",
+            faculty_supervisor_staff_id: ""
+        }));
+
+        await Promise.all(updatePromises);
+
+        toast.success(language === 'ms' ? "Penugasan telah dibatalkan." : "Assignment has been cancelled.", { id: loadingToast });
+    } catch (e: any) {
+        console.error(e);
+        toast.error(e.message || "Gagal", { id: loadingToast });
+    }
   };
 
   const handleSelfAssign = async (student: any) => {
@@ -314,9 +353,20 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                           )}
 
                           {isCoordinator && (
-                              <button onClick={() => handleAssignClick(item)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 shadow-sm" title={t(language, 'assignSup')}>
-                                  <UserPlus size={18} />
-                              </button>
+                              <>
+                                <button onClick={() => handleAssignClick(item)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 shadow-sm" title={t(language, 'assignSup')}>
+                                    <UserPlus size={18} />
+                                </button>
+                                {displaySupName && (
+                                    <button 
+                                        onClick={() => handleUnassignSupervisor(item)} 
+                                        className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 shadow-sm" 
+                                        title={language === 'ms' ? "Batal Penugasan Penyelia" : "Cancel Supervisor Assignment"}
+                                    >
+                                        <UserMinus size={18} />
+                                    </button>
+                                )}
+                              </>
                           )}
                           {isCoordinator && (
                               <>
