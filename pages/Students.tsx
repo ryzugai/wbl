@@ -41,6 +41,11 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
 
   const canSelfAssign = isLecturer && isJKWBL;
 
+  // Kira kuota semasa currentUser
+  const mySupervisedCount = users.filter(u => 
+    u.role === UserRole.STUDENT && u.faculty_supervisor_id === currentUser.id
+  ).length;
+
   const studentList = students.map(student => {
     const studentApps = applications.filter(a => a.student_id === student.matric_no || a.created_by === student.username);
     const approvedApp = studentApps.find(a => a.application_status === 'Diluluskan');
@@ -92,45 +97,44 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
 
   const handleSelfAssign = async (student: any) => {
     if (!canSelfAssign) return;
-    
-    // Pastikan kita menggunakan ID terkini daripada currentUser
-    const myId = currentUser.id;
-    const myName = currentUser.name;
-    const myStaffId = currentUser.staff_id || "";
+
+    // 1. Semakan Kuota (Maks 4)
+    if (mySupervisedCount >= 4) {
+        toast.error(language === 'ms' ? "Had kuota 4 pelajar telah dicapai." : "Maximum quota of 4 students reached.");
+        return;
+    }
 
     if (!confirm(t(language, 'claimConfirm'))) return;
 
     const loadingToast = toast.loading(language === 'ms' ? "Menugaskan pelajar kepada anda..." : "Assigning student to you...");
 
     try {
-        // 1. Bersihkan data pelajar (buang property placement yang ditambah oleh map)
+        // 2. Pembersihan Data Pelajar (Buang property 'placement' sebelum simpan)
         const { placement, ...studentClean } = student;
         
-        // 2. Kemaskini Profil Pelajar
-        const updatedStudent: User = {
+        // 3. Kemaskini Profil Pelajar
+        await onUpdateUser({
             ...studentClean,
-            faculty_supervisor_id: myId,
-            faculty_supervisor_name: myName,
-            faculty_supervisor_staff_id: myStaffId
-        };
+            faculty_supervisor_id: currentUser.id,
+            faculty_supervisor_name: currentUser.name,
+            faculty_supervisor_staff_id: currentUser.staff_id || ""
+        });
 
-        await onUpdateUser(updatedStudent);
-
-        // 3. Kemaskini SEMUA permohonan pelajar tersebut
+        // 4. Kemaskini SEMUA permohonan pelajar tersebut
         const studentApps = applications.filter(a => 
             (a.student_id === student.matric_no || a.created_by === student.username)
         );
         
         const updatePromises = studentApps.map(app => onUpdateApplication({
             ...app,
-            faculty_supervisor_id: myId,
-            faculty_supervisor_name: myName,
-            faculty_supervisor_staff_id: myStaffId
+            faculty_supervisor_id: currentUser.id,
+            faculty_supervisor_name: currentUser.name,
+            faculty_supervisor_staff_id: currentUser.staff_id || ""
         }));
 
         await Promise.all(updatePromises);
 
-        toast.success(language === 'ms' ? "Berjaya! Pelajar kini di bawah seliaan anda." : "Success! Student added to your list.", { id: loadingToast });
+        toast.success(language === 'ms' ? `Berjaya! ${studentClean.name} kini dalam seliaan anda.` : `Success! ${studentClean.name} added to your list.`, { id: loadingToast });
     } catch (e: any) {
         console.error(e);
         toast.error(e.message || "Gagal kemaskini", { id: loadingToast });
@@ -196,7 +200,12 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
           <h2 className="text-2xl font-bold text-slate-800">{t(language, 'studentTitle')}</h2>
           <p className="text-sm text-slate-500 mt-1">{t(language, 'studentDesc')}</p>
         </div>
-        <div className="flex gap-3 w-full md:w-auto">
+        <div className="flex flex-col md:flex-row items-end gap-3 w-full md:w-auto">
+          {canSelfAssign && (
+              <div className="bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 text-[10px] font-black text-blue-700 uppercase tracking-wider">
+                  Kuota Anda: {mySupervisedCount}/4
+              </div>
+          )}
           {hasSystemAccess && (
             <button onClick={exportToExcel} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow-sm font-bold text-sm">
               <FileSpreadsheet size={18} /> {t(language, 'exportExcel')}
@@ -229,9 +238,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 const isPending = item.placement?.application_status === 'Menunggu';
                 const hasResume = !!(item.resume_about || item.resume_education || item.resume_skills_soft);
                 
-                // SEMAKAN PALING PENTING: Adakah saya penyelianya?
-                const isMyStudent = item.faculty_supervisor_id === currentUser.id || 
-                                   (item.faculty_supervisor_name === currentUser.name && currentUser.name !== "");
+                // Semakan status pemilihan oleh CURRENT LECTURER
+                const isMyStudent = item.faculty_supervisor_id === currentUser.id;
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
@@ -252,8 +260,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     <td className="p-4 text-sm text-slate-600">
                         {displaySupName ? (
                             <div className={`flex items-center gap-2 ${isMyStudent ? 'text-green-700 font-black' : 'text-blue-700'}`}>
-                                <UserCheck size={16} />
-                                <span className="text-xs">{displaySupName} {isMyStudent && '(Anda)'}</span>
+                                {isMyStudent ? <CheckCircle2 size={16} /> : <UserCheck size={16} />}
+                                <span className="text-xs font-bold">{displaySupName} {isMyStudent && '(Anda)'}</span>
                             </div>
                         ) : (
                             <span className="text-slate-400 italic text-xs">{language === 'ms' ? 'Belum ditugaskan' : 'Not assigned'}</span>
@@ -273,21 +281,27 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               <FileText size={18} />
                           </button>
 
-                          {/* ACTION FOR JKWBL LECTURERS ONLY: SELF ASSIGN */}
+                          {/* ACTION FOR JKWBL LECTURERS ONLY: SELF ASSIGN / CHOOSE STUDENT */}
                           {canSelfAssign && (
                               isMyStudent ? (
                                   <button 
                                     disabled
-                                    className="px-3 py-2 bg-green-600 text-white rounded-lg shadow-sm flex items-center gap-1 border-2 border-green-400 transition-all" 
+                                    className="px-3 py-2 bg-green-600 text-white rounded-lg shadow-md flex items-center gap-1.5 border-2 border-green-400 transition-all scale-105" 
+                                    title="Pelajar ini sudah dalam seliaan anda"
                                   >
                                       <CheckCircle2 size={16} />
-                                      <span className="text-[10px] font-bold uppercase">{t(language, 'studentClaimed')}</span>
+                                      <span className="text-[10px] font-black uppercase tracking-tight">{t(language, 'studentClaimed')}</span>
                                   </button>
                               ) : !displaySupName && (
                                   <button 
                                     onClick={() => handleSelfAssign(item)} 
-                                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm transition-all flex items-center gap-1 active:scale-95 border-2 border-indigo-400" 
-                                    title="Pilih Sebagai Pelajar Seliaan Saya"
+                                    disabled={mySupervisedCount >= 4}
+                                    className={`px-3 py-2 text-white rounded-lg shadow-sm transition-all flex items-center gap-1 active:scale-95 border-2 ${
+                                        mySupervisedCount >= 4 
+                                        ? 'bg-slate-300 border-slate-400 cursor-not-allowed' 
+                                        : 'bg-indigo-600 hover:bg-indigo-700 border-indigo-400'
+                                    }`} 
+                                    title={mySupervisedCount >= 4 ? "Kuota Maksimum 4 Pelajar telah dipenuhi" : "Pilih Sebagai Pelajar Seliaan Saya"}
                                   >
                                       <ShieldCheck size={16} />
                                       <span className="text-[10px] font-bold uppercase">{t(language, 'claimStudent')}</span>

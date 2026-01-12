@@ -41,8 +41,8 @@ export const translations = {
     supervisedViewDoc: "Semak Borang PDF",
     supervisedNoDoc: "Borang Jawapan Tiada",
     supervisedStudentInfo: "Maklumat Pelajar Seliaan",
-    supervisedQuotaTitle: "Status Kuota Seliaan",
-    supervisedQuotaHint: "Pensyarah digalakkan memilih minimum 2 pelajar seliaan.",
+    supervisedQuotaTitle: "Status Kuota Seliaan (Min: 2, Maks: 4)",
+    supervisedQuotaHint: "Sasaran minimum 2 pelajar, had maksimum ialah 4 pelajar seliaan.",
 
     // Student Supervision (Student View)
     studentSupTitle: "Maklumat Penyeliaan Saya",
@@ -233,8 +233,8 @@ export const translations = {
     supervisedViewDoc: "Check PDF Form",
     supervisedNoDoc: "No Reply Form",
     supervisedStudentInfo: "Supervised Student Info",
-    supervisedQuotaTitle: "Supervision Quota Status",
-    supervisedQuotaHint: "Lecturers are encouraged to select at least 2 supervised students.",
+    supervisedQuotaTitle: "Supervision Quota Status (Min: 2, Max: 4)",
+    supervisedQuotaHint: "Minimum target 2 students, maximum limit is 4 students.",
 
     // Student Supervision
     studentSupTitle: "My Supervision Information",

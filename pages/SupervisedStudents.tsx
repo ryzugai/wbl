@@ -22,17 +22,17 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
 
   // LOGIK PENYELIAAN YANG LEBIH MANTAP
   const supervisedStudents = useMemo(() => {
-    // Gunakan JSON.stringify untuk memastikan kita memantau setiap perubahan kecil dalam array
+    // Memantau perubahan dalam array users dan applications secara mendalam
     const filtered = users.filter(u => {
       if (u.role !== UserRole.STUDENT) return false;
       
-      // Kriteria 1: Padanan ID (Utama)
+      // Kriteria 1: Padanan ID (Sangat tepat)
       const isMyStudentById = u.faculty_supervisor_id === currentUser.id;
       
-      // Kriteria 2: Padanan Nama (Fallback jika ID belum sinkron)
+      // Kriteria 2: Padanan Nama (Fallback seandainya ID tidak wujud)
       const isMyStudentByName = u.faculty_supervisor_name === currentUser.name && currentUser.name !== "";
       
-      // Kriteria 3: Semak dalam permohonan aktif pelajar tersebut
+      // Kriteria 3: Semakan tambahan pada permohonan aktif
       const studentApps = applications.filter(a => 
         (a.student_id === u.matric_no || a.created_by === u.username)
       );
@@ -49,7 +49,6 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
       return isMySupervisedStudent && searchMatch;
     }).map(student => {
       const studentApps = applications.filter(a => a.student_id === student.matric_no || a.created_by === student.username);
-      // Dapatkan permohonan yang paling relevan (Diluluskan dahulu, kemudian Menunggu)
       const activeApp = studentApps.find(a => a.application_status === 'Diluluskan') || 
                         studentApps.find(a => a.application_status === 'Menunggu');
       
@@ -65,7 +64,10 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
   };
 
   const totalSupervised = supervisedStudents.length;
+  
+  // LOGIK KUOTA BARU: Min 2 untuk bar hijau, Maks 4.
   const isGoalReached = totalSupervised >= 2;
+  const isMaxReached = totalSupervised >= 4;
 
   const handleVerifyBorang = async (app: Application) => {
     try {
@@ -114,17 +116,23 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
         </div>
       </div>
 
+      {/* STATUS KUOTA SELIAAN: UPGRADED TO MAX 4 */}
       <div className={`p-6 rounded-2xl border transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm ${
-        isGoalReached ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
+        isMaxReached ? 'bg-indigo-50 border-indigo-200' : isGoalReached ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
       }`}>
           <div className="flex items-center gap-5">
-              <div className={`p-4 rounded-2xl shadow-sm ${isGoalReached ? 'bg-green-600 text-white' : 'bg-orange-500 text-white'}`}>
+              <div className={`p-4 rounded-2xl shadow-sm ${isMaxReached ? 'bg-indigo-600 text-white' : isGoalReached ? 'bg-green-600 text-white' : 'bg-orange-500 text-white'}`}>
                   <Target size={28} />
               </div>
               <div>
-                  <h3 className={`font-black text-lg ${isGoalReached ? 'text-green-900' : 'text-orange-900'}`}>{t(language, 'supervisedQuotaTitle')}</h3>
-                  <p className={`text-xs font-bold ${isGoalReached ? 'text-green-700' : 'text-orange-700'}`}>
-                      {totalSupervised} {language === 'ms' ? 'Pelajar dipilih' : 'Students selected'} • {isGoalReached ? (language === 'ms' ? 'Sasaran minimum dicapai' : 'Minimum target reached') : t(language, 'supervisedQuotaHint')}
+                  <h3 className={`font-black text-lg ${isMaxReached ? 'text-indigo-900' : isGoalReached ? 'text-green-900' : 'text-orange-900'}`}>{t(language, 'supervisedQuotaTitle')}</h3>
+                  <p className={`text-xs font-bold ${isMaxReached ? 'text-indigo-700' : isGoalReached ? 'text-green-700' : 'text-orange-700'}`}>
+                      {totalSupervised} / 4 {language === 'ms' ? 'Pelajar dipilih' : 'Students selected'} • 
+                      {isMaxReached 
+                        ? (language === 'ms' ? ' Kuota maksimum dicapai' : ' Max quota reached') 
+                        : isGoalReached 
+                            ? (language === 'ms' ? ' Sasaran minimum dicapai' : ' Min target reached') 
+                            : (language === 'ms' ? ' Pilih sekurang-kurangnya 2 orang' : ' Select at least 2 students')}
                   </p>
               </div>
           </div>
@@ -133,15 +141,15 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ms' ? 'Progress Seliaan' : 'Supervision Progress'}</p>
                   <div className="w-48 h-2 bg-slate-200 rounded-full mt-1 overflow-hidden">
                       <div 
-                        className={`h-full transition-all duration-1000 ${isGoalReached ? 'bg-green-500' : 'bg-orange-500'}`} 
-                        style={{ width: `${Math.min((totalSupervised / 2) * 100, 100)}%` }}
+                        className={`h-full transition-all duration-1000 ${isMaxReached ? 'bg-indigo-500' : isGoalReached ? 'bg-green-500' : 'bg-orange-500'}`} 
+                        style={{ width: `${Math.min((totalSupervised / 4) * 100, 100)}%` }}
                       />
                   </div>
               </div>
               <div className={`w-14 h-14 rounded-full border-4 flex items-center justify-center font-black text-lg shadow-inner ${
-                isGoalReached ? 'bg-white border-green-200 text-green-600' : 'bg-white border-orange-200 text-orange-600'
+                isMaxReached ? 'bg-white border-indigo-200 text-indigo-600' : isGoalReached ? 'bg-white border-green-200 text-green-600' : 'bg-white border-orange-200 text-orange-600'
               }`}>
-                  {totalSupervised}/2
+                  {totalSupervised}/4
               </div>
           </div>
       </div>
@@ -155,14 +163,14 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
             <h3 className="text-lg font-bold text-slate-700">{language === 'ms' ? 'Tiada Pelajar Seliaan' : 'No Supervised Students'}</h3>
             <p className="text-slate-500 text-sm mt-1 max-w-xs mx-auto">
                 {language === 'ms' 
-                    ? `Akaun ${currentUser.name} belum mempunyai pelajar seliaan. Sila ke menu "Senarai Pelajar" untuk memilih pelajar anda.` 
-                    : `Account ${currentUser.name} has no supervised students. Please go to "Student List" to select yours.`}
+                    ? `Akaun ${currentUser.name} belum dikesan mempunyai pelajar seliaan. Sila ke menu "Senarai Pelajar" untuk memilih pelajar anda.` 
+                    : `Account ${currentUser.name} has no supervised students yet. Please go to "Student List" to select yours.`}
             </p>
             <button 
                 onClick={handleRefresh}
                 className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all"
             >
-                <RefreshCcw size={14} /> Muat Semula Data
+                <RefreshCcw size={14} /> Cuba Refresh Senarai
             </button>
           </div>
         ) : (
