@@ -93,7 +93,7 @@ export const generateLetter = (application: Application, company: Company | unde
       <p>3. Should the company agree to accept or not this student, please complete the attached "Reply Form" (on the next page) and return it to us via e-mail at guzairy@utem.edu.my at your earliest convenience.</p>
       <div class="footer">
         Your Sincerely,<br><br><br>
-        <strong>PROF. DR. MOHD. SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>Dean<br>FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP
+        <strong>PROF. DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>Dean<br>FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP
         <div class="computer-gen">This letter is computer generated, no signature is required / Surat ini adalah cetakan komputer dan tidak memerlukan tandatangan.</div>
       </div>
 
@@ -298,7 +298,7 @@ export const generateInvitationLetter = (company: Company | undefined, bilangan:
       <div class="signature-section">
         Saya yang menjalankan amanah,<br><br>
         <div style="height: 35px; font-style: italic; color: #ccc;">[Tandatangan]</div>
-        <strong>PROFESOR DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>
+        <strong>PROF. DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>
         Dekan<br>
         Fakulti Pengurusan Teknologi dan Teknousahawanan
       </div>
@@ -387,7 +387,7 @@ export const generateLOI = (company: Company) => {
         <tr><td>Signed for and on behalf of</td><td>Signed for and on behalf of</td></tr>
         <tr><td style="font-weight: bold; background-color: #f9f9f9;">UNIVERSITI TEKNIKAL MALAYSIA MELAKA</td><td style="font-weight: bold; background-color: #f9f9f9;">${company.company_name.toUpperCase()}</td></tr>
         <tr><td class="sig-space" style="vertical-align: bottom; position: relative;"><img src="${signatureBase64}" alt="Signature" style="height: 70px; display: block; margin-bottom: 5px; margin-left: 5px;"></td><td class="sig-space"></td></tr>
-        <tr><td style="vertical-align: bottom;"><strong>PROF. DR. MOHD SYAIFUL RIZAL BIN HAMID</strong></td><td style="vertical-align: bottom;"><div style="height: 20px;"></div><div class="sig-line"></div></td></tr>
+        <tr><td style="vertical-align: bottom;"><strong>PROF. DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</strong></td><td style="vertical-align: bottom;"><div style="height: 20px;"></div><div class="sig-line"></div></td></tr>
         <tr><td style="vertical-align: top;">Dean<br>Faculty of Technology Management and Technopreneurship</td><td style="vertical-align: top;"><div style="height: 40px;"></div></td></tr>
         <tr><td>Date: ${currentDate}</td><td>Date: <div style="display:inline-block; width: 150px; border-bottom: 1px solid black;"></div></td></tr>
       </table>

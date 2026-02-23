@@ -85,7 +85,7 @@ export const Guidebook: React.FC = () => {
             <Paragraph>Sekian, terima kasih.</Paragraph>
             
             <div className="mt-8 pt-4 border-t border-slate-200">
-                <p className="font-bold text-lg">Profesor Dr. Mohd Syaiful Rizal bin Abdul Hamid</p>
+                <p className="font-bold text-lg">PROF. DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</p>
                 <p className="text-slate-600">Dekan<br/>Fakulti Pengurusan Teknologi dan Teknousahawanan</p>
             </div>
         </div>
