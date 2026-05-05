@@ -162,6 +162,12 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
     return `Assalamualaikum dan salam sejahtera Tuan/Puan. Saya ${currentUser.name}, ${jawatan} program BTEC WBL ingin mempelawa pihak Tuan/Puan sebagai rakan Kerjasama industri seperti terkandung didalam surat yang dilampirkan.\n\nMohon jasa baik tuan untuk berikan respon pada pautan berikut https://forms.office.com/r/Z1QEaXM6RR\n\nSekian terima kasih atas perhatian dan kerjasama.`;
   };
 
+  const getLOIEmailBody = () => {
+    if (!currentUser) return "";
+    const jawatan = currentUser.role === UserRole.COORDINATOR ? 'Penyelaras' : 'Ahli Jawatankuasa (JK)';
+    return `Assalamualaikum dan salam sejahtera Tuan/Puan. Saya ${currentUser.name}, ${jawatan} program BTEC WBL ingin menghantar dokumen Letter of Intent (LOI) sebagai tanda persetujuan awal kerjasama industri antara UTeM dan ${selectedCompany?.company_name}.\n\nTerlampir adalah dokumen LOI untuk tindakan pihak tuan seterusnya.\n\nSekian terima kasih atas perhatian dan kerjasama.`;
+  };
+
   const handleLaunchEmail = () => {
     if (!selectedCompany?.company_contact_email) {
       toast.error(language === 'ms' ? 'Syarikat ini tidak mempunyai alamat emel.' : 'This company has no email address.');
@@ -170,8 +176,18 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
     const subject = encodeURIComponent(`Pelawaan Kerjasama Industri WBL UTeM - ${selectedCompany.company_name}`);
     const body = encodeURIComponent(getEmailBody());
     window.location.href = `mailto:${selectedCompany.company_contact_email}?subject=${subject}&body=${body}`;
-    setIsEmailModalOpen(false);
-    toast.success(language === 'ms' ? 'Membuka aplikasi emel...' : 'Opening email app...');
+    toast.success(language === 'ms' ? 'Membuka aplikasi emel (Pelawaan)...' : 'Opening email app (Invitation)...');
+  };
+
+  const handleLaunchLOIEmail = () => {
+    if (!selectedCompany?.company_contact_email) {
+      toast.error(language === 'ms' ? 'Syarikat ini tidak mempunyai alamat emel.' : 'This company has no email address.');
+      return;
+    }
+    const subject = encodeURIComponent(`Penghantaran Dokumen LOI WBL UTeM - ${selectedCompany.company_name}`);
+    const body = encodeURIComponent(getLOIEmailBody());
+    window.location.href = `mailto:${selectedCompany.company_contact_email}?subject=${subject}&body=${body}`;
+    toast.success(language === 'ms' ? 'Membuka aplikasi emel (LOI)...' : 'Opening email app (LOI)...');
   };
 
   const generateLocalSuggestion = (studentIdInternal: string, address: string) => {
@@ -493,38 +509,62 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-6">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 bg-slate-800 text-white rounded-full flex items-center justify-center text-xs font-black">2</div>
-              <h5 className="text-sm font-black text-slate-800 uppercase tracking-wide">Semak Kandungan Emel</h5>
+              <h5 className="text-sm font-black text-slate-800 uppercase tracking-wide">Semak & Hantar Emel</h5>
             </div>
-            <div className="pl-10 space-y-2">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-[11px] text-slate-600 leading-relaxed italic max-h-32 overflow-y-auto shadow-inner">
-                {getEmailBody()}
+            
+            <div className="pl-10 space-y-4">
+              {/* Langkah 3: Emel Pelawaan */}
+              <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-blue-600 uppercase tracking-tighter">Langkah 3: Emel Pelawaan</span>
+                  <button 
+                    onClick={() => { navigator.clipboard.writeText(getEmailBody()); toast.success(language === 'ms' ? 'Draf Pelawaan disalin!' : 'Invitation draft copied!'); }}
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-blue-600"
+                  >
+                    <Copy size={12} /> Salin Teks
+                  </button>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl text-[10px] text-slate-600 italic max-h-20 overflow-y-auto border border-slate-100">
+                  {getEmailBody()}
+                </div>
+                <button 
+                  onClick={handleLaunchEmail}
+                  disabled={!selectedCompany?.company_contact_email}
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300 text-xs font-black"
+                >
+                  <Mail size={16} /> Hantar Emel Pelawaan
+                </button>
               </div>
-              <button 
-                onClick={() => { navigator.clipboard.writeText(getEmailBody()); toast.success(language === 'ms' ? 'Draf disalin!' : 'Draft copied!'); }}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:underline"
-              >
-                <Copy size={12} /> Salin Teks Draf
-              </button>
-            </div>
-          </div>
 
-          <div className="pt-2">
-            <button 
-              onClick={handleLaunchEmail}
-              disabled={!selectedCompany?.company_contact_email}
-              className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 group active:scale-95 disabled:bg-slate-300"
-            >
-              <Mail size={24} className="group-hover:rotate-12 transition-transform" />
-              <div className="text-left">
-                <span className="text-sm font-black block">Langkah 3: Buka Emel Sekarang</span>
-                <span className="text-[9px] opacity-90 font-medium tracking-wide">Auto-fill Penerima & Kandungan</span>
+              {/* Langkah 4: Emel LOI */}
+              <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-purple-600 uppercase tracking-tighter">Langkah 4: Emel Dokumen LOI</span>
+                  <button 
+                    onClick={() => { navigator.clipboard.writeText(getLOIEmailBody()); toast.success(language === 'ms' ? 'Draf LOI disalin!' : 'LOI draft copied!'); }}
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-purple-600"
+                  >
+                    <Copy size={12} /> Salin Teks
+                  </button>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl text-[10px] text-slate-600 italic max-h-20 overflow-y-auto border border-slate-100">
+                  {getLOIEmailBody()}
+                </div>
+                <button 
+                  onClick={handleLaunchLOIEmail}
+                  disabled={!selectedCompany?.company_contact_email}
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-md active:scale-95 disabled:bg-slate-300 text-xs font-black"
+                >
+                  <FileText size={16} /> Hantar Emel LOI
+                </button>
               </div>
-            </button>
-            <p className="text-[9px] text-center text-slate-400 mt-4 px-6 italic">
-              *Nota: Sila lampirkan (attach) fail PDF yang dimuat turun di Langkah 1 ke dalam emel anda secara manual.
+            </div>
+
+            <p className="text-[9px] text-center text-slate-400 mt-2 px-6 italic">
+              *Nota: Sila lampirkan (attach) fail PDF yang dimuat turun di Langkah 1 ke dalam emel anda secara manual sebelum menghantar.
             </p>
           </div>
         </div>
