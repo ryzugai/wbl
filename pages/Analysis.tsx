@@ -38,6 +38,7 @@ interface GroupedCompanyData {
   company_name: string;
   company_location: string;
   company_id?: string;
+  is_agreed?: boolean;
   applicants: {
     student_name: string;
     student_matric: string;
@@ -109,39 +110,59 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
   const groupedByCompanyData = useMemo(() => {
     const groups: Record<string, GroupedCompanyData> = {};
 
-    if (!applications) return [];
-
-    applications.forEach(app => {
-      const companyKey = app.company_name;
-      if (!groups[companyKey]) {
-        const companyRef = companies.find(c => c.company_name === app.company_name);
-        groups[companyKey] = {
-          company_name: companyKey,
-          company_location: `${app.company_district}, ${app.company_state}`,
-          company_id: companyRef?.id,
+    // First, initialize with all companies that agreed to WBL or already have applications
+    companies.forEach(company => {
+      // Only include if they agreed to WBL or are already in the system
+      if (company.agreed_wbl || (company.is_approved)) {
+        groups[company.company_name] = {
+          company_name: company.company_name,
+          company_location: `${company.company_district}, ${company.company_state}`,
+          company_id: company.id,
+          is_agreed: company.agreed_wbl,
           applicants: []
         };
       }
-
-      const student = users.find(u => u.username === app.created_by || u.matric_no === app.student_id);
-      
-      if (!groups[companyKey].applicants.find(s => s.student_matric === app.student_id)) {
-        groups[companyKey].applicants.push({
-          student_name: app.student_name,
-          student_matric: app.student_id,
-          student_address: student?.address || (language === 'ms' ? 'Tiada Alamat' : 'No Address'),
-          status: app.application_status
-        });
-      }
     });
+
+    if (applications) {
+      applications.forEach(app => {
+        const companyKey = app.company_name;
+        if (!groups[companyKey]) {
+          const companyRef = companies.find(c => c.company_name === app.company_name);
+          groups[companyKey] = {
+            company_name: companyKey,
+            company_location: `${app.company_district}, ${app.company_state}`,
+            company_id: companyRef?.id,
+            is_agreed: companyRef?.agreed_wbl,
+            applicants: []
+          };
+        }
+
+        const student = users.find(u => u.username === app.created_by || u.matric_no === app.student_id);
+        
+        if (!groups[companyKey].applicants.find(s => s.student_matric === app.student_id)) {
+          groups[companyKey].applicants.push({
+            student_name: app.student_name,
+            student_matric: app.student_id,
+            student_address: student?.address || (language === 'ms' ? 'Tiada Alamat' : 'No Address'),
+            status: app.application_status
+          });
+        }
+      });
+    }
 
     return Object.values(groups).filter(item => {
       const searchLower = searchTerm.toLowerCase();
-      return (item.company_name?.toLowerCase() || "").includes(searchLower) || 
+      const matchesSearch = (item.company_name?.toLowerCase() || "").includes(searchLower) || 
              item.applicants.some(s => 
                (s.student_name?.toLowerCase() || "").includes(searchLower) || 
                (s.student_matric?.toLowerCase() || "").includes(searchLower)
              );
+      
+      // If we are searching, we show everything that matches. 
+      // If not searching, maybe we show only the ones with applicants? 
+      // But user wants to be able to see companies without applicants too.
+      return matchesSearch;
     });
   }, [applications, users, companies, searchTerm, language]);
 
@@ -407,6 +428,11 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
                                   <MapPin size={12} className="text-slate-400" />
                                   <div className="text-[10px] text-slate-500">{item.company_location}</div>
                               </div>
+                              {item.is_agreed && (
+                                <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-tighter border border-green-200">
+                                    <CheckCircle2 size={10} /> Kerjasama Aktif
+                                </div>
+                              )}
                               {isMultiple && (
                                 <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-200 text-yellow-800 text-[9px] font-black uppercase tracking-tighter shadow-sm animate-pulse-slow">
                                     <AlertTriangle size={10} /> {item.applicants.length} PERMOHONAN
@@ -415,22 +441,28 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
                           </div>
                         </td>
                         <td className="p-4 align-top space-y-2">
-                          {item.applicants.map((student, sIdx) => (
-                            <div key={sIdx} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-center group">
-                                <div>
-                                    <div className="text-xs font-bold text-slate-800">{student.student_name}</div>
-                                    <div className="text-[9px] text-indigo-600 font-bold uppercase">{student.student_matric}</div>
-                                    <div className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[200px]">{student.student_address}</div>
-                                </div>
-                                <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${
-                                    student.status === 'Diluluskan' ? 'bg-green-100 text-green-700' : 
-                                    student.status === 'Ditolak' ? 'bg-red-100 text-red-700' : 
-                                    'bg-yellow-100 text-yellow-700'
-                                }`}>
-                                    {student.status}
-                                </div>
+                          {item.applicants.length === 0 ? (
+                            <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center">
+                                <p className="text-[10px] text-slate-400 italic">Tiada pemohon lagi untuk syarikat ini.</p>
                             </div>
-                          ))}
+                          ) : (
+                            item.applicants.map((student, sIdx) => (
+                              <div key={sIdx} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-center group">
+                                  <div>
+                                      <div className="text-xs font-bold text-slate-800">{student.student_name}</div>
+                                      <div className="text-[9px] text-indigo-600 font-bold uppercase">{student.student_matric}</div>
+                                      <div className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[200px]">{student.student_address}</div>
+                                  </div>
+                                  <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${
+                                      student.status === 'Diluluskan' ? 'bg-green-100 text-green-700' : 
+                                      student.status === 'Ditolak' ? 'bg-red-100 text-red-700' : 
+                                      'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                      {student.status}
+                                  </div>
+                              </div>
+                            ))
+                          )}
                         </td>
                         <td className="p-4 align-top">
                            <div className="flex flex-col gap-2">
