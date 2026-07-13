@@ -35,7 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
   }, [adConfig.isEnabled, adConfig.items.length, showAd]);
 
   useEffect(() => {
-    const targetDate = new Date('2026-10-05T00:00:00').getTime();
+    const targetDate = new Date('2026-09-28T00:00:00').getTime();
 
     const updateCountdown = () => {
       const now = new Date().getTime();
@@ -62,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
   const timelineProgress = useMemo(() => {
     const now = new Date();
     const start = new Date('2026-06-01'); 
-    const end = new Date('2027-10-01');   
+    const end = new Date('2027-09-27');   
     
     if (now < start) return 0;
     if (now > end) return 100;
@@ -83,10 +83,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
 
   const milestones = [
     { date: 'Jun 2026', label: language === 'ms' ? 'Persediaan' : 'Preparation', icon: ClipboardCheck },
-    { date: '5 Okt 2026', label: language === 'ms' ? 'Mula WBL' : 'WBL Start', icon: Flag },
+    { date: '28 Sep 2026', label: language === 'ms' ? 'Mula WBL' : 'WBL Start', icon: Flag },
     { date: 'Mac 2027', label: language === 'ms' ? 'Pantau' : 'Monitoring', icon: MapPin },
     { date: 'Ogos 2027', label: language === 'ms' ? 'Penilaian' : 'Evaluation', icon: CheckCircle2 },
-    { date: '1 Okt 2027', label: language === 'ms' ? 'Tamat' : 'Finish', icon: Award },
+    { date: '27 Sep 2027', label: language === 'ms' ? 'Tamat' : 'Finish', icon: Award },
   ];
 
   const StatCard = ({ label, value, icon: Icon, colorClass, bgClass }: any) => (
@@ -210,10 +210,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
             <div className="relative flex justify-between">
                 {milestones.map((m, idx) => {
                     const milestoneDateString = m.date === 'Jun 2026' ? '2026-06-01' : 
-                                               m.date === '5 Okt 2026' ? '2026-10-05' : 
+                                               m.date === '28 Sep 2026' ? '2026-09-28' : 
                                                m.date === 'Mac 2027' ? '2027-03-01' : 
                                                m.date === 'Ogos 2027' ? '2027-08-01' : 
-                                               '2027-10-01';
+                                               '2027-09-27';
                     const milestoneDate = new Date(milestoneDateString);
                     const isPast = new Date() >= milestoneDate;
                     const Icon = m.icon;
@@ -242,7 +242,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                         <Timer size={18} />
                     </div>
                     <div>
-                        <h4 className="text-xs font-bold text-slate-800 leading-none">{t(language, 'countdownTitle')} 5 Okt 2026</h4>
+                        <h4 className="text-xs font-bold text-slate-800 leading-none">{t(language, 'countdownTitle')} 28 Sep 2026</h4>
                         <p className="text-[10px] text-slate-500 mt-1">{t(language, 'laporDiri')}</p>
                     </div>
                 </div>

@@ -82,7 +82,7 @@ export const generateLetter = (application: Application, company: Company | unde
         <div class="ref-col" style="text-align: right;">${formattedDate}</div>
       </div>
       <div style="margin-bottom: 15px;">TO WHOM IT MAY CONCERN<br><br>Dear Sir / Madam</div>
-      <div style="text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 15px;">Universiti Teknikal Malaysia Melaka (UTeM)<br>Student Work Based Learning Programme<br>Learning Session : 5/10/2026 to 1/10/2027</div>
+      <div style="text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 15px;">Universiti Teknikal Malaysia Melaka (UTeM)<br>Student Work Based Learning Programme<br>Learning Session : 28/09/2026 to 27/09/2027</div>
       <p>Universiti Teknikal Malaysia Melaka (UTeM) is a public university (UA) under the Ministry of Education Malaysia, established on 1st December 2000...</p>
       <table class="student-table">
         <tr><td class="label-col">Student Name</td><td class="sep-col">:</td><td>${student.name.toUpperCase()}</td></tr>
