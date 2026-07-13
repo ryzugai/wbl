@@ -327,19 +327,38 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
                     <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="font-bold text-slate-900">{item.name}</div>
-                        {isActive ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            AKTIF
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-200">
-                            TIDAK AKTIF
-                          </span>
-                        )}
+                      <div className="flex items-center gap-3">
+                        {/* Student Profile Image / Avatar */}
+                        <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                          {item.profile_image ? (
+                            <img 
+                              src={item.profile_image} 
+                              alt={item.name} 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className="font-extrabold text-indigo-600 text-sm">
+                              {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="font-bold text-slate-900">{item.name}</div>
+                            {isActive ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                AKTIF
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-200">
+                                TIDAK AKTIF
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500">{item.matric_no}</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500">{item.matric_no}</div>
                     </td>
                     <td className="p-4 text-sm text-slate-700 max-w-xs truncate">{item.program}</td>
                     <td className="p-4">
