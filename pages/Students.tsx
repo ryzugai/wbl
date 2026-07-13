@@ -59,8 +59,13 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             return null;
         }
     }
-    return { ...student, placement: primaryApp };
-  }).filter(Boolean) as (User & { placement?: Application })[];
+    const isAllDocsVerified = approvedApp ? (
+      approvedApp.application_letter_verified === true &&
+      approvedApp.reply_form_verified === true &&
+      approvedApp.offer_letter_verified === true
+    ) : false;
+    return { ...student, placement: primaryApp, studentApps, isAllDocsVerified };
+  }).filter(Boolean) as (User & { placement?: Application; studentApps?: Application[]; isAllDocsVerified?: boolean })[];
 
   const exportToExcel = () => {
     try {
@@ -362,12 +367,59 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     </td>
                     <td className="p-4 text-sm text-slate-700 max-w-xs truncate">{item.program}</td>
                     <td className="p-4">
-                      {isApproved ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">{item.placement.company_name}</span>
-                      ) : isPending ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200 shadow-sm"><Clock size={10} /> {item.placement.company_name}</span>
+                      {item.isAllDocsVerified ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white border border-emerald-700 shadow-sm">
+                            <span className="text-white">✓</span> {item.placement?.company_name}
+                          </span>
+                          <span className="block text-[10px] text-emerald-600 font-semibold italic">
+                            {language === 'ms' ? 'Dokumen Lengkap & Disahkan' : 'All Docs Verified'}
+                          </span>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">{language === 'ms' ? 'Belum Ditempatkan' : 'Not Placed'}</span>
+                        <div className="flex flex-col gap-1.5 max-w-[240px]">
+                          {item.studentApps && item.studentApps.length > 0 ? (
+                            item.studentApps.map((app: any) => {
+                              const isPreferred = app.student_preferred;
+                              return (
+                                <div 
+                                  key={app.id} 
+                                  className={`px-2 py-1 rounded-lg text-xs font-semibold border flex flex-col gap-0.5 ${
+                                    isPreferred 
+                                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' 
+                                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="truncate font-bold">{app.company_name}</span>
+                                    {isPreferred && (
+                                      <span className="shrink-0 text-[8px] bg-emerald-600 text-white px-1 py-0.2 rounded font-black uppercase">
+                                        PILIHAN
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center justify-between gap-1 text-[9px] text-slate-500">
+                                    <span>
+                                      Status: {app.application_status}
+                                    </span>
+                                    {/* Document Status Check indicator */}
+                                    <span className="text-[8px] text-slate-400">
+                                      Docs: {[
+                                        app.application_letter_verified ? '✓' : '✗',
+                                        app.reply_form_verified ? '✓' : '✗',
+                                        app.offer_letter_verified ? '✓' : '✗'
+                                      ].join('/')}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                              {language === 'ms' ? 'Tiada Permohonan' : 'No Applications'}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="p-4 text-sm text-slate-600">
