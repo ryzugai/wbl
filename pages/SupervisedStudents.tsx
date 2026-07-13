@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UsersRound, FileText, Eye, Building2, CheckCircle2, AlertCircle, Clock, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, TrendingUp, RefreshCcw, Infinity } from 'lucide-react';
+import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
@@ -54,7 +54,7 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
       const activeApp = studentApps.find(a => a.application_status === 'Diluluskan') || 
                         studentApps.find(a => a.application_status === 'Menunggu');
       
-      return { ...student, activeApp };
+      return { ...student, activeApp, studentApps };
     });
 
     return filtered;
@@ -261,42 +261,66 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                 </div>
 
                 <div className="pt-3 border-t border-slate-100">
-                   <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                      <Building2 size={10} /> {language === 'ms' ? 'Tempat Latihan (WBL)' : 'Placement'}
-                   </div>
-                   {student.activeApp ? (
-                     <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{student.activeApp.company_name}{student.activeApp.student_preferred && " ⭐"}{student.activeApp.student_has_offer && " ✅"}</span>
-                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
-                                student.activeApp.application_status === 'Diluluskan' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                       <Building2 size={10} /> {language === 'ms' ? 'Syarikat Dimohon' : 'Applied Companies'}
+                    </div>
+                    {student.studentApps && student.studentApps.length > 0 ? (
+                      <div className="space-y-2.5 max-h-[180px] overflow-y-auto pr-1">
+                        {student.studentApps.map(app => {
+                          const isTicked = app.student_preferred || app.student_has_offer;
+                          return (
+                            <div key={app.id} className={`p-2.5 rounded-xl border transition-all ${
+                              isTicked 
+                                ? 'bg-emerald-50/70 border-emerald-200' 
+                                : 'bg-slate-50 border-slate-100 hover:border-slate-200'
                             }`}>
-                                {student.activeApp.application_status}
-                            </span>
-                        </div>
-                        
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            {student.activeApp.reply_form_image ? (
-                                <button 
-                                    onClick={() => { setSelectedApp(student.activeApp || null); setIsPdfModalOpen(true); }}
-                                    className="w-full flex items-center justify-center gap-2 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                                >
-                                    <FileText size={14} />
-                                    {t(language, 'supervisedViewDoc')}
-                                </button>
-                            ) : (
-                                <div className="flex items-center justify-center gap-2 py-2 text-slate-400 text-[10px] italic">
-                                    <AlertCircle size={14} />
-                                    {t(language, 'supervisedNoDoc')}
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-xs font-bold text-slate-800 truncate" title={app.company_name}>
+                                  {app.company_name}
+                                  {app.student_preferred && " ⭐"}
+                                  {app.student_has_offer && " ✅"}
+                                </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
+                                    app.application_status === 'Diluluskan' ? 'bg-green-100 text-green-700' :
+                                    app.application_status === 'Ditolak' ? 'bg-red-100 text-red-700' :
+                                    'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                    {app.application_status}
+                                </span>
+                              </div>
+                              
+                              <div className="mt-1.5 flex items-center justify-between gap-1">
+                                <div className="text-[9px] text-slate-500">
+                                  {app.reply_form_image || app.reply_form_uploaded_tick ? (
+                                    app.reply_form_verified ? (
+                                      <span className="text-green-600 font-bold">Borang Disahkan</span>
+                                    ) : (
+                                      <span className="text-orange-600 font-medium">Borang Menunggu</span>
+                                    )
+                                  ) : (
+                                    <span className="text-slate-400">Borang tiada</span>
+                                  )}
                                 </div>
-                            )}
-                        </div>
-                     </div>
-                   ) : (
-                     <div className="flex items-center gap-2 text-slate-400 text-[10px] italic py-1">
-                        <Clock size={12} /> Belum Memohon Penempatan
-                     </div>
-                   )}
+                                
+                                {app.reply_form_image && (
+                                  <button 
+                                      onClick={() => { setSelectedApp(app); setIsPdfModalOpen(true); }}
+                                      className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-blue-200 text-blue-600 rounded-md text-[9px] font-black hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                  >
+                                      <Eye size={10} />
+                                      <span>Semak</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-slate-400 text-[10px] italic py-1">
+                         <Clock size={12} /> Belum Memohon Penempatan
+                      </div>
+                    )}
                 </div>
               </div>
               

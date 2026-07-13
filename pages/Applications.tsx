@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter } from '../utils/letterGenerator';
-import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star } from 'lucide-react';
+import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 
@@ -225,6 +225,22 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     }
   };
 
+  const groupedStudents = filteredApps.reduce((acc, app) => {
+    const studentKey = app.student_id || app.student_name;
+    if (!acc[studentKey]) {
+      acc[studentKey] = {
+        student_name: app.student_name,
+        student_id: app.student_id,
+        created_by: app.created_by,
+        apps: []
+      };
+    }
+    acc[studentKey].apps.push(app);
+    return acc;
+  }, {} as Record<string, { student_name: string; student_id: string; created_by: string; apps: Application[] }>);
+
+  const groupedList = Object.values(groupedStudents);
+
   return (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-slate-800">{t(language, 'appTitle')}</h2>
@@ -234,262 +250,281 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
             <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                    <th className="p-4 font-semibold text-sm text-slate-600">{t(language, 'appStudent')}</th>
-                    <th className="p-4 font-semibold text-sm text-slate-600">{t(language, 'appCompany')}</th>
-                    <th className="p-4 font-semibold text-sm text-slate-600">{t(language, 'status')}</th>
-                    <th className="p-4 font-semibold text-sm text-slate-600">Pilihan & Tawaran</th>
-                    <th className="p-4 font-semibold text-sm text-slate-600">Borang Jawapan</th>
-                    <th className="p-4 font-semibold text-sm text-slate-600 text-center">{t(language, 'actions')}</th>
+                    <th className="p-4 font-semibold text-sm text-slate-600 w-1/4">{t(language, 'appStudent')}</th>
+                    <th className="p-4 font-semibold text-sm text-slate-600">Syarikat & Status Permohonan</th>
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                {filteredApps.length === 0 && (
-                    <tr><td colSpan={6} className="p-8 text-center text-slate-500">{t(language, 'noRecords')}</td></tr>
+                {groupedList.length === 0 && (
+                    <tr><td colSpan={2} className="p-8 text-center text-slate-500">{t(language, 'noRecords')}</td></tr>
                 )}
-                {filteredApps.map(app => {
-                    const isPreferred = !!app.student_preferred;
-                    const hasOffer = !!app.student_has_offer;
-                    const isTicked = isPreferred || hasOffer;
-                    
-                    const rowClass = isTicked 
-                        ? "bg-emerald-50/70 hover:bg-emerald-100/70 transition-all border-l-4 border-l-emerald-500" 
-                        : "hover:bg-slate-50 transition-colors";
+                {groupedList.map(group => {
+                    const studentUser = users.find(u => u.matric_no === group.student_id || u.username === group.created_by);
                     
                     return (
-                        <tr key={app.id} className={rowClass}>
-                    <td className="p-4">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <div className="font-medium text-slate-900">{app.student_name}</div>
-                            {(() => {
-                              const activeNames = [
-                                "nor afizzi aqimi bin norihsan",
-                                "nurul izzati binti yusri",
-                                "yap yan zi",
-                                "ahmad rifa'at bin rosdi rifaa'at",
-                                "muhammad arif izzuddin bin mad nasir",
-                                "auni haziqah binti haswadi",
-                                "irsyad bin ahmad nizam",
-                                "joviar khor jian h’ng",
-                                "joviar khor jian h'ng",
-                                "muhammad nor hafiz ahmad saidi",
-                                "muhammad fikri bin hamzah",
-                                "intan natasha binti mohd farino",
-                                "wong wen hui",
-                                "teoh yi xian",
-                                "muhammad alif bin md farid",
-                                "laila suraya bt adnan",
-                                "laila suraya binti adnan",
-                                "nur syahirah binti mohd nor radzief",
-                                "putri zainab binti dzainuddin",
-                                "noor suhaila binti mohamed",
-                                "ker guo fuk",
-                                "siti nurnazura binti mohd nahar",
-                                "danial haikal bin abdul latif"
-                              ];
-                              const normalizedName = app.student_name.toLowerCase().trim();
-                              const matchedActiveStatic = activeNames.some(activeName => {
-                                const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
-                                const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
-                                return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
-                              });
-                              const studentUser = users.find(u => u.matric_no === app.student_id || u.username === app.created_by);
-                              const isActive = studentUser?.is_active !== undefined ? studentUser.is_active : matchedActiveStatic;
-                              return isActive ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                  AKTIF
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-rose-100 text-rose-800 border border-rose-200">
-                                  TIDAK AKTIF
-                                </span>
-                              );
-                            })()}
-                        </div>
-                        <div className="text-xs text-slate-500">{app.student_id}</div>
-                    </td>
-                    <td className="p-4">
-                        <div className="text-slate-900">{app.company_name}</div>
-                        <div className="text-xs text-slate-500">{app.company_state}</div>
-                    </td>
-                    <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                        app.application_status === 'Diluluskan' ? 'bg-green-100 text-green-700' :
-                        app.application_status === 'Ditolak' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                        {app.application_status}
-                        </span>
-                    </td>
-                    <td className="p-4">
-                        <div className="flex flex-col gap-1.5 min-w-[130px]">
-                            {currentUser.role === UserRole.STUDENT ? (
-                                <>
-                                    <button 
-                                        onClick={() => handleTogglePreferred(app)}
-                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all justify-start w-full ${
-                                            app.student_preferred 
-                                                ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-sm' 
-                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                                        }`}
-                                    >
-                                        <Star size={12} className={app.student_preferred ? 'fill-amber-500 text-amber-500' : ''} />
-                                        <span>{language === 'ms' ? 'Pilihan Utama' : 'Preferred'}</span>
-                                    </button>
-                                    <button 
-                                        onClick={() => handleToggleHasOffer(app)}
-                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all justify-start w-full ${
-                                            app.student_has_offer 
-                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-sm' 
-                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                                        }`}
-                                    >
-                                        <CheckCircle2 size={12} className={app.student_has_offer ? 'text-emerald-600 fill-emerald-50' : ''} />
-                                        <span>{language === 'ms' ? 'Dapat Tawaran' : 'Got Offer'}</span>
-                                    </button>
-                                </>
-                            ) : (
-                                <div className="flex flex-col gap-1">
-                                    {app.student_preferred && (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 w-fit">
-                                            <Star size={9} className="fill-amber-500 text-amber-500" /> PILIHAN
+                        <tr key={group.student_id || group.student_name} className="hover:bg-slate-50/40 transition-colors">
+                            <td className="p-4 align-top border-r border-slate-100 bg-slate-50/20">
+                                <div className="flex flex-col gap-1 sticky top-4">
+                                    <div className="font-bold text-slate-900 text-sm">{group.student_name}</div>
+                                    <div className="text-xs text-slate-500 font-mono">{group.student_id}</div>
+                                    
+                                    {(() => {
+                                      const activeNames = [
+                                        "nor afizzi aqimi bin norihsan",
+                                        "nurul izzati binti yusri",
+                                        "yap yan zi",
+                                        "ahmad rifa'at bin rosdi rifaa'at",
+                                        "muhammad arif izzuddin bin mad nasir",
+                                        "auni haziqah binti haswadi",
+                                        "irsyad bin ahmad nizam",
+                                        "joviar khor jian h’ng",
+                                        "joviar khor jian h'ng",
+                                        "muhammad nor hafiz ahmad saidi",
+                                        "muhammad fikri bin hamzah",
+                                        "intan natasha binti mohd farino",
+                                        "wong wen hui",
+                                        "teoh yi xian",
+                                        "muhammad alif bin md farid",
+                                        "laila suraya bt adnan",
+                                        "laila suraya binti adnan",
+                                        "nur syahirah binti mohd nor radzief",
+                                        "putri zainab binti dzainuddin",
+                                        "noor suhaila binti mohamed",
+                                        "ker guo fuk",
+                                        "siti nurnazura binti mohd nahar",
+                                        "danial haikal bin abdul latif"
+                                      ];
+                                      const normalizedName = group.student_name.toLowerCase().trim();
+                                      const matchedActiveStatic = activeNames.some(activeName => {
+                                        const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
+                                        const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
+                                        return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
+                                      });
+                                      const isActive = studentUser?.is_active !== undefined ? studentUser.is_active : matchedActiveStatic;
+                                      return isActive ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 w-fit mt-1">
+                                          AKTIF
                                         </span>
-                                    )}
-                                    {app.student_has_offer && (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 w-fit">
-                                            <CheckCircle2 size={9} className="text-emerald-600" /> TAWARAN
+                                      ) : (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-200 w-fit mt-1">
+                                          TIDAK AKTIF
                                         </span>
-                                    )}
-                                    {!app.student_preferred && !app.student_has_offer && (
-                                        <span className="text-slate-400 italic text-[11px]">-</span>
-                                    )}
+                                      );
+                                    })()}
                                 </div>
-                            )}
-                        </div>
-                    </td>
-                    <td className="p-4">
-                        <div className="flex flex-col gap-1 text-[11px]">
-                            <div className="flex items-center gap-1.5">
-                                <span className="font-medium text-slate-500 w-24">Borang Jawapan:</span>
-                                {app.reply_form_image || app.reply_form_uploaded_tick ? (
-                                    app.reply_form_verified ? (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
-                                            <CheckCircle size={8} /> DISAHKAN
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">
-                                            <Clock size={8} /> MENUNGGU
-                                        </span>
-                                    )
-                                ) : (
-                                    <span className="text-[9px] font-bold text-slate-400">BELUM DIHANTAR</span>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <span className="font-medium text-slate-500 w-24">Surat Tawaran:</span>
-                                {app.offer_letter_image || app.offer_letter_uploaded_tick ? (
-                                    app.offer_letter_verified ? (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
-                                            <CheckCircle size={8} /> DISAHKAN
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">
-                                            <Clock size={8} /> MENUNGGU
-                                        </span>
-                                    )
-                                ) : (
-                                    <span className="text-[9px] font-bold text-slate-400">BELUM DIHANTAR</span>
-                                )}
-                            </div>
-                            {(app.reply_form_image || app.offer_letter_image || app.reply_form_uploaded_tick || app.offer_letter_uploaded_tick) && (
-                                <button 
-                                    onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
-                                    className="mt-1 text-blue-600 hover:text-blue-800 text-[10px] font-bold flex items-center gap-1 w-fit hover:underline"
-                                >
-                                    <Eye size={12} /> Lihat Dokumen / Status
-                                </button>
-                            )}
-                        </div>
-                    </td>
-                    <td className="p-4">
-                        <div className="flex justify-center gap-2">
-                        {/* Coordinator Actions */}
-                        {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && app.application_status === 'Menunggu' && (
-                            <>
-                                <button 
-                                  onClick={() => { setStatusConfirmData({app, newStatus: 'Diluluskan'}); setModalType('statusConfirm'); }} 
-                                  className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
-                                  title={language === 'ms' ? "Luluskan Permohonan" : "Approve Application"}
-                                >
-                                  <FileCheck size={18} />
-                                </button>
-                                <button 
-                                  onClick={() => { setStatusConfirmData({app, newStatus: 'Ditolak'}); setModalType('statusConfirm'); }} 
-                                  className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                                  title={language === 'ms' ? "Tolak Permohonan" : "Reject Application"}
-                                >
-                                  <FileX size={18} />
-                                </button>
-                            </>
-                        )}
-                        
-                        {/* Student Actions */}
-                        {currentUser.role === UserRole.STUDENT && (
-                            <>
-                                <button 
-                                  onClick={() => { setSelectedApp(app); setModalType('letter'); }} 
-                                  className="p-2 bg-purple-100 text-purple-600 rounded hover:bg-purple-200 transition-colors" 
-                                  title={t(language, 'appJanaSurat')}
-                                >
-                                    <Printer size={18} />
-                                </button>
-                                {app.application_status === 'Diluluskan' && (
-                                    <button 
-                                        onClick={() => openUploadModal(app)}
-                                        className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors flex items-center gap-1 text-xs font-bold"
-                                        title={language === 'ms' ? "Hantar Borang & Surat" : "Submit Form & Letter"}
-                                    >
-                                        <Upload size={18} />
-                                        <span>Dokumen</span>
-                                    </button>
-                                )}
-                                {/* New Cancellation Button for Pending Apps */}
-                                {app.application_status === 'Menunggu' && (
-                                    <button 
-                                        onClick={() => { setSelectedApp(app); setModalType('cancelConfirm'); }}
-                                        className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                                        title={language === 'ms' ? "Batal Permohonan" : "Cancel Application"}
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                )}
-                            </>
-                        )}
-
-                        {/* Coordinator Verification/Maintenance */}
-                        {hasSystemAccess && (
-                            <>
-                                {(((app.reply_form_image || app.reply_form_uploaded_tick) && !app.reply_form_verified) || ((app.offer_letter_image || app.offer_letter_uploaded_tick) && !app.offer_letter_verified)) && (
-                                     <button 
-                                        onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
-                                        className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors flex items-center gap-1 text-xs font-bold"
-                                        title="Sahkan Dokumen Penempatan"
-                                    >
-                                        <FileCheck size={18} />
-                                        <span>Sahkan</span>
-                                    </button>
-                                )}
-                                <button 
-                                    onClick={() => { if(confirm(language === 'ms' ? 'Padam rekod ini secara kekal?' : 'Delete this record permanently?')) onDeleteApplication?.(app.id); }}
-                                    className="p-2 bg-slate-100 text-slate-400 rounded hover:bg-red-50 hover:text-red-500 transition-colors"
-                                    title="Maintenance: Padam Rekod"
-                                >
-                                    <X size={14} />
-                                </button>
-                            </>
-                        )}
-                        </div>
-                    </td>
-                    </tr>
-                );})}
+                            </td>
+                            
+                            <td className="p-4 align-top">
+                                <div className="space-y-4">
+                                    {group.apps.map(app => {
+                                        const isPreferred = !!app.student_preferred;
+                                        const hasOffer = !!app.student_has_offer;
+                                        const isTicked = isPreferred || hasOffer;
+                                        
+                                        const cardClass = isTicked
+                                            ? "bg-emerald-50/80 border border-emerald-300 rounded-xl p-4 shadow-sm transition-all"
+                                            : "bg-slate-50 border border-slate-200 rounded-xl p-4 hover:border-slate-300 transition-all";
+                                        
+                                        return (
+                                            <div key={app.id} className={cardClass}>
+                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Building2 size={16} className={isTicked ? 'text-emerald-600' : 'text-slate-400'} />
+                                                            <h4 className="font-bold text-slate-900 text-sm">{app.company_name}</h4>
+                                                        </div>
+                                                        <p className="text-xs text-slate-500 mt-0.5 ml-6">{app.company_state}</p>
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-wrap items-center gap-2 ml-6 md:ml-0">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                                            app.application_status === 'Diluluskan' ? 'bg-green-100 text-green-700 border border-green-200' :
+                                                            app.application_status === 'Ditolak' ? 'bg-red-100 text-red-700 border border-red-200' :
+                                                            'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                                                        }`}>
+                                                            {app.application_status}
+                                                        </span>
+                                                        
+                                                        <div className="flex gap-1.5">
+                                                            {currentUser.role === UserRole.STUDENT ? (
+                                                                <>
+                                                                    <button 
+                                                                        onClick={() => handleTogglePreferred(app)}
+                                                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-black transition-all ${
+                                                                            app.student_preferred 
+                                                                                ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-sm' 
+                                                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                                                        }`}
+                                                                        title="Tanda sebagai syarikat pilihan utama anda"
+                                                                    >
+                                                                        <Star size={10} className={app.student_preferred ? 'fill-amber-500 text-amber-500' : ''} />
+                                                                        <span>PILIHAN</span>
+                                                                    </button>
+                                                                    
+                                                                    <button 
+                                                                        onClick={() => handleToggleHasOffer(app)}
+                                                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-black transition-all ${
+                                                                            app.student_has_offer 
+                                                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-sm' 
+                                                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                                                        }`}
+                                                                        title="Tanda jika mendapat tawaran daripada syarikat"
+                                                                    >
+                                                                        <CheckCircle2 size={10} className={app.student_has_offer ? 'text-emerald-600 fill-emerald-50' : ''} />
+                                                                        <span>TAWARAN</span>
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <div className="flex gap-1">
+                                                                    {app.student_preferred && (
+                                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                                                            <Star size={10} className="fill-amber-500 text-amber-500" /> PILIHAN
+                                                                        </span>
+                                                                    )}
+                                                                    {app.student_has_offer && (
+                                                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                                            <CheckCircle2 size={10} className="text-emerald-600" /> TAWARAN
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="mt-4 pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ml-6">
+                                                    <div className="flex flex-col gap-1 text-[11px]">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold text-slate-500 w-24">Borang Jawapan:</span>
+                                                            {app.reply_form_image || app.reply_form_uploaded_tick ? (
+                                                                app.reply_form_verified ? (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded text-[9px] border border-green-100">
+                                                                        <CheckCircle size={8} /> DISAHKAN
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded text-[9px] border border-orange-100">
+                                                                        <Clock size={8} /> MENUNGGU VERIFIKASI
+                                                                    </span>
+                                                                )
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-slate-400">BELUM DIHANTAR</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold text-slate-500 w-24">Surat Tawaran:</span>
+                                                            {app.offer_letter_image || app.offer_letter_uploaded_tick ? (
+                                                                app.offer_letter_verified ? (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded text-[9px] border border-green-100">
+                                                                        <CheckCircle size={8} /> DISAHKAN
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded text-[9px] border border-orange-100">
+                                                                        <Clock size={8} /> MENUNGGU VERIFIKASI
+                                                                    </span>
+                                                                )
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-slate-400">BELUM DIHANTAR</span>
+                                                            )}
+                                                        </div>
+                                                        {(app.reply_form_image || app.offer_letter_image || app.reply_form_uploaded_tick || app.offer_letter_uploaded_tick) && (
+                                                            <button 
+                                                                onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
+                                                                className="mt-1.5 text-blue-600 hover:text-blue-800 font-extrabold flex items-center gap-1 w-fit hover:underline"
+                                                            >
+                                                                <Eye size={12} /> Lihat Dokumen / Status
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                                        {hasSystemAccess && (
+                                                            <>
+                                                                {(((app.reply_form_image || app.reply_form_uploaded_tick) && !app.reply_form_verified) || ((app.offer_letter_image || app.offer_letter_uploaded_tick) && !app.offer_letter_verified)) && (
+                                                                    <button 
+                                                                        onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
+                                                                        className="px-2.5 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-green-200 shadow-sm"
+                                                                        title="Sahkan Dokumen Penempatan"
+                                                                    >
+                                                                        <FileCheck size={12} />
+                                                                        <span>Sahkan Dokumen</span>
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                        
+                                                        {(hasSystemAccess || currentUser.role === UserRole.LECTURER) && app.application_status === 'Menunggu' && (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => { setStatusConfirmData({app, newStatus: 'Diluluskan'}); setModalType('statusConfirm'); }} 
+                                                                    className="px-2 py-1 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1 text-[11px] font-bold border border-green-200"
+                                                                    title={language === 'ms' ? "Luluskan Permohonan" : "Approve Application"}
+                                                                >
+                                                                    <FileCheck size={12} />
+                                                                    <span>Lulus</span>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => { setStatusConfirmData({app, newStatus: 'Ditolak'}); setModalType('statusConfirm'); }} 
+                                                                    className="px-2 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1 text-[11px] font-bold border border-red-200"
+                                                                    title={language === 'ms' ? "Tolak Permohonan" : "Reject Application"}
+                                                                >
+                                                                    <FileX size={12} />
+                                                                    <span>Tolak</span>
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        
+                                                        {currentUser.role === UserRole.STUDENT && (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => { setSelectedApp(app); setModalType('letter'); }} 
+                                                                    className="p-1.5 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors border border-purple-200" 
+                                                                    title={t(language, 'appJanaSurat')}
+                                                                >
+                                                                    <Printer size={14} />
+                                                                </button>
+                                                                
+                                                                {app.application_status === 'Diluluskan' && (
+                                                                    <button 
+                                                                        onClick={() => openUploadModal(app)}
+                                                                        className="px-2.5 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-blue-200 shadow-sm"
+                                                                        title="Hantar Borang & Surat"
+                                                                    >
+                                                                        <Upload size={12} />
+                                                                        <span>Hantar Dokumen</span>
+                                                                    </button>
+                                                                )}
+                                                                
+                                                                {app.application_status === 'Menunggu' && (
+                                                                    <button 
+                                                                        onClick={() => { setSelectedApp(app); setModalType('cancelConfirm'); }}
+                                                                        className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors border border-red-200"
+                                                                        title={language === 'ms' ? "Batal Permohonan" : "Cancel Application"}
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                        
+                                                        {hasSystemAccess && (
+                                                            <button 
+                                                                onClick={() => { if(confirm(language === 'ms' ? 'Padam rekod ini secara kekal?' : 'Delete this record permanently?')) onDeleteApplication?.(app.id); }}
+                                                                className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors border border-slate-200"
+                                                                title="Maintenance: Padam Rekod"
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                })}
                 </tbody>
             </table>
             </div>
