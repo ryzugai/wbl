@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity, Mail, Phone, MapPin, GraduationCap, Briefcase, Code, Globe, Languages, Star, BookOpen } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import * as XLSX from 'xlsx';
@@ -30,6 +30,41 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [resettingUser, setResettingUser] = useState<User | null>(null);
+
+  // Student Detail Modal State
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [viewingStudent, setViewingStudent] = useState<any | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<'profile' | 'resume'>('profile');
+
+  const parseJSON = (str: string | undefined, def: any = []) => {
+    if (!str) return def;
+    try {
+      const parsed = JSON.parse(str);
+      return Array.isArray(parsed) ? parsed : def;
+    } catch (e) {
+      return def;
+    }
+  };
+
+  const getFullProgramName = (program: string | undefined): string => {
+    if (!program) return '-';
+    const cleanCode = program.trim().toUpperCase();
+    const mapping: Record<string, string> = {
+      'BMM': 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+      'BMMW': 'Ijazah Sarjana Muda Teknologi Kejuruteraan Pembuatan (WBL) dengan Kepujian',
+      'BMMT': 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian (WBL)',
+      'BMMH': 'Ijazah Sarjana Muda Pengurusan Teknologi (Pengurusan Inovasi) dengan Kepujian',
+      'BMMG': 'Ijazah Sarjana Muda Pengurusan Teknologi (Pengurusan Teknologi Tinggi) dengan Kepujian',
+      'BITD': 'Ijazah Sarjana Muda Sains Komputer (Pembangunan Perisian) dengan Kepujian',
+      'BITS': 'Ijazah Sarjana Muda Sains Komputer (Keselamatan Komputer) dengan Kepujian',
+      'BITC': 'Ijazah Sarjana Muda Sains Komputer (Rangkaian Komputer) dengan Kepujian',
+      'BITM': 'Ijazah Sarjana Muda Sains Komputer (Media Interaktif) dengan Kepujian',
+      'BITI': 'Ijazah Sarjana Muda Sains Komputer (Kecerdasan Buatan) dengan Kepujian',
+      'BMMD': 'Ijazah Sarjana Muda Pengurusan Teknologi (Pemasaran Digital) dengan Kepujian',
+      'BMMA': 'Ijazah Sarjana Muda Pengurusan Teknologi (Analitik Data) dengan Kepujian',
+    };
+    return mapping[cleanCode] || program;
+  };
 
   const students = users.filter(u => u.role === UserRole.STUDENT);
   const lecturers = users.filter(u => u.role === UserRole.LECTURER);
@@ -332,9 +367,9 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
                     <td className="p-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         {/* Student Profile Image / Avatar */}
-                        <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-200 bg-slate-100 flex items-center justify-center shrink-0 shadow-md">
                           {item.profile_image ? (
                             <img 
                               src={item.profile_image} 
@@ -343,14 +378,20 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <span className="font-extrabold text-indigo-600 text-sm">
+                            <span className="font-black text-indigo-600 text-2xl">
                               {item.name ? item.name.charAt(0).toUpperCase() : '?'}
                             </span>
                           )}
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <div className="font-bold text-slate-900">{item.name}</div>
+                            <button
+                              type="button"
+                              onClick={() => { setViewingStudent(item); setIsDetailModalOpen(true); }}
+                              className="text-left font-extrabold text-slate-900 hover:text-indigo-600 hover:underline transition-all text-sm md:text-base"
+                            >
+                              {item.name}
+                            </button>
                             {isActive ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 AKTIF
@@ -361,11 +402,13 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-500">{item.matric_no}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{item.matric_no}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="p-4 text-sm text-slate-700 max-w-xs truncate">{item.program}</td>
+                    <td className="p-4 text-sm text-slate-700 max-w-md break-words font-medium">
+                      {getFullProgramName(item.program)}
+                    </td>
                     <td className="p-4">
                       {item.isAllDocsVerified ? (
                         <div className="space-y-1">
@@ -593,6 +636,354 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                   <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">{t(language, 'save')}</button>
               </form>
           )}
+      </Modal>
+
+      <Modal 
+        isOpen={isDetailModalOpen} 
+        onClose={() => { setIsDetailModalOpen(false); setViewingStudent(null); }} 
+        title={language === 'ms' ? 'Butiran Lengkap Pelajar' : 'Student Full Details'}
+      >
+        {viewingStudent && (
+          <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
+            {/* Header / Profile Summary Card */}
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-5">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-indigo-200 bg-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                {viewingStudent.profile_image ? (
+                  <img 
+                    src={viewingStudent.profile_image} 
+                    alt={viewingStudent.name} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="font-black text-indigo-600 text-3xl">
+                    {viewingStudent.name ? viewingStudent.name.charAt(0).toUpperCase() : '?'}
+                  </span>
+                )}
+              </div>
+              <div className="text-center sm:text-left space-y-1">
+                <h3 className="text-xl font-black text-slate-900 leading-tight">{viewingStudent.name}</h3>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <span className="text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded">
+                    {viewingStudent.matric_no || (language === 'ms' ? 'Tiada No Matrik' : 'No Matric')}
+                  </span>
+                  {viewingStudent.is_active !== false ? (
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      {language === 'ms' ? 'Aktif' : 'Active'}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-full">
+                      {language === 'ms' ? 'Tidak Aktif' : 'Inactive'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 font-medium">{getFullProgramName(viewingStudent.program)}</p>
+              </div>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-200">
+              <button
+                type="button"
+                onClick={() => setActiveDetailTab('profile')}
+                className={`flex-1 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                  activeDetailTab === 'profile'
+                    ? 'border-indigo-600 text-indigo-600 font-extrabold'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {language === 'ms' ? 'Profil & Penempatan' : 'Profile & Placement'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDetailTab('resume')}
+                className={`flex-1 py-2.5 text-sm font-bold border-b-2 transition-all ${
+                  activeDetailTab === 'resume'
+                    ? 'border-indigo-600 text-indigo-600 font-extrabold'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {language === 'ms' ? 'Resume & Kemahiran' : 'Resume & Skills'}
+              </button>
+            </div>
+
+            {/* Tab Contents */}
+            {activeDetailTab === 'profile' ? (
+              <div className="space-y-4 animate-fadeIn">
+                {/* Personal Information */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                    <UserCheck size={16} /> {language === 'ms' ? 'Maklumat Peribadi' : 'Personal Information'}
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">{language === 'ms' ? 'No. Kad Pengenalan' : 'IC Number'}</span>
+                      <p className="font-bold text-slate-800">{viewingStudent.ic_no || '-'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">{language === 'ms' ? 'No. Matrik' : 'Matric No'}</span>
+                      <p className="font-bold text-slate-800">{viewingStudent.matric_no || '-'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">{language === 'ms' ? 'E-mel' : 'Email'}</span>
+                      <p className="font-bold text-slate-800 hover:text-indigo-600 transition-colors">
+                        <a href={`mailto:${viewingStudent.email}`}>{viewingStudent.email}</a>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-slate-400 font-medium">{language === 'ms' ? 'No. Telefon' : 'Phone'}</span>
+                      <p className="font-bold text-slate-800">{viewingStudent.phone || '-'}</p>
+                    </div>
+                    <div className="md:col-span-2 space-y-1">
+                      <span className="text-slate-400 font-medium">{language === 'ms' ? 'Alamat' : 'Address'}</span>
+                      <p className="font-bold text-slate-800 leading-relaxed">{viewingStudent.address || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Placement Information */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                    <Handshake size={16} /> {language === 'ms' ? 'Status Penempatan WBL' : 'WBL Placement Status'}
+                  </h4>
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="font-bold text-slate-700">{language === 'ms' ? 'Status Dokumen Keperluan' : 'Required Docs Status'}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                        viewingStudent.isAllDocsVerified 
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                          : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                      }`}>
+                        {viewingStudent.isAllDocsVerified 
+                          ? (language === 'ms' ? 'LENGKAP & DISAHKAN' : 'VERIFIED & COMPLETE') 
+                          : (language === 'ms' ? 'BELUM LENGKAP' : 'INCOMPLETE')}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-slate-400 font-medium block">{language === 'ms' ? 'Syarikat Dipohon / Ditempatkan' : 'Applied / Placed Companies'}</span>
+                      {viewingStudent.studentApps && viewingStudent.studentApps.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-2">
+                          {viewingStudent.studentApps.map((app: any) => {
+                            const isPreferred = app.student_preferred;
+                            return (
+                              <div 
+                                key={app.id} 
+                                className={`p-3 rounded-lg border transition-all flex flex-col md:flex-row md:items-center md:justify-between gap-2 ${
+                                  isPreferred 
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+                                    : 'bg-slate-50 border-slate-200 text-slate-800'
+                                }`}
+                              >
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold">{app.company_name}</span>
+                                    {isPreferred && (
+                                      <span className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded uppercase">
+                                        Pilihan Utama
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 flex flex-wrap gap-x-3 gap-y-1">
+                                    <span>{language === 'ms' ? 'Status' : 'Status'}: <strong>{app.application_status}</strong></span>
+                                    <span>{language === 'ms' ? 'Tarikh' : 'Date'}: {app.created_at ? new Date(app.created_at).toLocaleDateString() : '-'}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[10px]">
+                                  <span className={`px-1.5 py-0.5 rounded font-bold ${app.application_letter_verified ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                    Surat: {app.application_letter_verified ? '✓' : '✗'}
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 rounded font-bold ${app.reply_form_verified ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                    Jawapan: {app.reply_form_verified ? '✓' : '✗'}
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 rounded font-bold ${app.offer_letter_verified ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                                    Tawaran: {app.offer_letter_verified ? '✓' : '✗'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-slate-400 italic bg-slate-50 p-3 rounded-lg border border-dashed border-slate-200 text-center">
+                          {language === 'ms' ? 'Tiada permohonan aktif.' : 'No active applications.'}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                      <div className="space-y-1">
+                        <span className="text-slate-400 font-medium block">{language === 'ms' ? 'Penyelia Fakulti' : 'Faculty Supervisor'}</span>
+                        {viewingStudent.faculty_supervisor_name ? (
+                          <div className="bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100">
+                            <p className="font-extrabold text-indigo-900 text-xs">{viewingStudent.faculty_supervisor_name}</p>
+                            <p className="text-[10px] text-indigo-700 font-medium">ID: {viewingStudent.faculty_supervisor_staff_id || '-'}</p>
+                            <p className="text-[10px] text-indigo-700 font-medium">{viewingStudent.faculty_supervisor_email || '-'}</p>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 italic">{language === 'ms' ? 'Belum ditugaskan' : 'Not assigned'}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-slate-400 font-medium block">{language === 'ms' ? 'Syarikat Ditugaskan' : 'Assigned Company'}</span>
+                        {viewingStudent.isAllDocsVerified ? (
+                          <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100">
+                            <p className="font-extrabold text-emerald-900 text-xs">{viewingStudent.placement?.company_name}</p>
+                            <p className="text-[10px] text-emerald-700 font-bold mt-1">✓ {language === 'ms' ? 'Dokumen Disahkan Lengkap' : 'Documents Verified Complete'}</p>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 italic">{language === 'ms' ? 'Belum lengkap dokumen keperluan' : 'Required documents incomplete'}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fadeIn">
+                {/* About Section */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                  <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                    <BookOpen size={16} /> {language === 'ms' ? 'Tentang Pelajar' : 'About Student'}
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed text-justify whitespace-pre-line">
+                    {viewingStudent.resume_about || (language === 'ms' ? 'Pelajar belum mengisi deskripsi diri.' : 'Student has not filled their description yet.')}
+                  </p>
+                </div>
+
+                {/* Academic & Education */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                    <GraduationCap size={16} /> {language === 'ms' ? 'Latar Belakang Pendidikan' : 'Education History'}
+                  </h4>
+                  {viewingStudent.resume_cgpa && (
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center justify-between text-xs mb-2">
+                      <span className="font-bold text-slate-700">PNGK Semasa / CGPA:</span>
+                      <span className="bg-indigo-600 text-white px-2.5 py-1 rounded font-black text-sm">{viewingStudent.resume_cgpa}</span>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {parseJSON(viewingStudent.resume_education).length > 0 ? (
+                      parseJSON(viewingStudent.resume_education).map((edu: any, idx: number) => (
+                        <div key={idx} className="border-l-2 border-indigo-500 pl-3 py-0.5 space-y-1 text-xs">
+                          <div className="flex justify-between items-start gap-1 flex-wrap">
+                            <span className="font-extrabold text-slate-800">{edu.school || edu.institution}</span>
+                            <span className="text-[10px] text-slate-500 font-semibold">{edu.year || edu.period}</span>
+                          </div>
+                          <p className="text-slate-600 italic">{edu.degree || edu.course}</p>
+                          {edu.grade && <p className="text-indigo-600 font-bold text-[10px]">CGPA: {edu.grade}</p>}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 italic text-xs">{language === 'ms' ? 'Tiada maklumat pendidikan.' : 'No education info.'}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Work Experience */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                    <Briefcase size={16} /> {language === 'ms' ? 'Pengalaman Kerja & Latihan' : 'Work & Internship Experience'}
+                  </h4>
+                  <div className="space-y-3">
+                    {parseJSON(viewingStudent.resume_work_experience).length > 0 ? (
+                      parseJSON(viewingStudent.resume_work_experience).map((work: any, idx: number) => (
+                        <div key={idx} className="border-l-2 border-slate-400 pl-3 py-0.5 space-y-1 text-xs">
+                          <div className="flex justify-between items-start gap-1 flex-wrap">
+                            <span className="font-extrabold text-slate-800">{work.role || work.position}</span>
+                            <span className="text-[10px] text-slate-500 font-semibold">{work.period || work.year}</span>
+                          </div>
+                          <p className="text-slate-600 font-bold">{work.company}</p>
+                          <p className="text-slate-500 text-[11px] leading-relaxed whitespace-pre-line">{work.description}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 italic text-xs">{language === 'ms' ? 'Tiada pengalaman kerja.' : 'No work experience.'}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Skills Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Technical Skills */}
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                      <Code size={16} /> {language === 'ms' ? 'Kemahiran Teknikal' : 'Technical Skills'}
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      {parseJSON(viewingStudent.resume_skills_tech).length > 0 ? (
+                        parseJSON(viewingStudent.resume_skills_tech).map((skill: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 p-1.5 hover:bg-slate-50 rounded transition-colors">
+                            <span className="font-bold text-slate-700">{skill.name}</span>
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star 
+                                  key={s} 
+                                  size={10} 
+                                  className={s <= (skill.level || 3) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-slate-400 italic text-xs">{language === 'ms' ? 'Tiada kemahiran teknikal.' : 'No technical skills.'}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Soft Skills */}
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                      <Globe size={16} /> {language === 'ms' ? 'Kemahiran Insaniah' : 'Soft Skills'}
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      {parseJSON(viewingStudent.resume_skills_soft).length > 0 ? (
+                        parseJSON(viewingStudent.resume_skills_soft).map((skill: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 p-1.5 hover:bg-slate-50 rounded transition-colors">
+                            <span className="font-bold text-slate-700">{skill.name}</span>
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star 
+                                  key={s} 
+                                  size={10} 
+                                  className={s <= (skill.level || 3) ? 'text-indigo-500 fill-indigo-500' : 'text-slate-200'} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-slate-400 italic text-xs">{language === 'ms' ? 'Tiada kemahiran insaniah.' : 'No soft skills.'}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Languages */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                  <h4 className="text-sm font-black text-indigo-900 border-b pb-1.5 flex items-center gap-2">
+                    <Languages size={16} /> {language === 'ms' ? 'Penguasaan Bahasa' : 'Languages'}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {parseJSON(viewingStudent.resume_languages).length > 0 ? (
+                      parseJSON(viewingStudent.resume_languages).map((lang: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200">
+                          <span className="font-bold text-slate-800">{lang.name}</span>
+                          <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                            {lang.level === 5 ? (language === 'ms' ? 'Sangat Baik' : 'Excellent') : lang.level >= 3 ? (language === 'ms' ? 'Baik' : 'Good') : (language === 'ms' ? 'Sederhana' : 'Basic')}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 italic text-xs col-span-2">{language === 'ms' ? 'Tiada data bahasa.' : 'No language data.'}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );
