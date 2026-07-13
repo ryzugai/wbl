@@ -46,6 +46,20 @@ export interface User {
   resume_work_experience?: string; 
   resume_cgpa?: string;
   resume_courses?: string;
+  last_login_at?: string;
+  last_activity_at?: string;
+}
+
+export interface UserActivity {
+  id: string;
+  userId: string;
+  username: string;
+  userRole: UserRole;
+  name: string;
+  type: string;
+  description_ms: string;
+  description_en: string;
+  timestamp: string;
 }
 
 export interface Company {

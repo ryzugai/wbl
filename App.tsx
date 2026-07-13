@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { StorageService } from './services/storage';
 import { User, Company, Application } from './types';
 import { Layout } from './components/Layout';
@@ -19,6 +19,7 @@ import { SystemData } from './pages/SystemData';
 import { Statistics } from './pages/Statistics';
 import { Analysis } from './pages/Analysis';
 import { PosterFlipbook } from './pages/PosterFlipbook';
+import { UserActivities } from './pages/UserActivities';
 import { Toaster, toast } from 'react-hot-toast';
 import { Language } from './translations';
 
@@ -89,7 +90,7 @@ function App() {
 
   const handleUpdateUser = async (updatedUser: User) => {
     try {
-        const savedUser = await StorageService.updateUser(updatedUser);
+        await StorageService.updateUser(updatedUser);
         refreshData(); // Panggil segera selepas simpan
         toast.success(language === 'ms' ? 'Profil berjaya dikemaskini' : 'Profile updated');
     } catch (error: any) {
@@ -344,11 +345,15 @@ function App() {
           <PosterFlipbook language={language} />
         )}
         
-        {currentView === 'uploadExcel' && <UploadExcel language={language} onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}
+        {currentView === 'userActivities' && (
+          <UserActivities language={language} />
+        )}
+        
+        {currentView === 'uploadExcel' && <UploadExcel onUploadSuccess={refreshData} onNavigateToCompanies={() => setCurrentView('companies')} />}
         
         {currentView === 'systemData' && <SystemData language={language} onDataRestored={refreshData} />}
         
-        {currentView === 'guidebook' && <Guidebook language={language} />}
+        {currentView === 'guidebook' && <Guidebook />}
       </Layout>
     </>
   );

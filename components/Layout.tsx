@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -151,6 +151,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           )}
           
           <NavItem view="applications" label={t(language, 'applications')} icon={FileText} />
+
+          {hasSystemAccess && (
+            <NavItem view="userActivities" label={language === 'ms' ? 'Aktiviti & Log Masuk' : 'Activities & Logins'} icon={Activity} />
+          )}
           
           {hasSystemAccess && (
             <>

@@ -1,5 +1,5 @@
 
-import { User, Company, Application, UserRole, AdConfig } from '../types';
+import { User, Company, Application, UserRole, AdConfig, UserActivity } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   COMPANIES: 'wbl_companies',
   APPLICATIONS: 'wbl_applications',
   SESSION: 'wbl_session',
-  AD_CONFIG: 'wbl_ad_config'
+  AD_CONFIG: 'wbl_ad_config',
+  ACTIVITIES: 'wbl_activities'
 };
 
 const firebaseConfig = {
@@ -60,6 +61,7 @@ const setupRealtimeListeners = () => {
   syncCollection('users', STORAGE_KEYS.USERS);
   syncCollection('companies', STORAGE_KEYS.COMPANIES);
   syncCollection('applications', STORAGE_KEYS.APPLICATIONS);
+  syncCollection('activities', STORAGE_KEYS.ACTIVITIES);
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
@@ -166,15 +168,52 @@ export const StorageService = {
 
   login: async (username: string, password: string): Promise<User | null> => {
     if (username === COORDINATOR_ACCOUNT.username && password === COORDINATOR_ACCOUNT.password) {
-      const user = COORDINATOR_ACCOUNT as unknown as User;
+      const user = {
+        ...COORDINATOR_ACCOUNT,
+        last_login_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString()
+      } as unknown as User;
       localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      
+      await StorageService.logActivity(
+        user.id || 'coordinator-id',
+        user.username,
+        user.role,
+        user.name,
+        'login',
+        'Telah log masuk ke dalam sistem.',
+        'Logged into the system.'
+      );
+      
       return user;
     }
     const users = StorageService.getUsers();
-    const user = users.find((u: User) => u.username === username && u.password === password);
-    if (user) {
+    const userIdx = users.findIndex((u: User) => u.username === username && u.password === password);
+    if (userIdx !== -1) {
+      const user = users[userIdx];
       if (user.is_approved === false) throw new Error('Akaun masih menunggu kelulusan.');
+      
+      user.last_login_at = new Date().toISOString();
+      user.last_activity_at = new Date().toISOString();
+      users[userIdx] = user;
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      
+      if (db) {
+        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+      }
+      
+      await StorageService.logActivity(
+        user.id,
+        user.username,
+        user.role,
+        user.name,
+        'login',
+        'Telah log masuk ke dalam sistem.',
+        'Logged into the system.'
+      );
+      
+      notifyListeners();
       return user;
     }
     return null;
@@ -199,6 +238,7 @@ export const StorageService = {
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
+    updatedUser.last_activity_at = new Date().toISOString();
     const users = StorageService.getUsers();
     const idx = users.findIndex(u => u.id === updatedUser.id);
     if (idx !== -1) {
@@ -207,6 +247,35 @@ export const StorageService = {
         notifyListeners();
     }
     if (db) await setDoc(doc(db, 'users', updatedUser.id), sanitizeForFirebase(updatedUser), { merge: true });
+    
+    const curSession = getCurrentUser();
+    if (curSession && curSession.id === updatedUser.id) {
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
+    }
+
+    // Identify update type for elegant logging
+    let actType = 'profile_update';
+    let msgMs = 'Telah mengemaskini maklumat profil.';
+    let msgEn = 'Updated profile information.';
+
+    if (updatedUser.role === UserRole.STUDENT) {
+      msgMs = 'Telah mengemaskini maklumat pelajar / resume.';
+      msgEn = 'Updated student/resume information.';
+    } else if (updatedUser.role === UserRole.LECTURER) {
+      msgMs = 'Telah mengemaskini maklumat pensyarah.';
+      msgEn = 'Updated lecturer information.';
+    }
+
+    await StorageService.logActivity(
+      updatedUser.id,
+      updatedUser.username,
+      updatedUser.role,
+      updatedUser.name,
+      actType,
+      msgMs,
+      msgEn
+    );
+
     return updatedUser;
   },
 
@@ -238,6 +307,31 @@ export const StorageService = {
     notifyListeners();
 
     if (db) await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
+
+    if (user) {
+      user.last_activity_at = timestamp;
+      const users = StorageService.getUsers();
+      const uIdx = users.findIndex(u => u.id === user.id);
+      if (uIdx !== -1) {
+        users[uIdx] = user;
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      }
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      if (db) {
+        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+      }
+      
+      await StorageService.logActivity(
+        user.id,
+        user.username,
+        user.role,
+        user.name,
+        'company_create',
+        `Telah mencadangkan / menambah syarikat baharu: ${newCompany.company_name}.`,
+        `Proposed / added a new company: ${newCompany.company_name}.`
+      );
+    }
+
     return newCompany;
   },
 
@@ -321,6 +415,8 @@ export const StorageService = {
   getApplications: (): Application[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
   
   createApplication: async (app: Omit<Application, 'id'>): Promise<Application> => {
+    const user = getCurrentUser();
+    const timestamp = new Date().toISOString();
     const newApp = { ...app, id: generateId() };
     const apps = StorageService.getApplications();
     apps.push(newApp as Application);
@@ -328,18 +424,102 @@ export const StorageService = {
     notifyListeners();
 
     if (db) await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
+
+    if (user) {
+      user.last_activity_at = timestamp;
+      const users = StorageService.getUsers();
+      const uIdx = users.findIndex(u => u.id === user.id);
+      if (uIdx !== -1) {
+        users[uIdx] = user;
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      }
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      if (db) {
+        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+      }
+
+      await StorageService.logActivity(
+        user.id,
+        user.username,
+        user.role,
+        user.name,
+        'apply',
+        `Telah memohon latihan industri di: ${newApp.company_name}.`,
+        `Applied for industrial training at: ${newApp.company_name}.`
+      );
+    }
     return newApp as Application;
   },
 
   updateApplication: async (updatedApp: Application): Promise<Application> => {
     const apps = StorageService.getApplications();
     const idx = apps.findIndex(a => a.id === updatedApp.id);
+    const oldApp = idx !== -1 ? apps[idx] : null;
+
     if (idx !== -1) {
         apps[idx] = updatedApp;
         localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
         notifyListeners();
     }
     if (db) await setDoc(doc(db, 'applications', updatedApp.id), sanitizeForFirebase(updatedApp), { merge: true });
+
+    // Track user action
+    const user = getCurrentUser();
+    const timestamp = new Date().toISOString();
+
+    if (user) {
+      user.last_activity_at = timestamp;
+      const users = StorageService.getUsers();
+      const uIdx = users.findIndex(u => u.id === user.id);
+      if (uIdx !== -1) {
+        users[uIdx] = user;
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      }
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      if (db) {
+        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+      }
+
+      // Detect what changed to log a descriptive message
+      let msgMs = `Telah mengemaskini permohonan latihan industri untuk pelajar ${updatedApp.student_name}.`;
+      let msgEn = `Updated industrial training application for student ${updatedApp.student_name}.`;
+      let actType = 'application_update';
+
+      if (oldApp) {
+        if (oldApp.reply_form_image !== updatedApp.reply_form_image && updatedApp.reply_form_image) {
+          actType = 'reply_form_upload';
+          msgMs = `Telah memuat naik Borang Maklum Balas (Reply Form) untuk ${updatedApp.company_name}.`;
+          msgEn = `Uploaded Reply Form for ${updatedApp.company_name}.`;
+        } else if (oldApp.offer_letter_image !== updatedApp.offer_letter_image && updatedApp.offer_letter_image) {
+          actType = 'offer_letter_upload';
+          msgMs = `Telah memuat naik Surat Tawaran (Offer Letter) dari ${updatedApp.company_name}.`;
+          msgEn = `Uploaded Offer Letter from ${updatedApp.company_name}.`;
+        } else if (oldApp.application_status !== updatedApp.application_status) {
+          actType = 'application_status_update';
+          msgMs = `Telah menukar status permohonan ${updatedApp.student_name} di ${updatedApp.company_name} kepada "${updatedApp.application_status}".`;
+          msgEn = `Changed application status for ${updatedApp.student_name} at ${updatedApp.company_name} to "${updatedApp.application_status}".`;
+        } else if (oldApp.faculty_supervisor_id !== updatedApp.faculty_supervisor_id && updatedApp.faculty_supervisor_id) {
+          actType = 'supervisor_assign';
+          msgMs = `Telah menugaskan ${updatedApp.faculty_supervisor_name} sebagai Penyelia Fakulti untuk ${updatedApp.student_name}.`;
+          msgEn = `Assigned ${updatedApp.faculty_supervisor_name} as Faculty Supervisor for ${updatedApp.student_name}.`;
+        } else if (oldApp.reply_form_verified !== updatedApp.reply_form_verified) {
+          actType = 'application_verification';
+          msgMs = `Telah ${updatedApp.reply_form_verified ? 'mengesahkan' : 'membatalkan pengesahan'} Borang Maklum Balas untuk ${updatedApp.student_name}.`;
+          msgEn = `${updatedApp.reply_form_verified ? 'Verified' : 'Unverified'} Reply Form for ${updatedApp.student_name}.`;
+        }
+      }
+
+      await StorageService.logActivity(
+        user.id,
+        user.username,
+        user.role,
+        user.name,
+        actType,
+        msgMs,
+        msgEn
+      );
+    }
+
     return updatedApp;
   },
 
@@ -348,6 +528,48 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
     notifyListeners();
     if (db) await deleteDoc(doc(db, 'applications', id));
+  },
+
+  getActivities: (): UserActivity[] => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVITIES) || '[]') as UserActivity[];
+    } catch {
+      return [];
+    }
+  },
+
+  logActivity: async (
+    userId: string,
+    username: string,
+    userRole: UserRole,
+    name: string,
+    type: string,
+    description_ms: string,
+    description_en: string
+  ): Promise<void> => {
+    const activities = StorageService.getActivities();
+    const newActivity: UserActivity = {
+      id: generateId(),
+      userId,
+      username,
+      userRole,
+      name,
+      type,
+      description_ms,
+      description_en,
+      timestamp: new Date().toISOString()
+    };
+    activities.unshift(newActivity);
+    const trimmed = activities.slice(0, 200);
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(trimmed));
+    notifyListeners();
+    if (db) {
+      try {
+        await setDoc(doc(db, 'activities', newActivity.id), sanitizeForFirebase(newActivity));
+      } catch (e) {
+        console.error('Failed to sync activity to cloud:', e);
+      }
+    }
   },
 
   getFullSystemBackup: () => ({
