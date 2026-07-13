@@ -33,6 +33,7 @@ export interface User {
   faculty_supervisor_id?: string;
   faculty_supervisor_name?: string;
   faculty_supervisor_staff_id?: string;
+  faculty_supervisor_email?: string;
   // Teaching Subjects (for Lecturers)
   teaching_subjects?: string; // JSON string array
   // Resume Data Fields
@@ -81,6 +82,7 @@ export interface Application {
   faculty_supervisor_id?: string;
   faculty_supervisor_name?: string;
   faculty_supervisor_staff_id?: string;
+  faculty_supervisor_email?: string;
   reply_form_image?: string;
   reply_form_uploaded_at?: string;
   reply_form_verified: boolean;

@@ -3,7 +3,12 @@ import { User } from '../types';
 
 export type ResumeTheme = 'modern-blue' | 'emerald-green' | 'royal-purple' | 'professional-slate';
 
-export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', theme: ResumeTheme = 'modern-blue') => {
+export const generateResume = async (
+  student: User, 
+  lang: 'ms' | 'en' = 'ms', 
+  theme: ResumeTheme = 'modern-blue',
+  users?: User[]
+) => {
   const parseJSON = (str: string | undefined, def: any = []) => {
     if (!str) return def;
     try {
@@ -79,6 +84,12 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
   const techSkills = parseJSON(student.resume_skills_tech);
   const languages = parseJSON(student.resume_languages);
   const coursesList = coursesRaw ? coursesRaw.split(',').map(c => c.trim()) : [];
+
+  const supervisor = users?.find(u => 
+    (student.faculty_supervisor_id && u.id === student.faculty_supervisor_id) || 
+    (student.faculty_supervisor_name && u.name.toLowerCase().trim() === student.faculty_supervisor_name.toLowerCase().trim())
+  );
+  const supervisorEmail = supervisor?.email || student.faculty_supervisor_email || '';
 
   const renderStars = (level: number) => {
     let stars = '';
@@ -259,7 +270,7 @@ export const generateResume = async (student: User, lang: 'ms' | 'en' = 'ms', th
                   <div class="ref-name">${student.faculty_supervisor_name}</div>
                   <div>${t.supervisorTitle}</div>
                   <div>${t.faculty}</div>
-                  <div style="font-style: italic;">No. Staf: ${student.faculty_supervisor_staff_id || '-'}</div>
+                  <div>Email: ${supervisorEmail || '-'}</div>
                 </div>
                 ` : ''}
             </div>

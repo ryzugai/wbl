@@ -69,9 +69,10 @@ interface ProfileProps {
   user: User;
   onUpdateUser: (updatedUser: User) => Promise<void>;
   language: 'ms' | 'en';
+  users?: User[];
 }
 
-export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }) => {
+export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, users }) => {
   const [formData, setFormData] = useState<User>(() => ({ 
     ...user, 
     teaching_subjects: user.teaching_subjects || '[]' 
@@ -184,7 +185,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language }
     const loadingToast = toast.loading(selectedLang === 'en' ? 'Translating & generating resume...' : 'Menjana resume...');
     
     try {
-      await generateResume(user, selectedLang, selectedTheme);
+      await generateResume(user, selectedLang, selectedTheme, users);
       toast.success('Resume berjaya dijana!', { id: loadingToast });
     } catch (error) {
       toast.error('Ralat semasa menjana resume.', { id: loadingToast });

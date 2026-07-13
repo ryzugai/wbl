@@ -307,7 +307,7 @@ function App() {
             />
         )}
 
-        {currentView === 'profile' && <Profile language={language} user={currentUser} onUpdateUser={handleUpdateUser} />}
+        {currentView === 'profile' && <Profile language={language} user={currentUser} onUpdateUser={handleUpdateUser} users={users} />}
         
         {currentView === 'staff' && (
             <StaffList 

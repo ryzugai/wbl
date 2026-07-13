@@ -15,7 +15,7 @@ export const generateLetter = (application: Application, company: Company | unde
       return;
   }
 
-  const programName = "BACHELOR OF TECHNOPRENEURSHIP WITH HONOURS";
+  const programName = student.program || "BACHELOR OF TECHNOPRENEURSHIP WITH HONOURS";
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -83,18 +83,32 @@ export const generateLetter = (application: Application, company: Company | unde
       </div>
       <div style="margin-bottom: 15px;">TO WHOM IT MAY CONCERN<br><br>Dear Sir / Madam</div>
       <div style="text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 15px;">Universiti Teknikal Malaysia Melaka (UTeM)<br>Student Work Based Learning Programme<br>Learning Session : 28/09/2026 to 27/09/2027</div>
-      <p>Universiti Teknikal Malaysia Melaka (UTeM) is a public university (UA) under the Ministry of Education Malaysia, established on 1st December 2000...</p>
+      <p>Universiti Teknikal Malaysia Melaka (UTeM) is a public university (UA) under the Ministry of Education Malaysia, established on 1st December 2000. UTeM currently offers undergraduate and postgraduate programmes in various fields e.g. Electronic and Computer Engineering, Electrical Engineering, Mechanical Engineering, Manufacturing Engineering, Engineering Technology, Information &amp; Communication Technology (ICT) and Technology Management &amp; Technopreneurship. The Work-Based Learning for a period of approximately 52 weeks is compulsory for the Degree Programmes in UTeM.</p>
+      <p>With reference to the above, we wish to acknowledge that the bearer of this letter is the student of University Teknikal Malaysia Melaka (UTeM). We will be very grateful if you can consider the application of industrial training placement in your company for the duration specified above.</p>
       <table class="student-table">
         <tr><td class="label-col">Student Name</td><td class="sep-col">:</td><td>${student.name.toUpperCase()}</td></tr>
         <tr><td class="label-col">Identity Card No.</td><td class="sep-col">:</td><td>${student.ic_no || '-'}</td></tr>
         <tr><td class="label-col">Matric No.</td><td class="sep-col">:</td><td>${student.matric_no}</td></tr>
         <tr><td class="label-col">Programme</td><td class="sep-col">:</td><td>${programName}</td></tr>
       </table>
-      <p>3. Should the company agree to accept or not this student, please complete the attached "Reply Form" (on the next page) and return it to us via e-mail at guzairy@utem.edu.my at your earliest convenience.</p>
+      <p>Should the company agree to accept or not this student, please complete the attached "Reply Form" to be submitted to the university one month before.</p>
+      <p>Should there be any queries with regards to the above, please do not hesitate to contact Faculty WBL Coordinator as below :</p>
+      <table class="coordinator-table" style="margin-bottom: 15px;">
+        <tr><td style="width: 80px; font-weight: bold;">Name</td><td style="width: 15px; text-align: center;">:</td><td>DR. MOHD GUZAIRY BIN ABD GHANI</td></tr>
+        <tr><td style="font-weight: bold;">Tel No.</td><td style="text-align: center;">:</td><td>06-2708134</td></tr>
+        <tr><td style="font-weight: bold;">Fax No.</td><td style="text-align: center;">:</td><td>06-2701043</td></tr>
+        <tr><td style="font-weight: bold;">Email</td><td style="text-align: center;">:</td><td>guzairy@utem.edu.my</td></tr>
+        <tr><td style="font-weight: bold;">Url</td><td style="text-align: center;">:</td><td>http://fptt.utem.edu.my/</td></tr>
+      </table>
+      <p>Thank you in advance for your kind consideration and participation in UTeM student Industrial Training Programme.</p>
       <div class="footer">
-        Your Sincerely,<br><br><br>
-        <strong>PROF. DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>Dean<br>FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP
-        <div class="computer-gen">This letter is computer generated, no signature is required / Surat ini adalah cetakan komputer dan tidak memerlukan tandatangan.</div>
+        Your Sincerely<br><br><br>
+        <strong>PROFESOR DR. MOHD SYAIFUL RIZAL BIN ABDUL HAMID</strong><br>
+        Dean<br>
+        FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP<br>
+        On behalf of Vice Chancellor<br>
+        Universiti Teknikal Malaysia Melaka (UTeM)
+        <div class="computer-gen">This letter is computer generated, no signature is required</div>
       </div>
 
       <!-- PAGE 2: REPLY FORM -->
@@ -111,55 +125,70 @@ export const generateLetter = (application: Application, company: Company | unde
         </tr>
       </table>
 
-      <div class="reply-header">
-        STUDENT WORK-BASED LEARNING (WBL) PROGRAMME<br>REPLY FORM (BORANG MAKLUM BALAS)
+      <div style="margin-top: 15px; font-weight: bold;">
+        To,<br>
+        FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP
       </div>
 
-      <p>Dean,<br>Faculty of Technology Management and Technopreneurship,<br>Universiti Teknikal Malaysia Melaka.</p>
-      
-      <p>Dear Sir/Madam,</p>
-      <p>With reference to your letter Ref: <strong>${refNumber}</strong> regarding the WBL placement for the following student:</p>
-      
-      <div style="background: #f9fafb; padding: 10px; border: 1px solid #eee; margin-bottom: 20px;">
-        <table style="width: 100%; font-size: 10pt;">
-            <tr><td width="150"><strong>Student Name:</strong></td><td>${student.name.toUpperCase()}</td></tr>
-            <tr><td><strong>Matric No:</strong></td><td>${student.matric_no}</td></tr>
-            <tr><td><strong>Programme:</strong></td><td>${programName}</td></tr>
-        </table>
+      <p style="margin-top: 10px; margin-bottom: 10px;">Dear Sir / Madam,</p>
+
+      <div style="font-weight: bold; text-decoration: underline; margin-bottom: 15px; font-size: 10.5pt; text-transform: uppercase;">
+        UTeM STUDENT WORK-BASED LEARNING PROGRAMME<br>
+        TRAINING SESSION : 28/09/2026 - 27/09/2027
       </div>
 
-      <p>We wish to inform you that our company:</p>
-      <div class="checkbox-container">
-          <div class="checkbox-item"><div class="box"></div> <strong>AGREE</strong> to accept this student</div>
-          <div class="checkbox-item"><div class="box"></div> <strong>DO NOT AGREE</strong> to accept this student</div>
+      <p style="margin-bottom: 15px;">With reference to the above we agree / disagree to accept the student as mentioned below to undergo industrial training at our company for the period specified above :</p>
+
+      <table class="student-table" style="margin-bottom: 15px; width: 100%; border-collapse: collapse;">
+        <tr><td style="width: 150px; font-weight: bold; padding: 2px 0;">Student's Name</td><td style="width: 15px; text-align: center;">:</td><td>${student.name.toUpperCase()}</td></tr>
+        <tr><td style="font-weight: bold; padding: 2px 0;">Identity Card No.</td><td style="text-align: center;">:</td><td>${student.ic_no || '-'}</td></tr>
+        <tr><td style="font-weight: bold; padding: 2px 0;">Matric No.</td><td style="text-align: center;">:</td><td>${student.matric_no || '-'}</td></tr>
+        <tr><td style="font-weight: bold; padding: 2px 0;">Programme</td><td style="text-align: center;">:</td><td>${programName.toUpperCase()}</td></tr>
+      </table>
+
+      <p style="margin-bottom: 8px; font-weight: bold;">This student will be located at :</p>
+      <div style="margin-left: 20px; font-size: 10pt; margin-bottom: 15px;">
+          <div style="margin-bottom: 8px;">Department : <span class="underline" style="min-width: 400px;"></span></div>
+          <div style="margin-bottom: 8px;">Address : <span class="underline" style="min-width: 424px;"></span></div>
+          <div style="margin-bottom: 8px; margin-left: 78px;"><span class="underline" style="min-width: 424px;"></span></div>
+          <div style="margin-bottom: 8px;">Scope of Training : <span class="underline" style="min-width: 355px;"></span></div>
+          <div style="margin-bottom: 8px;">(Compulsory) : <span class="underline" style="min-width: 388px;"></span></div>
       </div>
 
-      <p>If accepted, the student is required to report for duty on (Date): <span class="underline"></span></p>
-      
-      <p><strong>Industrial Supervisor Details:</strong></p>
-      <div style="margin-left: 20px; font-size: 10pt;">
-          <div style="margin-bottom: 8px;">Name: <span class="underline" style="min-width: 400px;"></span></div>
-          <div style="margin-bottom: 8px;">Designation: <span class="underline" style="min-width: 370px;"></span></div>
-          <div style="margin-bottom: 8px;">Department: <span class="underline" style="min-width: 380px;"></span></div>
-          <div style="margin-bottom: 8px;">Tel/Fax No: <span class="underline" style="min-width: 388px;"></span></div>
-          <div style="margin-bottom: 8px;">E-mail: <span class="underline" style="min-width: 403px;"></span></div>
+      <p style="margin-bottom: 10px;">Thank you.</p>
+
+      <p style="margin-bottom: 20px;">Yours Sincerely,</p>
+
+      <div style="margin-bottom: 20px;">
+        ______________________
       </div>
 
-      <div class="signature-area">
-          <div class="sig-col">
-              <br><br><br>
-              <div class="full-underline"></div>
-              <p style="font-size: 9pt; text-align: center;">Authorized Signature & Company Stamp</p>
+      <div style="font-size: 10pt; line-height: 1.6; margin-bottom: 15px;">
+        <div>Officer's Name : "put Officer name" <span class="underline" style="min-width: 250px;"></span></div>
+        <div>Position : "put officer position" <span class="underline" style="min-width: 275px;"></span></div>
+        <div>Email : "put company email" <span class="underline" style="min-width: 292px;"></span></div>
+      </div>
+
+      <div style="margin-bottom: 25px; font-size: 10pt;">
+        Company's Stamp : <span style="display: inline-block; width: 120px; height: 40px; border: 1px dashed #666; vertical-align: middle; margin-left: 10px;"></span>
+      </div>
+
+      <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 20px;">
+        <div style="font-weight: bold; text-align: center; margin-bottom: 10px; font-size: 10.5pt; text-transform: uppercase;">
+          Acceptance of Work-based Learning Placement (upon faculty's approval)
+        </div>
+        <p style="text-align: justify; line-height: 1.4; margin-bottom: 20px; font-size: 10pt;">
+          I <strong>${student.name.toUpperCase()}</strong> Identity Card No. <strong>${student.ic_no || '_____________________'}</strong> hereby agree / disagree to accept the placement offered. In the case that i have accepted the placement offered, i promise to abide by the rules / regulations of the company and UTeM.
+        </p>
+        <div style="display: flex; justify-content: space-between; margin-top: 25px; font-size: 10pt;">
+          <div>
+            ...........................<br>
+            (Student's Signature)
           </div>
-          <div class="sig-col">
-              <br><br><br>
-              <div style="margin-bottom: 8px;">Name: <span class="underline" style="min-width: 200px;"></span></div>
-              <div style="margin-bottom: 8px;">Date: <span class="underline" style="min-width: 205px;"></span></div>
+          <div style="text-align: right;">
+            Date: ...........................
           </div>
-      </div>
-
-      <div style="margin-top: 30px; padding: 10px; border: 1px dashed #666; font-size: 9pt; background-color: #fffbeb;">
-          <strong>Instructions:</strong> Please scan and return this completed form to <strong>guzairy@utem.edu.my</strong> or pass it to the student. Thank you.
+        </div>
       </div>
       
     </body>

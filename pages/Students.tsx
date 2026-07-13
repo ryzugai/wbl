@@ -111,7 +111,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             ...studentClean,
             faculty_supervisor_id: "",
             faculty_supervisor_name: "",
-            faculty_supervisor_staff_id: ""
+            faculty_supervisor_staff_id: "",
+            faculty_supervisor_email: ""
         });
 
         // 2. Reset SEMUA permohonan pelajar tersebut
@@ -123,7 +124,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             ...app,
             faculty_supervisor_id: "",
             faculty_supervisor_name: "",
-            faculty_supervisor_staff_id: ""
+            faculty_supervisor_staff_id: "",
+            faculty_supervisor_email: ""
         }));
 
         await Promise.all(updatePromises);
@@ -157,7 +159,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             ...studentClean,
             faculty_supervisor_id: currentUser.id,
             faculty_supervisor_name: currentUser.name,
-            faculty_supervisor_staff_id: currentUser.staff_id || ""
+            faculty_supervisor_staff_id: currentUser.staff_id || "",
+            faculty_supervisor_email: currentUser.email || ""
         });
 
         // 4. Kemaskini SEMUA permohonan pelajar tersebut
@@ -169,7 +172,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             ...app,
             faculty_supervisor_id: currentUser.id,
             faculty_supervisor_name: currentUser.name,
-            faculty_supervisor_staff_id: currentUser.staff_id || ""
+            faculty_supervisor_staff_id: currentUser.staff_id || "",
+            faculty_supervisor_email: currentUser.email || ""
         }));
 
         await Promise.all(updatePromises);
@@ -195,7 +199,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             ...studentClean,
             faculty_supervisor_id: lecturer.id,
             faculty_supervisor_name: lecturer.name,
-            faculty_supervisor_staff_id: lecturer.staff_id || ""
+            faculty_supervisor_staff_id: lecturer.staff_id || "",
+            faculty_supervisor_email: lecturer.email || ""
         };
 
         await onUpdateUser(updatedStudent);
@@ -208,7 +213,8 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
             ...app,
             faculty_supervisor_id: lecturer.id,
             faculty_supervisor_name: lecturer.name,
-            faculty_supervisor_staff_id: lecturer.staff_id || ""
+            faculty_supervisor_staff_id: lecturer.staff_id || "",
+            faculty_supervisor_email: lecturer.email || ""
         }));
 
         await Promise.all(updatePromises);
@@ -358,7 +364,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                     <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button 
-                            onClick={() => generateResume(item, language)} 
+                            onClick={() => generateResume(item, language, 'modern-blue', users)} 
                             className={`p-2 rounded-lg transition-colors ${
                                 hasResume 
                                     ? 'bg-green-100 text-green-600 hover:bg-green-200' 
