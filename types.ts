@@ -86,6 +86,13 @@ export interface Application {
   reply_form_verified: boolean;
   reply_form_verified_by?: string;
   reply_form_verified_at?: string;
+  reply_form_uploaded_tick?: boolean;
+  offer_letter_image?: string;
+  offer_letter_uploaded_at?: string;
+  offer_letter_uploaded_tick?: boolean;
+  offer_letter_verified?: boolean;
+  offer_letter_verified_by?: string;
+  offer_letter_verified_at?: string;
   created_by: string;
   created_at: string;
 }

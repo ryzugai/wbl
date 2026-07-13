@@ -147,30 +147,42 @@ export const StudentSupervision: React.FC<StudentSupervisionProps> = ({ currentU
                 
                 <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                        <div className={`p-1 rounded-full ${myApprovedApp?.reply_form_image ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}>
+                        <div className={`p-1 rounded-full ${(myApprovedApp?.reply_form_image || myApprovedApp?.reply_form_uploaded_tick) ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}>
                             <CheckCircle2 size={16} />
                         </div>
                         <div>
                             <p className="text-xs font-bold text-slate-700">Borang Jawapan Industri</p>
-                            <p className="text-[10px] text-slate-400">{myApprovedApp?.reply_form_image ? 'Telah Dimuat Naik' : 'Belum Dihantar'}</p>
+                            <p className="text-[10px] text-slate-400">
+                                {myApprovedApp?.reply_form_verified 
+                                    ? `Disahkan oleh ${myApprovedApp.reply_form_verified_by}` 
+                                    : (myApprovedApp?.reply_form_image || myApprovedApp?.reply_form_uploaded_tick) 
+                                        ? 'Menunggu Pengesahan' 
+                                        : 'Belum Dihantar'}
+                            </p>
                         </div>
                     </div>
 
                     <div className="flex items-start gap-3">
-                        <div className={`p-1 rounded-full ${myApprovedApp?.reply_form_verified ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}>
+                        <div className={`p-1 rounded-full ${(myApprovedApp?.offer_letter_image || myApprovedApp?.offer_letter_uploaded_tick) ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-300'}`}>
                             <CheckCircle2 size={16} />
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-slate-700">Pengesahan Dokumen</p>
-                            <p className="text-[10px] text-slate-400">{myApprovedApp?.reply_form_verified ? `Disahkan oleh ${myApprovedApp.reply_form_verified_by}` : 'Menunggu Pengesahan'}</p>
+                            <p className="text-xs font-bold text-slate-700">Surat Tawaran Syarikat</p>
+                            <p className="text-[10px] text-slate-400">
+                                {myApprovedApp?.offer_letter_verified 
+                                    ? `Disahkan oleh ${myApprovedApp.offer_letter_verified_by}` 
+                                    : (myApprovedApp?.offer_letter_image || myApprovedApp?.offer_letter_uploaded_tick) 
+                                        ? 'Menunggu Pengesahan' 
+                                        : 'Belum Dihantar'}
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                {myApprovedApp && !myApprovedApp.reply_form_image && (
+                {myApprovedApp && !(myApprovedApp.reply_form_image || myApprovedApp.reply_form_uploaded_tick || myApprovedApp.offer_letter_image || myApprovedApp.offer_letter_uploaded_tick) && (
                     <div className="mt-6 p-4 bg-orange-50 border border-orange-100 rounded-2xl">
                         <p className="text-[10px] font-bold text-orange-800 leading-tight">
-                            TINDAKAN: Sila muat naik borang jawapan industri di menu "Permohonan" untuk disemak oleh {supervisorName}.
+                            TINDAKAN: Sila tick status & muat naik fail PDF di menu "Permohonan" untuk disemak oleh penyelaras/pensyarah.
                         </p>
                     </div>
                 )}

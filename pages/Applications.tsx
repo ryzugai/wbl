@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter } from '../utils/letterGenerator';
-import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X } from 'lucide-react';
+import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 
@@ -21,6 +21,18 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [modalType, setModalType] = useState<'supervisor' | 'upload' | 'viewReply' | 'letter' | 'statusConfirm' | 'viewPdf' | 'cancelConfirm' | null>(null);
   const [statusConfirmData, setStatusConfirmData] = useState<{ app: Application; newStatus: any } | null>(null);
+  
+  // States and refs for dual upload/tick functionality
+  const replyFormInputRef = useRef<HTMLInputElement>(null);
+  const offerLetterInputRef = useRef<HTMLInputElement>(null);
+  const [tempReplyFormImage, setTempReplyFormImage] = useState<string | undefined>('');
+  const [tempOfferLetterImage, setTempOfferLetterImage] = useState<string | undefined>('');
+  const [replyFormTick, setReplyFormTick] = useState(false);
+  const [offerLetterTick, setOfferLetterTick] = useState(false);
+  const [isUploadingReply, setIsUploadingReply] = useState(false);
+  const [isUploadingOffer, setIsUploadingOffer] = useState(false);
+  const [activeDocTab, setActiveDocTab] = useState<'reply' | 'offer'>('reply');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   
@@ -47,9 +59,18 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     setSelectedApp(null);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const openUploadModal = (app: Application) => {
+    setSelectedApp(app);
+    setTempReplyFormImage(app.reply_form_image || '');
+    setTempOfferLetterImage(app.offer_letter_image || '');
+    setReplyFormTick(!!app.reply_form_uploaded_tick);
+    setOfferLetterTick(!!app.offer_letter_uploaded_tick);
+    setModalType('upload');
+  };
+
+  const handleReplyFormFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedApp) return;
+    if (!file) return;
 
     const maxSize = 20 * 1024 * 1024; // 20MB
     if (file.size > maxSize) {
@@ -62,42 +83,113 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       return;
     }
 
-    setIsUploading(true);
+    setIsUploadingReply(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const base64String = evt.target?.result as string;
-        
-        await onUpdateApplication({
-          ...selectedApp,
-          reply_form_image: base64String,
-          reply_form_uploaded_at: new Date().toISOString(),
-          reply_form_verified: false
-        });
-
-        toast.success(t(language, 'appUploadSuccess'));
-        setModalType(null);
+        setTempReplyFormImage(base64String);
+        setReplyFormTick(true);
+        toast.success(language === 'ms' ? 'Borang jawapan sedia disimpan.' : 'Reply form ready to save.');
       } catch (err) {
-        toast.error("Gagal menyimpan fail.");
+        toast.error("Gagal membaca fail.");
       } finally {
-        setIsUploading(false);
+        setIsUploadingReply(false);
       }
     };
     reader.readAsDataURL(file);
   };
 
+  const handleOfferLetterFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 20 * 1024 * 1024; // 20MB
+    if (file.size > maxSize) {
+      toast.error(t(language, 'appFileTooLarge'));
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      toast.error(t(language, 'appInvalidFormat'));
+      return;
+    }
+
+    setIsUploadingOffer(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const base64String = evt.target?.result as string;
+        setTempOfferLetterImage(base64String);
+        setOfferLetterTick(true);
+        toast.success(language === 'ms' ? 'Surat tawaran sedia disimpan.' : 'Offer letter ready to save.');
+      } catch (err) {
+        toast.error("Gagal membaca fail.");
+      } finally {
+        setIsUploadingOffer(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveUploadsAndTicks = async () => {
+    if (!selectedApp) return;
+
+    try {
+      setIsUploading(true);
+      
+      const updatedApp: Application = {
+        ...selectedApp,
+        reply_form_image: tempReplyFormImage || undefined,
+        reply_form_uploaded_at: tempReplyFormImage && tempReplyFormImage !== selectedApp.reply_form_image ? new Date().toISOString() : selectedApp.reply_form_uploaded_at,
+        reply_form_uploaded_tick: replyFormTick,
+        reply_form_verified: replyFormTick ? selectedApp.reply_form_verified : false,
+
+        offer_letter_image: tempOfferLetterImage || undefined,
+        offer_letter_uploaded_at: tempOfferLetterImage && tempOfferLetterImage !== selectedApp.offer_letter_image ? new Date().toISOString() : selectedApp.offer_letter_uploaded_at,
+        offer_letter_uploaded_tick: offerLetterTick,
+        offer_letter_verified: offerLetterTick ? selectedApp.offer_letter_verified : false
+      };
+
+      await onUpdateApplication(updatedApp);
+      toast.success(language === 'ms' ? 'Dokumen & pengesahan berjaya disimpan!' : 'Documents & verification saved successfully!');
+      setModalType(null);
+    } catch (err) {
+      toast.error("Gagal menyimpan fail & status.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleVerifyBorang = async (app: Application) => {
     try {
-      await onUpdateApplication({
+      const updated: Application = {
         ...app,
         reply_form_verified: true,
         reply_form_verified_by: currentUser.name,
         reply_form_verified_at: new Date().toISOString()
-      });
+      };
+      await onUpdateApplication(updated);
+      setSelectedApp(updated);
       toast.success(language === 'ms' ? "Borang disahkan!" : "Form verified!");
-      setModalType(null);
     } catch (err) {
       toast.error("Gagal mengesahkan borang.");
+    }
+  };
+
+  const handleVerifyOfferLetter = async (app: Application) => {
+    try {
+      const updated: Application = {
+        ...app,
+        offer_letter_verified: true,
+        offer_letter_verified_by: currentUser.name,
+        offer_letter_verified_at: new Date().toISOString()
+      };
+      await onUpdateApplication(updated);
+      setSelectedApp(updated);
+      toast.success(language === 'ms' ? "Surat tawaran disahkan!" : "Offer letter verified!");
+    } catch (err) {
+      toast.error("Gagal mengesahkan surat tawaran.");
     }
   };
 
@@ -186,28 +278,48 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         </span>
                     </td>
                     <td className="p-4">
-                        {app.reply_form_image ? (
-                            <div className="flex items-center gap-2">
-                                {app.reply_form_verified ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                                        <CheckCircle size={10} /> DISAHKAN
-                                    </span>
+                        <div className="flex flex-col gap-1 text-[11px]">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-slate-500 w-24">Borang Jawapan:</span>
+                                {app.reply_form_image || app.reply_form_uploaded_tick ? (
+                                    app.reply_form_verified ? (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
+                                            <CheckCircle size={8} /> DISAHKAN
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">
+                                            <Clock size={8} /> MENUNGGU
+                                        </span>
+                                    )
                                 ) : (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">
-                                        <Clock size={10} /> MENUNGGU
-                                    </span>
+                                    <span className="text-[9px] font-bold text-slate-400">BELUM DIHANTAR</span>
                                 )}
-                                <button 
-                                    onClick={() => { setSelectedApp(app); setModalType('viewPdf'); }}
-                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                    title="Lihat PDF"
-                                >
-                                    <Eye size={16} />
-                                </button>
                             </div>
-                        ) : (
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">TIADA FAIL</span>
-                        )}
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-slate-500 w-24">Surat Tawaran:</span>
+                                {app.offer_letter_image || app.offer_letter_uploaded_tick ? (
+                                    app.offer_letter_verified ? (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
+                                            <CheckCircle size={8} /> DISAHKAN
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100">
+                                            <Clock size={8} /> MENUNGGU
+                                        </span>
+                                    )
+                                ) : (
+                                    <span className="text-[9px] font-bold text-slate-400">BELUM DIHANTAR</span>
+                                )}
+                            </div>
+                            {(app.reply_form_image || app.offer_letter_image || app.reply_form_uploaded_tick || app.offer_letter_uploaded_tick) && (
+                                <button 
+                                    onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
+                                    className="mt-1 text-blue-600 hover:text-blue-800 text-[10px] font-bold flex items-center gap-1 w-fit hover:underline"
+                                >
+                                    <Eye size={12} /> Lihat Dokumen / Status
+                                </button>
+                            )}
+                        </div>
                     </td>
                     <td className="p-4">
                         <div className="flex justify-center gap-2">
@@ -243,11 +355,12 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                 </button>
                                 {app.application_status === 'Diluluskan' && (
                                     <button 
-                                        onClick={() => { setSelectedApp(app); setModalType('upload'); }}
-                                        className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
-                                        title={t(language, 'appHantarBorang')}
+                                        onClick={() => openUploadModal(app)}
+                                        className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors flex items-center gap-1 text-xs font-bold"
+                                        title={language === 'ms' ? "Hantar Borang & Surat" : "Submit Form & Letter"}
                                     >
                                         <Upload size={18} />
+                                        <span>Dokumen</span>
                                     </button>
                                 )}
                                 {/* New Cancellation Button for Pending Apps */}
@@ -266,13 +379,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         {/* Coordinator Verification/Maintenance */}
                         {hasSystemAccess && (
                             <>
-                                {app.reply_form_image && !app.reply_form_verified && (
+                                {(((app.reply_form_image || app.reply_form_uploaded_tick) && !app.reply_form_verified) || ((app.offer_letter_image || app.offer_letter_uploaded_tick) && !app.offer_letter_verified)) && (
                                      <button 
-                                        onClick={() => { setSelectedApp(app); setModalType('viewPdf'); }}
-                                        className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
-                                        title="Sahkan Borang Jawapan"
+                                        onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
+                                        className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors flex items-center gap-1 text-xs font-bold"
+                                        title="Sahkan Dokumen Penempatan"
                                     >
                                         <FileCheck size={18} />
+                                        <span>Sahkan</span>
                                     </button>
                                 )}
                                 <button 
@@ -331,104 +445,326 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
             </div>
         </Modal>
 
-        {/* MODAL: MUAT NAIK PDF */}
-        <Modal isOpen={modalType === 'upload'} onClose={() => setModalType(null)} title={t(language, 'appHantarBorang')}>
-            <div className="space-y-6">
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                    <h4 className="font-bold text-blue-800 text-sm mb-1">Arahan Muat Naik</h4>
-                    <ul className="text-xs text-blue-600 space-y-1 list-disc pl-4">
-                        <li>Pastikan fail dalam format **PDF**.</li>
-                        <li>Saiz fail tidak melebihi **20MB**.</li>
-                        <li>Pastikan tandatangan dan cop industri jelas dalam dokumen.</li>
-                    </ul>
+        {/* MODAL: MUAT NAIK DOKUMEN & TICK STATUS */}
+        <Modal isOpen={modalType === 'upload'} onClose={() => setModalType(null)} title="Hantar Borang Jawapan & Surat Tawaran">
+            <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1">
+                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-xs text-indigo-800">
+                    <p className="font-bold mb-1">💡 Arahan Pengesahan Pelajar:</p>
+                    <p>Sila tandakan (tick) pilihan di bawah untuk memaklumkan penyelaras, dan muat naik dokumen PDF sokongan sekiranya ada untuk memudahkan proses kelulusan.</p>
                 </div>
 
-                <div 
-                    onClick={() => !isUploading && fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all cursor-pointer ${
-                        isUploading ? 'bg-slate-50 border-slate-200 opacity-50' : 'border-slate-300 hover:border-blue-500 hover:bg-blue-50'
-                    }`}
-                >
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileChange} 
-                        accept="application/pdf" 
-                        className="hidden" 
-                    />
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="p-4 bg-white rounded-full shadow-sm text-blue-600">
-                            <Upload size={32} />
-                        </div>
+                {/* SECTION 1: BORANG JAWAPAN INDUSTRI */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                    <div className="flex items-start gap-2.5">
+                        <button 
+                            type="button"
+                            onClick={() => setReplyFormTick(!replyFormTick)}
+                            className="mt-0.5 text-indigo-600 hover:scale-105 transition-transform"
+                        >
+                            {replyFormTick ? <CheckSquare size={20} className="fill-indigo-50" /> : <Square size={20} />}
+                        </button>
                         <div>
-                            <p className="font-bold text-slate-700">Pilih Fail PDF</p>
-                            <p className="text-xs text-slate-400 mt-1">Atau tarik fail ke sini (Maks 20MB)</p>
+                            <label className="text-sm font-bold text-slate-800 block cursor-pointer" onClick={() => setReplyFormTick(!replyFormTick)}>
+                                Saya mengesahkan telah menerima & menghantar Borang Jawapan Industri
+                            </label>
+                            <p className="text-xs text-slate-500 mt-0.5">Tandakan ini jika syarikat telah bersetuju menerima anda dan borang maklum balas lengkap telah dihantar.</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-slate-600">Fail PDF Borang Jawapan:</span>
+                            {tempReplyFormImage ? (
+                                <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircle size={10} /> Telah Dipilih
+                                </span>
+                            ) : (
+                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+                                    Tiada Fail PDF
+                                </span>
+                            )}
+                        </div>
+
+                        <input 
+                            type="file" 
+                            ref={replyFormInputRef} 
+                            onChange={handleReplyFormFileChange} 
+                            accept="application/pdf" 
+                            className="hidden" 
+                        />
+                        
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => replyFormInputRef.current?.click()}
+                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                                <Upload size={14} /> {tempReplyFormImage ? "Tukar PDF" : "Muat Naik PDF"}
+                            </button>
+                            {tempReplyFormImage && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setTempReplyFormImage(''); setReplyFormTick(false); }}
+                                    className="px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors"
+                                >
+                                    Padam
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* SECTION 2: SURAT TAWARAN SYARIKAT */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                    <div className="flex items-start gap-2.5">
+                        <button 
+                            type="button"
+                            onClick={() => setOfferLetterTick(!offerLetterTick)}
+                            className="mt-0.5 text-indigo-600 hover:scale-105 transition-transform"
+                        >
+                            {offerLetterTick ? <CheckSquare size={20} className="fill-indigo-50" /> : <Square size={20} />}
+                        </button>
+                        <div>
+                            <label className="text-sm font-bold text-slate-800 block cursor-pointer" onClick={() => setOfferLetterTick(!offerLetterTick)}>
+                                Saya mengesahkan telah menerima Surat Tawaran rasmi dari syarikat
+                            </label>
+                            <p className="text-xs text-slate-500 mt-0.5">Tandakan ini setelah menerima surat tawaran (offer letter) dari pihak industri.</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-slate-600">Fail PDF Surat Tawaran Syarikat:</span>
+                            {tempOfferLetterImage ? (
+                                <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircle size={10} /> Telah Dipilih
+                                </span>
+                            ) : (
+                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+                                    Tiada Fail PDF
+                                </span>
+                            )}
+                        </div>
+
+                        <input 
+                            type="file" 
+                            ref={offerLetterInputRef} 
+                            onChange={handleOfferLetterFileChange} 
+                            accept="application/pdf" 
+                            className="hidden" 
+                        />
+                        
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => offerLetterInputRef.current?.click()}
+                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                                <Upload size={14} /> {tempOfferLetterImage ? "Tukar PDF" : "Muat Naik PDF"}
+                            </button>
+                            {tempOfferLetterImage && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setTempOfferLetterImage(''); setOfferLetterTick(false); }}
+                                    className="px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors"
+                                >
+                                    Padam
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 {isUploading && (
-                    <div className="text-center">
-                        <RefreshCcw className="animate-spin mx-auto text-blue-600 mb-2" />
-                        <p className="text-xs font-bold text-blue-600 animate-pulse">Sedang memuat naik...</p>
+                    <div className="text-center py-2">
+                        <RefreshCcw className="animate-spin mx-auto text-blue-600 mb-1" size={20} />
+                        <p className="text-[10px] font-bold text-blue-600 animate-pulse">Sedang mengemas kini dokumen...</p>
                     </div>
                 )}
 
-                <button 
-                    onClick={() => setModalType(null)} 
-                    className="w-full py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl"
-                >
-                    {t(language, 'cancel')}
-                </button>
+                <div className="flex gap-3 pt-2">
+                    <button 
+                        type="button"
+                        onClick={() => setModalType(null)} 
+                        className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm border border-slate-200"
+                    >
+                        {t(language, 'cancel')}
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={handleSaveUploadsAndTicks}
+                        className="flex-1 py-3 bg-indigo-600 text-white font-bold hover:bg-indigo-700 rounded-xl text-sm shadow-md transition-all active:scale-95"
+                    >
+                        Simpan & Hantar
+                    </button>
+                </div>
             </div>
         </Modal>
 
         {/* MODAL: LIHAT & SAHKAN PDF */}
-        <Modal isOpen={modalType === 'viewPdf'} onClose={() => setModalType(null)} title="Semakan Borang Jawapan PDF">
-            <div className="space-y-6">
-                <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '500px' }}>
-                    {selectedApp?.reply_form_image ? (
-                        <iframe 
-                            src={selectedApp.reply_form_image} 
-                            className="w-full h-full"
-                            title="PDF Preview"
-                        />
-                    ) : (
-                        <div className="flex items-center justify-center h-full text-slate-400 italic">Fail tidak ditemui.</div>
-                    )}
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-3">
-                    {hasSystemAccess && !selectedApp?.reply_form_verified && (
-                        <button 
-                            onClick={() => selectedApp && handleVerifyBorang(selectedApp)}
-                            className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100"
-                        >
-                            <FileCheck size={20} /> Sahkan Borang Pelajar
-                        </button>
-                    )}
-                    <button 
-                        onClick={() => {
-                            if (selectedApp?.reply_form_image) {
-                                const link = document.createElement('a');
-                                link.href = selectedApp.reply_form_image;
-                                link.download = `Borang_Jawapan_${selectedApp.student_id}.pdf`;
-                                link.click();
-                            }
-                        }}
-                        className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100"
+        <Modal isOpen={modalType === 'viewPdf'} onClose={() => setModalType(null)} title="Semakan Dokumen & Pengesahan Pelajar">
+            <div className="space-y-4">
+                {/* Tabs to select which doc to look at */}
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button
+                        onClick={() => setActiveDocTab('reply')}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                            activeDocTab === 'reply' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                        }`}
                     >
-                        <Printer size={20} /> Simpan / Cetak
+                        Borang Jawapan Industri
+                    </button>
+                    <button
+                        onClick={() => setActiveDocTab('offer')}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                            activeDocTab === 'offer' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        Surat Tawaran Syarikat
                     </button>
                 </div>
-                
-                {selectedApp?.reply_form_verified && (
-                    <div className="p-3 bg-green-50 border border-green-100 rounded-lg flex items-center gap-3">
-                        <CheckCircle size={20} className="text-green-600" />
-                        <div>
-                            <p className="text-[11px] font-bold text-green-800 uppercase">Dokumen Telah Disahkan</p>
-                            <p className="text-[10px] text-green-600 italic">Disahkan oleh: {selectedApp.reply_form_verified_by} pada {selectedApp.reply_form_verified_at ? new Date(selectedApp.reply_form_verified_at).toLocaleString() : '-'}</p>
+
+                {activeDocTab === 'reply' ? (
+                    <div className="space-y-4">
+                        {/* Information & Ticked State */}
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+                            <div>
+                                <span className="text-[11px] text-slate-500 font-bold block uppercase">Pengesahan Penghantaran (Tick Pelajar)</span>
+                                <span className="text-xs text-slate-800 font-medium">
+                                    {selectedApp?.reply_form_uploaded_tick ? '✅ Pelajar telah tick "Borang Dihantar"' : '❌ Belum ditandakan oleh pelajar'}
+                                </span>
+                            </div>
+                            {selectedApp?.reply_form_uploaded_at && (
+                                <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 block">Tarikh Kemas Kini</span>
+                                    <span className="text-xs font-semibold text-slate-600">{new Date(selectedApp.reply_form_uploaded_at).toLocaleDateString()}</span>
+                                </div>
+                            )}
                         </div>
+
+                        {/* PDF View */}
+                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '400px' }}>
+                            {selectedApp?.reply_form_image ? (
+                                <iframe 
+                                    src={selectedApp.reply_form_image} 
+                                    className="w-full h-full"
+                                    title="PDF Preview Borang Jawapan"
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 italic gap-2">
+                                    <span>Fail PDF Borang Jawapan tidak ditemui.</span>
+                                    <span className="text-xs font-normal text-slate-400">(Pelajar tidak memuat naik fail)</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions & Verification */}
+                        <div className="flex flex-col md:flex-row gap-3">
+                            {hasSystemAccess && !selectedApp?.reply_form_verified && (
+                                <button 
+                                    onClick={() => selectedApp && handleVerifyBorang(selectedApp)}
+                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-transform active:scale-95"
+                                >
+                                    <FileCheck size={18} /> Lulus / Sahkan Borang Jawapan
+                                </button>
+                            )}
+                            {selectedApp?.reply_form_image && (
+                                <button 
+                                    onClick={() => {
+                                        if (selectedApp?.reply_form_image) {
+                                            const link = document.createElement('a');
+                                            link.href = selectedApp.reply_form_image;
+                                            link.download = `Borang_Jawapan_${selectedApp.student_id}.pdf`;
+                                            link.click();
+                                        }
+                                    }}
+                                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-transform active:scale-95 text-xs text-center"
+                                >
+                                    <Printer size={16} /> Muat Turun
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedApp?.reply_form_verified && (
+                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center gap-3">
+                                <CheckCircle size={20} className="text-green-600" />
+                                <div>
+                                    <p className="text-[11px] font-bold text-green-800 uppercase">Borang Jawapan Telah Disahkan</p>
+                                    <p className="text-[10px] text-green-600 italic">Disahkan oleh: {selectedApp.reply_form_verified_by} pada {selectedApp.reply_form_verified_at ? new Date(selectedApp.reply_form_verified_at).toLocaleString() : '-'}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {/* Information & Ticked State */}
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+                            <div>
+                                <span className="text-[11px] text-slate-500 font-bold block uppercase">Pengesahan Penerimaan (Tick Pelajar)</span>
+                                <span className="text-xs text-slate-800 font-medium">
+                                    {selectedApp?.offer_letter_uploaded_tick ? '✅ Pelajar telah tick "Surat Tawaran Diterima"' : '❌ Belum ditandakan oleh pelajar'}
+                                </span>
+                            </div>
+                            {selectedApp?.offer_letter_uploaded_at && (
+                                <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 block">Tarikh Kemas Kini</span>
+                                    <span className="text-xs font-semibold text-slate-600">{new Date(selectedApp.offer_letter_uploaded_at).toLocaleDateString()}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* PDF View */}
+                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '400px' }}>
+                            {selectedApp?.offer_letter_image ? (
+                                <iframe 
+                                    src={selectedApp.offer_letter_image} 
+                                    className="w-full h-full"
+                                    title="PDF Preview Surat Tawaran"
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 italic gap-2">
+                                    <span>Fail PDF Surat Tawaran tidak ditemui.</span>
+                                    <span className="text-xs font-normal text-slate-400">(Pelajar tidak memuat naik fail)</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions & Verification */}
+                        <div className="flex flex-col md:flex-row gap-3">
+                            {hasSystemAccess && !selectedApp?.offer_letter_verified && (
+                                <button 
+                                    onClick={() => selectedApp && handleVerifyOfferLetter(selectedApp)}
+                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-transform active:scale-95"
+                                >
+                                    <FileCheck size={18} /> Lulus / Sahkan Surat Tawaran
+                                </button>
+                            )}
+                            {selectedApp?.offer_letter_image && (
+                                <button 
+                                    onClick={() => {
+                                        if (selectedApp?.offer_letter_image) {
+                                            const link = document.createElement('a');
+                                            link.href = selectedApp.offer_letter_image;
+                                            link.download = `Surat_Tawaran_${selectedApp.student_id}.pdf`;
+                                            link.click();
+                                        }
+                                    }}
+                                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-transform active:scale-95 text-xs text-center"
+                                >
+                                    <Printer size={16} /> Muat Turun
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedApp?.offer_letter_verified && (
+                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center gap-3">
+                                <CheckCircle size={20} className="text-green-600" />
+                                <div>
+                                    <p className="text-[11px] font-bold text-green-800 uppercase">Surat Tawaran Telah Disahkan</p>
+                                    <p className="text-[10px] text-green-600 italic">Disahkan oleh: {selectedApp.offer_letter_verified_by} pada {selectedApp.offer_letter_verified_at ? new Date(selectedApp.offer_letter_verified_at).toLocaleString() : '-'}</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
