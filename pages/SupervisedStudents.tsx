@@ -267,7 +267,7 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                    {student.activeApp ? (
                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{student.activeApp.company_name}</span>
+                            <span className="text-xs font-bold text-slate-800 truncate max-w-[150px]">{student.activeApp.company_name}{student.activeApp.student_preferred && " ⭐"}{student.activeApp.student_has_offer && " ✅"}</span>
                             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
                                 student.activeApp.application_status === 'Diluluskan' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                             }`}>

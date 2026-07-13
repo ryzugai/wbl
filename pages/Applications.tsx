@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter } from '../utils/letterGenerator';
-import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square } from 'lucide-react';
+import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 
@@ -193,6 +193,38 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     }
   };
 
+  const handleTogglePreferred = async (app: Application) => {
+    try {
+      const updated: Application = {
+        ...app,
+        student_preferred: !app.student_preferred
+      };
+      await onUpdateApplication(updated);
+      toast.success(updated.student_preferred 
+        ? (language === 'ms' ? 'Ditandakan sebagai pilihan utama!' : 'Marked as preferred!')
+        : (language === 'ms' ? 'Nyahpilih pilihan utama' : 'Removed from preferred')
+      );
+    } catch (err) {
+      toast.error(language === 'ms' ? "Gagal mengemaskini pilihan." : "Failed to update preference.");
+    }
+  };
+
+  const handleToggleHasOffer = async (app: Application) => {
+    try {
+      const updated: Application = {
+        ...app,
+        student_has_offer: !app.student_has_offer
+      };
+      await onUpdateApplication(updated);
+      toast.success(updated.student_has_offer 
+        ? (language === 'ms' ? 'Ditandakan sebagai mendapat tawaran!' : 'Marked as received offer!')
+        : (language === 'ms' ? 'Nyahpilih status tawaran' : 'Removed from received offer')
+      );
+    } catch (err) {
+      toast.error(language === 'ms' ? "Gagal mengemaskini status tawaran." : "Failed to update offer status.");
+    }
+  };
+
   return (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-slate-800">{t(language, 'appTitle')}</h2>
@@ -205,16 +237,26 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                     <th className="p-4 font-semibold text-sm text-slate-600">{t(language, 'appStudent')}</th>
                     <th className="p-4 font-semibold text-sm text-slate-600">{t(language, 'appCompany')}</th>
                     <th className="p-4 font-semibold text-sm text-slate-600">{t(language, 'status')}</th>
+                    <th className="p-4 font-semibold text-sm text-slate-600">Pilihan & Tawaran</th>
                     <th className="p-4 font-semibold text-sm text-slate-600">Borang Jawapan</th>
                     <th className="p-4 font-semibold text-sm text-slate-600 text-center">{t(language, 'actions')}</th>
                 </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                 {filteredApps.length === 0 && (
-                    <tr><td colSpan={5} className="p-8 text-center text-slate-500">{t(language, 'noRecords')}</td></tr>
+                    <tr><td colSpan={6} className="p-8 text-center text-slate-500">{t(language, 'noRecords')}</td></tr>
                 )}
-                {filteredApps.map(app => (
-                    <tr key={app.id} className="hover:bg-slate-50 transition-colors">
+                {filteredApps.map(app => {
+                    const isPreferred = !!app.student_preferred;
+                    const hasOffer = !!app.student_has_offer;
+                    const isTicked = isPreferred || hasOffer;
+                    
+                    const rowClass = isTicked 
+                        ? "bg-emerald-50/70 hover:bg-emerald-100/70 transition-all border-l-4 border-l-emerald-500" 
+                        : "hover:bg-slate-50 transition-colors";
+                    
+                    return (
+                        <tr key={app.id} className={rowClass}>
                     <td className="p-4">
                         <div className="flex items-center gap-2 flex-wrap">
                             <div className="font-medium text-slate-900">{app.student_name}</div>
@@ -276,6 +318,52 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         }`}>
                         {app.application_status}
                         </span>
+                    </td>
+                    <td className="p-4">
+                        <div className="flex flex-col gap-1.5 min-w-[130px]">
+                            {currentUser.role === UserRole.STUDENT ? (
+                                <>
+                                    <button 
+                                        onClick={() => handleTogglePreferred(app)}
+                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all justify-start w-full ${
+                                            app.student_preferred 
+                                                ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-sm' 
+                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <Star size={12} className={app.student_preferred ? 'fill-amber-500 text-amber-500' : ''} />
+                                        <span>{language === 'ms' ? 'Pilihan Utama' : 'Preferred'}</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleToggleHasOffer(app)}
+                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all justify-start w-full ${
+                                            app.student_has_offer 
+                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-sm' 
+                                                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <CheckCircle2 size={12} className={app.student_has_offer ? 'text-emerald-600 fill-emerald-50' : ''} />
+                                        <span>{language === 'ms' ? 'Dapat Tawaran' : 'Got Offer'}</span>
+                                    </button>
+                                </>
+                            ) : (
+                                <div className="flex flex-col gap-1">
+                                    {app.student_preferred && (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 w-fit">
+                                            <Star size={9} className="fill-amber-500 text-amber-500" /> PILIHAN
+                                        </span>
+                                    )}
+                                    {app.student_has_offer && (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 w-fit">
+                                            <CheckCircle2 size={9} className="text-emerald-600" /> TAWARAN
+                                        </span>
+                                    )}
+                                    {!app.student_preferred && !app.student_has_offer && (
+                                        <span className="text-slate-400 italic text-[11px]">-</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </td>
                     <td className="p-4">
                         <div className="flex flex-col gap-1 text-[11px]">
@@ -401,7 +489,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         </div>
                     </td>
                     </tr>
-                ))}
+                );})}
                 </tbody>
             </table>
             </div>

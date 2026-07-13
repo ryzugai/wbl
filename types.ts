@@ -93,6 +93,8 @@ export interface Application {
   offer_letter_verified?: boolean;
   offer_letter_verified_by?: string;
   offer_letter_verified_at?: string;
+  student_preferred?: boolean;
+  student_has_offer?: boolean;
   created_by: string;
   created_at: string;
 }
