@@ -27,6 +27,7 @@ export interface User {
   experience_years?: number;
   has_dual_role?: boolean;
   is_approved?: boolean;
+  is_active?: boolean;
   profile_image?: string;
   // Supervisor assigned directly to student
   faculty_supervisor_id?: string;

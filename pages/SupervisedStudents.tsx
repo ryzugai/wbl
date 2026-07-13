@@ -224,11 +224,12 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                             "danial haikal bin abdul latif"
                           ];
                           const normalizedName = student.name.toLowerCase().trim();
-                          const isActive = activeNames.some(activeName => {
+                          const matchedActiveStatic = activeNames.some(activeName => {
                             const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
                             const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
                             return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
                           });
+                          const isActive = student.is_active !== undefined ? student.is_active : matchedActiveStatic;
                           return isActive ? (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
                               AKTIF

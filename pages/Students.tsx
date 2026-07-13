@@ -311,11 +311,12 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                   "danial haikal bin abdul latif"
                 ];
                 const normalizedName = item.name.toLowerCase().trim();
-                const isActive = activeNames.some(activeName => {
+                const matchedActiveStatic = activeNames.some(activeName => {
                   const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
                   const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
                   return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
                 });
+                const isActive = item.is_active !== undefined ? item.is_active : matchedActiveStatic;
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 group transition-colors">
@@ -418,6 +419,28 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, current
                                   </button>
                                   <button onClick={() => { setEditingStudent({...item}); setIsEditModalOpen(true); }} className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100" title={t(language, 'editUser')}>
                                       <Edit size={18} />
+                                  </button>
+                                  <button 
+                                    onClick={async () => {
+                                      const newStatus = !isActive;
+                                      const { placement, ...cleanItem } = item;
+                                      await onUpdateUser({
+                                        ...cleanItem,
+                                        is_active: newStatus
+                                      });
+                                      toast.success(language === 'ms' 
+                                        ? `Status aktif ${item.name} telah dikemaskini!` 
+                                        : `Active status for ${item.name} updated!`
+                                      );
+                                    }}
+                                    className={`p-2 rounded-lg transition-colors border ${
+                                      isActive 
+                                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-emerald-200' 
+                                        : 'bg-rose-50 text-rose-600 hover:bg-rose-100 border-rose-200'
+                                    }`}
+                                    title={isActive ? (language === 'ms' ? "Nyahaktif Pelajar" : "Deactivate Student") : (language === 'ms' ? "Aktifkan Pelajar" : "Activate Student")}
+                                  >
+                                    {isActive ? <UserCheck size={18} /> : <UserMinus size={18} />}
                                   </button>
                                   <button onClick={() => { if(confirm('Hapus pengguna?')) onDeleteUser(item.id); }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100" title={t(language, 'deleteUser')}>
                                       <Trash2 size={18} />

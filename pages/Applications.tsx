@@ -153,11 +153,13 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                 "danial haikal bin abdul latif"
                               ];
                               const normalizedName = app.student_name.toLowerCase().trim();
-                              const isActive = activeNames.some(activeName => {
+                              const matchedActiveStatic = activeNames.some(activeName => {
                                 const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
                                 const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
                                 return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
                               });
+                              const studentUser = users.find(u => u.matric_no === app.student_id || u.username === app.created_by);
+                              const isActive = studentUser?.is_active !== undefined ? studentUser.is_active : matchedActiveStatic;
                               return isActive ? (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
                                   AKTIF

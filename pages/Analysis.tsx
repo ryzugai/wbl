@@ -44,6 +44,7 @@ interface GroupedCompanyData {
     student_matric: string;
     student_address: string;
     status: string;
+    student_id_internal?: string;
   }[];
 }
 
@@ -145,7 +146,8 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
             student_name: app.student_name,
             student_matric: app.student_id,
             student_address: student?.address || (language === 'ms' ? 'Tiada Alamat' : 'No Address'),
-            status: app.application_status
+            status: app.application_status,
+            student_id_internal: student?.id
           });
         }
       });
@@ -478,11 +480,13 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
                                               "danial haikal bin abdul latif"
                                             ];
                                             const normalizedName = student.student_name.toLowerCase().trim();
-                                            const isActive = activeNames.some(activeName => {
+                                            const matchedActiveStatic = activeNames.some(activeName => {
                                               const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
                                               const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
                                               return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
                                             });
+                                            const studentUser = users.find(u => u.matric_no === student.student_matric || u.username === student.student_id_internal);
+                                            const isActive = studentUser?.is_active !== undefined ? studentUser.is_active : matchedActiveStatic;
                                             return isActive ? (
                                               <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[7px] font-black bg-emerald-100 text-emerald-800 border border-emerald-100">
                                                 AKTIF
