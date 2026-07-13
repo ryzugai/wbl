@@ -449,7 +449,51 @@ export const Analysis: React.FC<AnalysisProps> = ({ applications, users, compani
                             item.applicants.map((student, sIdx) => (
                               <div key={sIdx} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm flex justify-between items-center group">
                                   <div>
-                                      <div className="text-xs font-bold text-slate-800">{student.student_name}</div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                          <div className="text-xs font-bold text-slate-800">{student.student_name}</div>
+                                          {(() => {
+                                            const activeNames = [
+                                              "nor afizzi aqimi bin norihsan",
+                                              "nurul izzati binti yusri",
+                                              "yap yan zi",
+                                              "ahmad rifa'at bin rosdi rifaa'at",
+                                              "muhammad arif izzuddin bin mad nasir",
+                                              "auni haziqah binti haswadi",
+                                              "irsyad bin ahmad nizam",
+                                              "joviar khor jian h’ng",
+                                              "joviar khor jian h'ng",
+                                              "muhammad nor hafiz ahmad saidi",
+                                              "muhammad fikri bin hamzah",
+                                              "intan natasha binti mohd farino",
+                                              "wong wen hui",
+                                              "teoh yi xian",
+                                              "muhammad alif bin md farid",
+                                              "laila suraya bt adnan",
+                                              "laila suraya binti adnan",
+                                              "nur syahirah binti mohd nor radzief",
+                                              "putri zainab binti dzainuddin",
+                                              "noor suhaila binti mohamed",
+                                              "ker guo fuk",
+                                              "siti nurnazura binti mohd nahar",
+                                              "danial haikal bin abdul latif"
+                                            ];
+                                            const normalizedName = student.student_name.toLowerCase().trim();
+                                            const isActive = activeNames.some(activeName => {
+                                              const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
+                                              const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
+                                              return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
+                                            });
+                                            return isActive ? (
+                                              <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[7px] font-black bg-emerald-100 text-emerald-800 border border-emerald-100">
+                                                AKTIF
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center px-1 py-0.5 rounded-full text-[7px] font-black bg-rose-100 text-rose-800 border border-rose-100">
+                                                TIDAK AKTIF
+                                              </span>
+                                            );
+                                          })()}
+                                      </div>
                                       <div className="text-[9px] text-indigo-600 font-bold uppercase">{student.student_matric}</div>
                                       <div className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[200px]">{student.student_address}</div>
                                   </div>

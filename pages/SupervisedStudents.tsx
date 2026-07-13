@@ -194,8 +194,52 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                           student.name.charAt(0)
                       )}
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 leading-tight group-hover:text-blue-700 transition-colors">{student.name}</h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-slate-800 leading-tight group-hover:text-blue-700 transition-colors truncate max-w-[150px]">{student.name}</h3>
+                        {(() => {
+                          const activeNames = [
+                            "nor afizzi aqimi bin norihsan",
+                            "nurul izzati binti yusri",
+                            "yap yan zi",
+                            "ahmad rifa'at bin rosdi rifaa'at",
+                            "muhammad arif izzuddin bin mad nasir",
+                            "auni haziqah binti haswadi",
+                            "irsyad bin ahmad nizam",
+                            "joviar khor jian h’ng",
+                            "joviar khor jian h'ng",
+                            "muhammad nor hafiz ahmad saidi",
+                            "muhammad fikri bin hamzah",
+                            "intan natasha binti mohd farino",
+                            "wong wen hui",
+                            "teoh yi xian",
+                            "muhammad alif bin md farid",
+                            "laila suraya bt adnan",
+                            "laila suraya binti adnan",
+                            "nur syahirah binti mohd nor radzief",
+                            "putri zainab binti dzainuddin",
+                            "noor suhaila binti mohamed",
+                            "ker guo fuk",
+                            "siti nurnazura binti mohd nahar",
+                            "danial haikal bin abdul latif"
+                          ];
+                          const normalizedName = student.name.toLowerCase().trim();
+                          const isActive = activeNames.some(activeName => {
+                            const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
+                            const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
+                            return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
+                          });
+                          return isActive ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              AKTIF
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-rose-100 text-rose-800 border border-rose-200">
+                              TIDAK AKTIF
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <p className="text-[10px] font-bold text-blue-600 uppercase mt-0.5">{student.matric_no}</p>
                     </div>
                   </div>

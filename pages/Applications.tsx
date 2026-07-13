@@ -124,7 +124,51 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                 {filteredApps.map(app => (
                     <tr key={app.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4">
-                        <div className="font-medium text-slate-900">{app.student_name}</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="font-medium text-slate-900">{app.student_name}</div>
+                            {(() => {
+                              const activeNames = [
+                                "nor afizzi aqimi bin norihsan",
+                                "nurul izzati binti yusri",
+                                "yap yan zi",
+                                "ahmad rifa'at bin rosdi rifaa'at",
+                                "muhammad arif izzuddin bin mad nasir",
+                                "auni haziqah binti haswadi",
+                                "irsyad bin ahmad nizam",
+                                "joviar khor jian h’ng",
+                                "joviar khor jian h'ng",
+                                "muhammad nor hafiz ahmad saidi",
+                                "muhammad fikri bin hamzah",
+                                "intan natasha binti mohd farino",
+                                "wong wen hui",
+                                "teoh yi xian",
+                                "muhammad alif bin md farid",
+                                "laila suraya bt adnan",
+                                "laila suraya binti adnan",
+                                "nur syahirah binti mohd nor radzief",
+                                "putri zainab binti dzainuddin",
+                                "noor suhaila binti mohamed",
+                                "ker guo fuk",
+                                "siti nurnazura binti mohd nahar",
+                                "danial haikal bin abdul latif"
+                              ];
+                              const normalizedName = app.student_name.toLowerCase().trim();
+                              const isActive = activeNames.some(activeName => {
+                                const cleanActive = activeName.replace(/[^a-z0-9]/g, '');
+                                const cleanInput = normalizedName.replace(/[^a-z0-9]/g, '');
+                                return cleanInput === cleanActive || cleanInput.includes(cleanActive) || cleanActive.includes(cleanInput);
+                              });
+                              return isActive ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  AKTIF
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black bg-rose-100 text-rose-800 border border-rose-200">
+                                  TIDAK AKTIF
+                                </span>
+                              );
+                            })()}
+                        </div>
                         <div className="text-xs text-slate-500">{app.student_id}</div>
                     </td>
                     <td className="p-4">
