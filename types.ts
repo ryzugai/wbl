@@ -109,6 +109,12 @@ export interface Application {
   offer_letter_verified?: boolean;
   offer_letter_verified_by?: string;
   offer_letter_verified_at?: string;
+  application_letter_image?: string;
+  application_letter_uploaded_at?: string;
+  application_letter_uploaded_tick?: boolean;
+  application_letter_verified?: boolean;
+  application_letter_verified_by?: string;
+  application_letter_verified_at?: string;
   student_preferred?: boolean;
   student_has_offer?: boolean;
   created_by: string;
@@ -125,3 +131,19 @@ export interface AdConfig {
   items: AdItem[];
   isEnabled: boolean;
 }
+
+export interface Notification {
+  id: string;
+  recipient_id: string; // 'coordinator' or user.id
+  recipient_role?: UserRole;
+  title_ms: string;
+  title_en: string;
+  message_ms: string;
+  message_en: string;
+  is_read: boolean;
+  created_at: string;
+  sender_name: string;
+  sender_matric?: string;
+  application_id?: string;
+}
+

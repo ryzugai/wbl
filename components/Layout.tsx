@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { User, UserRole } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity } from 'lucide-react';
+import { User, UserRole, Notification } from '../types';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -19,11 +19,47 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentView, onNavigate, onLogout, language, onLanguageChange }) => {
   const [isCloud, setIsCloud] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     setIsCloud(StorageService.isCloudEnabled());
   }, []);
+
+  useEffect(() => {
+    const loadNotifs = () => {
+      const allNotifs = StorageService.getNotifications();
+      const userNotifs = allNotifs.filter(n => {
+        if (currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl) {
+          return n.recipient_id === 'coordinator' || n.recipient_id === currentUser.id;
+        }
+        return n.recipient_id === currentUser.id;
+      });
+      setNotifications(userNotifs);
+    };
+
+    loadNotifs();
+    const unsubscribe = StorageService.subscribe(loadNotifs);
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const handleMarkAllRead = async () => {
+    if (currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl) {
+      await StorageService.markAllNotificationsAsRead('coordinator');
+    }
+    await StorageService.markAllNotificationsAsRead(currentUser.id);
+  };
+
+  const handleMarkRead = async (id: string) => {
+    await StorageService.markNotificationAsRead(id);
+  };
+
+  const handleDeleteNotif = async (id: string) => {
+    await StorageService.deleteNotification(id);
+  };
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR;
   const isJKWBL = currentUser.is_jkwbl === true;
@@ -223,6 +259,114 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto h-[calc(100vh-65px)] md:h-screen p-4 md:p-8 w-full">
         <div className="max-w-7xl mx-auto animate-fadeIn pb-20 md:pb-0 flex flex-col min-h-full">
+          
+          {/* Top Bar with Session details and Notification Dropdown */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                Session: 2026/2027
+              </span>
+              <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">
+                {language === 'ms' 
+                  ? 'Sesi Latihan WBL: 28/09/2026 - 27/09/2027' 
+                  : 'WBL Training Period: 28/09/2026 - 27/09/2027'}
+              </span>
+            </div>
+
+            {/* Notification Bell Icon */}
+            <div className="relative self-end sm:self-auto">
+              <button 
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all relative border border-slate-200 bg-slate-50 flex items-center justify-center"
+                title={language === 'ms' ? 'Notifikasi' : 'Notifications'}
+              >
+                <Bell size={18} className={unreadCount > 0 ? "animate-swing origin-top" : ""} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotifOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 animate-slideDown overflow-hidden max-h-[480px] flex flex-col">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                        <Bell size={16} className="text-blue-600" />
+                        <span>{language === 'ms' ? 'Pemberitahuan' : 'Notifications'}</span>
+                        {unreadCount > 0 && (
+                          <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {unreadCount} {language === 'ms' ? 'Baharu' : 'New'}
+                          </span>
+                        )}
+                      </h3>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={handleMarkAllRead}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 hover:underline"
+                        >
+                          <Check size={14} />
+                          <span>{language === 'ms' ? 'Semua Dibaca' : 'Mark All Read'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400">
+                          <Bell size={36} className="mx-auto mb-2 text-slate-200 stroke-1" />
+                          <p className="text-xs font-medium">{language === 'ms' ? 'Tiada notifikasi baharu' : 'No new notifications'}</p>
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div 
+                            key={n.id} 
+                            className={`p-4 transition-colors relative hover:bg-slate-50 ${!n.is_read ? 'bg-blue-50/50' : ''}`}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <h4 className="font-bold text-xs text-slate-800 leading-tight">
+                                {language === 'ms' ? n.title_ms : n.title_en}
+                              </h4>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteNotif(n.id);
+                                }}
+                                className="text-slate-400 hover:text-red-500 transition-colors"
+                                title={language === 'ms' ? 'Padam' : 'Delete'}
+                              >
+                                <Trash size={12} />
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                              {language === 'ms' ? n.message_ms : n.message_en}
+                            </p>
+                            <div className="flex justify-between items-center mt-2.5">
+                              <span className="text-[9px] font-medium text-slate-400">
+                                {new Date(n.created_at).toLocaleString()}
+                              </span>
+                              {!n.is_read && (
+                                <button 
+                                  onClick={() => handleMarkRead(n.id)}
+                                  className="text-[9px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 hover:underline"
+                                >
+                                  <Check size={10} />
+                                  <span>{language === 'ms' ? 'Tandakan Dibaca' : 'Mark Read'}</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           <div className="flex-1">
             {children}
           </div>

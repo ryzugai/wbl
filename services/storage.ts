@@ -1,5 +1,5 @@
 
-import { User, Company, Application, UserRole, AdConfig, UserActivity } from '../types';
+import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
@@ -10,7 +10,8 @@ const STORAGE_KEYS = {
   APPLICATIONS: 'wbl_applications',
   SESSION: 'wbl_session',
   AD_CONFIG: 'wbl_ad_config',
-  ACTIVITIES: 'wbl_activities'
+  ACTIVITIES: 'wbl_activities',
+  NOTIFICATIONS: 'wbl_notifications'
 };
 
 const firebaseConfig = {
@@ -62,6 +63,7 @@ const setupRealtimeListeners = () => {
   syncCollection('companies', STORAGE_KEYS.COMPANIES);
   syncCollection('applications', STORAGE_KEYS.APPLICATIONS);
   syncCollection('activities', STORAGE_KEYS.ACTIVITIES);
+  syncCollection('notifications', STORAGE_KEYS.NOTIFICATIONS);
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
@@ -122,6 +124,7 @@ const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
   if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
+  if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
   
   const rawAd = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
   if (!rawAd) {
@@ -570,6 +573,80 @@ export const StorageService = {
         console.error('Failed to sync activity to cloud:', e);
       }
     }
+  },
+
+  getNotifications: (): Notification[] => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || '[]') as Notification[];
+    } catch {
+      return [];
+    }
+  },
+
+  createNotification: async (notif: Omit<Notification, 'id'>): Promise<Notification> => {
+    const notifications = StorageService.getNotifications();
+    const newNotif: Notification = {
+      ...notif,
+      id: generateId()
+    };
+    notifications.unshift(newNotif);
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    notifyListeners();
+    if (db) {
+      try {
+        await setDoc(doc(db, 'notifications', newNotif.id), sanitizeForFirebase(newNotif));
+      } catch (e) {
+        console.error('Failed to sync notification to cloud:', e);
+      }
+    }
+    return newNotif;
+  },
+
+  markNotificationAsRead: async (id: string): Promise<void> => {
+    const notifications = StorageService.getNotifications();
+    const idx = notifications.findIndex(n => n.id === id);
+    if (idx !== -1) {
+      notifications[idx].is_read = true;
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+      notifyListeners();
+      if (db) {
+        await setDoc(doc(db, 'notifications', id), { is_read: true }, { merge: true });
+      }
+    }
+  },
+
+  markAllNotificationsAsRead: async (recipientId: string): Promise<void> => {
+    const notifications = StorageService.getNotifications();
+    let updated = false;
+    const updatedNotifications = notifications.map(n => {
+      const isRecipient = n.recipient_id === recipientId || (recipientId === 'coordinator' && n.recipient_id === 'coordinator');
+      if (isRecipient && !n.is_read) {
+        n.is_read = true;
+        updated = true;
+      }
+      return n;
+    });
+    if (updated) {
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updatedNotifications));
+      notifyListeners();
+      if (db) {
+        const batch = writeBatch(db);
+        updatedNotifications.forEach(n => {
+          const isRecipient = n.recipient_id === recipientId || (recipientId === 'coordinator' && n.recipient_id === 'coordinator');
+          if (isRecipient && n.is_read) {
+            batch.set(doc(db, 'notifications', n.id), { is_read: true }, { merge: true });
+          }
+        });
+        await batch.commit();
+      }
+    }
+  },
+
+  deleteNotification: async (id: string): Promise<void> => {
+    const notifications = StorageService.getNotifications().filter(n => n.id !== id);
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    notifyListeners();
+    if (db) await deleteDoc(doc(db, 'notifications', id));
   },
 
   getFullSystemBackup: () => ({

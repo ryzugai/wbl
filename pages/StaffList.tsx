@@ -154,7 +154,7 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                       <td className="p-4 align-top">
                         <div className="font-bold text-slate-900 flex items-center gap-2">
                             {user.name}
-                            {user.is_jkwbl && <ShieldCheck size={14} className="text-indigo-600" title="Ahli JKWBL" />}
+                            {user.is_jkwbl && <span title="Ahli JKWBL"><ShieldCheck size={14} className="text-indigo-600" /></span>}
                         </div>
                         <div className="text-xs text-slate-500 flex items-center gap-1 mb-2"><Mail size={12} /> {user.email}</div>
                         

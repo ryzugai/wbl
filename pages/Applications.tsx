@@ -3,9 +3,10 @@ import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter } from '../utils/letterGenerator';
-import { FileCheck, FileX, Printer, UserPlus, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2 } from 'lucide-react';
+import { FileCheck, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
+import { StorageService } from '../services/storage';
 
 interface ApplicationsProps {
   currentUser: User;
@@ -25,15 +26,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   // States and refs for dual upload/tick functionality
   const replyFormInputRef = useRef<HTMLInputElement>(null);
   const offerLetterInputRef = useRef<HTMLInputElement>(null);
+  const applicationLetterInputRef = useRef<HTMLInputElement>(null);
   const [tempReplyFormImage, setTempReplyFormImage] = useState<string | undefined>('');
   const [tempOfferLetterImage, setTempOfferLetterImage] = useState<string | undefined>('');
+  const [tempApplicationLetterImage, setTempApplicationLetterImage] = useState<string | undefined>('');
   const [replyFormTick, setReplyFormTick] = useState(false);
   const [offerLetterTick, setOfferLetterTick] = useState(false);
-  const [isUploadingReply, setIsUploadingReply] = useState(false);
-  const [isUploadingOffer, setIsUploadingOffer] = useState(false);
-  const [activeDocTab, setActiveDocTab] = useState<'reply' | 'offer'>('reply');
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [applicationLetterTick, setApplicationLetterTick] = useState(false);
+  const [activeDocTab, setActiveDocTab] = useState<'letter' | 'reply' | 'offer'>('letter');
   const [isUploading, setIsUploading] = useState(false);
   
   const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
@@ -63,9 +63,44 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     setSelectedApp(app);
     setTempReplyFormImage(app.reply_form_image || '');
     setTempOfferLetterImage(app.offer_letter_image || '');
+    setTempApplicationLetterImage(app.application_letter_image || '');
     setReplyFormTick(!!app.reply_form_uploaded_tick);
     setOfferLetterTick(!!app.offer_letter_uploaded_tick);
+    setApplicationLetterTick(!!app.application_letter_uploaded_tick);
+    setActiveDocTab('letter');
     setModalType('upload');
+  };
+
+  const handleApplicationLetterFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 20 * 1024 * 1024; // 20MB
+    if (file.size > maxSize) {
+      toast.error(t(language, 'appFileTooLarge'));
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      toast.error(t(language, 'appInvalidFormat'));
+      return;
+    }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const base64String = evt.target?.result as string;
+        setTempApplicationLetterImage(base64String);
+        setApplicationLetterTick(true);
+        toast.success(language === 'ms' ? 'Surat permohonan sedia disimpan.' : 'Application letter ready to save.');
+      } catch (err) {
+        toast.error("Gagal membaca fail.");
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleReplyFormFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,7 +118,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       return;
     }
 
-    setIsUploadingReply(true);
+    setIsUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -94,7 +129,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       } catch (err) {
         toast.error("Gagal membaca fail.");
       } finally {
-        setIsUploadingReply(false);
+        setIsUploading(false);
       }
     };
     reader.readAsDataURL(file);
@@ -115,7 +150,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       return;
     }
 
-    setIsUploadingOffer(true);
+    setIsUploading(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -126,7 +161,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       } catch (err) {
         toast.error("Gagal membaca fail.");
       } finally {
-        setIsUploadingOffer(false);
+        setIsUploading(false);
       }
     };
     reader.readAsDataURL(file);
@@ -138,6 +173,8 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     try {
       setIsUploading(true);
       
+      const isNewlyTickedLetter = applicationLetterTick && !selectedApp.application_letter_uploaded_tick;
+
       const updatedApp: Application = {
         ...selectedApp,
         reply_form_image: tempReplyFormImage || undefined,
@@ -148,10 +185,54 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
         offer_letter_image: tempOfferLetterImage || undefined,
         offer_letter_uploaded_at: tempOfferLetterImage && tempOfferLetterImage !== selectedApp.offer_letter_image ? new Date().toISOString() : selectedApp.offer_letter_uploaded_at,
         offer_letter_uploaded_tick: offerLetterTick,
-        offer_letter_verified: offerLetterTick ? selectedApp.offer_letter_verified : false
+        offer_letter_verified: offerLetterTick ? selectedApp.offer_letter_verified : false,
+
+        application_letter_image: tempApplicationLetterImage || undefined,
+        application_letter_uploaded_at: tempApplicationLetterImage && tempApplicationLetterImage !== selectedApp.application_letter_image ? new Date().toISOString() : selectedApp.application_letter_uploaded_at,
+        application_letter_uploaded_tick: applicationLetterTick,
+        application_letter_verified: applicationLetterTick ? selectedApp.application_letter_verified : false
       };
 
       await onUpdateApplication(updatedApp);
+
+      // Trigger notifications if student ticked "Telah Hantar Surat Permohonan"
+      if (isNewlyTickedLetter) {
+        const studentUser = users.find(u => u.matric_no === selectedApp.student_id || u.username === selectedApp.created_by);
+        const supervisorId = studentUser?.faculty_supervisor_id || selectedApp.faculty_supervisor_id;
+        
+        // Notification to Coordinator
+        await StorageService.createNotification({
+          recipient_id: 'coordinator',
+          recipient_role: UserRole.COORDINATOR,
+          title_ms: `Surat Permohonan Dihantar oleh Pelajar`,
+          title_en: `Application Letter Sent by Student`,
+          message_ms: `Pelajar ${selectedApp.student_name} (${selectedApp.student_id}) telah menandakan bahawa beliau telah menghantar Surat Permohonan ke syarikat ${selectedApp.company_name}.`,
+          message_en: `Student ${selectedApp.student_name} (${selectedApp.student_id}) has marked that they have sent the Application Letter to ${selectedApp.company_name}.`,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          sender_name: selectedApp.student_name,
+          sender_matric: selectedApp.student_id,
+          application_id: selectedApp.id
+        });
+
+        // Notification to Supervisor (if assigned)
+        if (supervisorId) {
+          await StorageService.createNotification({
+            recipient_id: supervisorId,
+            recipient_role: UserRole.LECTURER,
+            title_ms: `Surat Permohonan Dihantar oleh Pelajar Seliaan`,
+            title_en: `Application Letter Sent by Supervised Student`,
+            message_ms: `Pelajar seliaan anda, ${selectedApp.student_name} (${selectedApp.student_id}), telah menandakan bahawa beliau telah menghantar Surat Permohonan ke syarikat ${selectedApp.company_name}.`,
+            message_en: `Your supervised student, ${selectedApp.student_name} (${selectedApp.student_id}), has marked that they have sent the Application Letter to ${selectedApp.company_name}.`,
+            is_read: false,
+            created_at: new Date().toISOString(),
+            sender_name: selectedApp.student_name,
+            sender_matric: selectedApp.student_id,
+            application_id: selectedApp.id
+          });
+        }
+      }
+
       toast.success(language === 'ms' ? 'Dokumen & pengesahan berjaya disimpan!' : 'Documents & verification saved successfully!');
       setModalType(null);
     } catch (err) {
@@ -193,6 +274,22 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     }
   };
 
+  const handleVerifyApplicationLetter = async (app: Application) => {
+    try {
+      const updated: Application = {
+        ...app,
+        application_letter_verified: true,
+        application_letter_verified_by: currentUser.name,
+        application_letter_verified_at: new Date().toISOString()
+      };
+      await onUpdateApplication(updated);
+      setSelectedApp(updated);
+      toast.success(language === 'ms' ? "Surat permohonan disahkan!" : "Application letter verified!");
+    } catch (err) {
+      toast.error("Gagal mengesahkan surat permohonan.");
+    }
+  };
+
   const handleTogglePreferred = async (app: Application) => {
     try {
       const updated: Application = {
@@ -222,6 +319,62 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       );
     } catch (err) {
       toast.error(language === 'ms' ? "Gagal mengemaskini status tawaran." : "Failed to update offer status.");
+    }
+  };
+
+  const handleToggleLetterSent = async (app: Application) => {
+    try {
+      const isNowTicked = !app.application_letter_uploaded_tick;
+      const updated: Application = {
+        ...app,
+        application_letter_uploaded_tick: isNowTicked,
+        application_letter_uploaded_at: isNowTicked ? new Date().toISOString() : app.application_letter_uploaded_at
+      };
+      await onUpdateApplication(updated);
+
+      if (isNowTicked) {
+        const studentUser = users.find(u => u.matric_no === app.student_id || u.username === app.created_by);
+        const supervisorId = studentUser?.faculty_supervisor_id || app.faculty_supervisor_id;
+        
+        // Notification to Coordinator
+        await StorageService.createNotification({
+          recipient_id: 'coordinator',
+          recipient_role: UserRole.COORDINATOR,
+          title_ms: `Surat Permohonan Dihantar oleh Pelajar`,
+          title_en: `Application Letter Sent by Student`,
+          message_ms: `Pelajar ${app.student_name} (${app.student_id}) telah menandakan bahawa beliau telah menghantar Surat Permohonan ke syarikat ${app.company_name}.`,
+          message_en: `Student ${app.student_name} (${app.student_id}) has marked that they have sent the Application Letter to ${app.company_name}.`,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          sender_name: app.student_name,
+          sender_matric: app.student_id,
+          application_id: app.id
+        });
+
+        // Notification to Supervisor (if assigned)
+        if (supervisorId) {
+          await StorageService.createNotification({
+            recipient_id: supervisorId,
+            recipient_role: UserRole.LECTURER,
+            title_ms: `Surat Permohonan Dihantar oleh Pelajar Seliaan`,
+            title_en: `Application Letter Sent by Supervised Student`,
+            message_ms: `Pelajar seliaan anda, ${app.student_name} (${app.student_id}), telah menandakan bahawa beliau telah menghantar Surat Permohonan ke syarikat ${app.company_name}.`,
+            message_en: `Your supervised student, ${app.student_name} (${app.student_id}), has marked that they have sent the Application Letter to ${app.company_name}.`,
+            is_read: false,
+            created_at: new Date().toISOString(),
+            sender_name: app.student_name,
+            sender_matric: app.student_id,
+            application_id: app.id
+          });
+        }
+      }
+
+      toast.success(isNowTicked 
+        ? (language === 'ms' ? 'Ditandakan sebagai sudah menghantar surat permohonan! Notifikasi dihantar.' : 'Marked as application letter sent! Notifications triggered.')
+        : (language === 'ms' ? 'Nyahpilih status penghantaran surat' : 'Removed application letter sent status')
+      );
+    } catch (err) {
+      toast.error(language === 'ms' ? "Gagal mengemaskini status." : "Failed to update status.");
     }
   };
 
@@ -361,7 +514,20 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                                         <span>PILIHAN</span>
                                                                     </button>
                                                                     
-                                                                    <button 
+                                                                    
+                                                                     <button 
+                                                                         onClick={() => handleToggleLetterSent(app)}
+                                                                         className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-black transition-all ${
+                                                                             app.application_letter_uploaded_tick 
+                                                                                 ? 'bg-blue-100 text-blue-800 border-blue-300 shadow-sm' 
+                                                                                 : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                                                         }`}
+                                                                         title="Tanda jika sudah menghantar surat permohonan ke syarikat"
+                                                                     >
+                                                                         <FileText size={10} className={app.application_letter_uploaded_tick ? 'text-blue-600 fill-blue-50' : ''} />
+                                                                         <span>SURAT DIHANTAR</span>
+                                                                     </button>
+<button 
                                                                         onClick={() => handleToggleHasOffer(app)}
                                                                         className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-black transition-all ${
                                                                             app.student_has_offer 
@@ -381,7 +547,12 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                                             <Star size={10} className="fill-amber-500 text-amber-500" /> PILIHAN
                                                                         </span>
                                                                     )}
-                                                                    {app.student_has_offer && (
+                                                                    {app.application_letter_uploaded_tick && (
+                                                                         <span className="inline-flex items-center gap-1 text-[9px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                                                             <FileText size={10} className="text-blue-600" /> SURAT DIHANTAR
+                                                                         </span>
+                                                                     )}
+                                                                     {app.student_has_offer && (
                                                                         <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                                                             <CheckCircle2 size={10} className="text-emerald-600" /> TAWARAN
                                                                         </span>
@@ -394,6 +565,22 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                 
                                                 <div className="mt-4 pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ml-6">
                                                     <div className="flex flex-col gap-1 text-[11px]">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold text-slate-500 w-24">Surat Permohonan:</span>
+                                                            {app.application_letter_image || app.application_letter_uploaded_tick ? (
+                                                                app.application_letter_verified ? (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded text-[9px] border border-green-100">
+                                                                        <CheckCircle size={8} /> DISAHKAN
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded text-[9px] border border-orange-100">
+                                                                        <Clock size={8} /> MENUNGGU VERIFIKASI
+                                                                    </span>
+                                                                )
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-slate-400">BELUM DIHANTAR</span>
+                                                            )}
+                                                        </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-semibold text-slate-500 w-24">Borang Jawapan:</span>
                                                             {app.reply_form_image || app.reply_form_uploaded_tick ? (
@@ -426,9 +613,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                                 <span className="text-[10px] font-bold text-slate-400">BELUM DIHANTAR</span>
                                                             )}
                                                         </div>
-                                                        {(app.reply_form_image || app.offer_letter_image || app.reply_form_uploaded_tick || app.offer_letter_uploaded_tick) && (
+                                                        {(app.application_letter_image || app.reply_form_image || app.offer_letter_image || app.application_letter_uploaded_tick || app.reply_form_uploaded_tick || app.offer_letter_uploaded_tick) && (
                                                             <button 
-                                                                onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
+                                                                onClick={() => { setSelectedApp(app); if (app.application_letter_image || app.application_letter_uploaded_tick) { setActiveDocTab('letter'); } else if (app.reply_form_image || app.reply_form_uploaded_tick) { setActiveDocTab('reply'); } else { setActiveDocTab('offer'); } setModalType('viewPdf'); }}
                                                                 className="mt-1.5 text-blue-600 hover:text-blue-800 font-extrabold flex items-center gap-1 w-fit hover:underline"
                                                             >
                                                                 <Eye size={12} /> Lihat Dokumen / Status
@@ -439,9 +626,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                     <div className="flex items-center gap-1.5 self-end sm:self-auto">
                                                         {hasSystemAccess && (
                                                             <>
-                                                                {(((app.reply_form_image || app.reply_form_uploaded_tick) && !app.reply_form_verified) || ((app.offer_letter_image || app.offer_letter_uploaded_tick) && !app.offer_letter_verified)) && (
+                                                                {(((app.application_letter_image || app.application_letter_uploaded_tick) && !app.application_letter_verified) || ((app.reply_form_image || app.reply_form_uploaded_tick) && !app.reply_form_verified) || ((app.offer_letter_image || app.offer_letter_uploaded_tick) && !app.offer_letter_verified)) && (
                                                                     <button 
-                                                                        onClick={() => { setSelectedApp(app); setActiveDocTab(app.reply_form_image || app.reply_form_uploaded_tick ? 'reply' : 'offer'); setModalType('viewPdf'); }}
+                                                                        onClick={() => { setSelectedApp(app); if (app.application_letter_image || app.application_letter_uploaded_tick) { setActiveDocTab('letter'); } else if (app.reply_form_image || app.reply_form_uploaded_tick) { setActiveDocTab('reply'); } else { setActiveDocTab('offer'); } setModalType('viewPdf'); }}
                                                                         className="px-2.5 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-green-200 shadow-sm"
                                                                         title="Sahkan Dokumen Penempatan"
                                                                     >
@@ -569,14 +756,75 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
         </Modal>
 
         {/* MODAL: MUAT NAIK DOKUMEN & TICK STATUS */}
-        <Modal isOpen={modalType === 'upload'} onClose={() => setModalType(null)} title="Hantar Borang Jawapan & Surat Tawaran">
+        <Modal isOpen={modalType === 'upload'} onClose={() => setModalType(null)} title="Kemaskini Dokumen Penempatan">
             <div className="space-y-6 max-h-[75vh] overflow-y-auto pr-1">
                 <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-xs text-indigo-800">
                     <p className="font-bold mb-1">💡 Arahan Pengesahan Pelajar:</p>
                     <p>Sila tandakan (tick) pilihan di bawah untuk memaklumkan penyelaras, dan muat naik dokumen PDF sokongan sekiranya ada untuk memudahkan proses kelulusan.</p>
                 </div>
 
-                {/* SECTION 1: BORANG JAWAPAN INDUSTRI */}
+                {/* SECTION 1: SURAT PERMOHONAN */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                    <div className="flex items-start gap-2.5">
+                        <button 
+                            type="button"
+                            onClick={() => setApplicationLetterTick(!applicationLetterTick)}
+                            className="mt-0.5 text-indigo-600 hover:scale-105 transition-transform"
+                        >
+                            {applicationLetterTick ? <CheckSquare size={20} className="fill-indigo-50" /> : <Square size={20} />}
+                        </button>
+                        <div>
+                            <label className="text-sm font-bold text-slate-800 block cursor-pointer" onClick={() => setApplicationLetterTick(!applicationLetterTick)}>
+                                Saya mengesahkan telah menghantar Surat Permohonan ke syarikat
+                            </label>
+                            <p className="text-xs text-slate-500 mt-0.5">Tandakan ini jika anda telah menghantar surat permohonan rasmi ke syarikat tersebut.</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-slate-600">Fail PDF Surat Permohonan:</span>
+                            {tempApplicationLetterImage ? (
+                                <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <CheckCircle size={10} /> Telah Dipilih
+                                </span>
+                            ) : (
+                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+                                    Tiada Fail PDF
+                                </span>
+                            )}
+                        </div>
+
+                        <input 
+                            type="file" 
+                            ref={applicationLetterInputRef} 
+                            onChange={handleApplicationLetterFileChange} 
+                            accept="application/pdf" 
+                            className="hidden" 
+                        />
+                        
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => applicationLetterInputRef.current?.click()}
+                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                                <Upload size={14} /> {tempApplicationLetterImage ? "Tukar PDF" : "Muat Naik PDF"}
+                            </button>
+                            {tempApplicationLetterImage && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setTempApplicationLetterImage(''); setApplicationLetterTick(false); }}
+                                    className="px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors"
+                                >
+                                    Padam
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* SECTION 2: BORANG JAWAPAN INDUSTRI */}
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
                     <div className="flex items-start gap-2.5">
                         <button 
@@ -728,14 +976,22 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
         <Modal isOpen={modalType === 'viewPdf'} onClose={() => setModalType(null)} title="Semakan Dokumen & Pengesahan Pelajar">
             <div className="space-y-4">
                 {/* Tabs to select which doc to look at */}
-                <div className="flex bg-slate-100 p-1 rounded-xl">
+                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                    <button
+                        onClick={() => setActiveDocTab('letter')}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                            activeDocTab === 'letter' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        Surat Permohonan
+                    </button>
                     <button
                         onClick={() => setActiveDocTab('reply')}
                         className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                             activeDocTab === 'reply' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                         }`}
                     >
-                        Borang Jawapan Industri
+                        Borang Jawapan
                     </button>
                     <button
                         onClick={() => setActiveDocTab('offer')}
@@ -743,11 +999,82 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             activeDocTab === 'offer' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                         }`}
                     >
-                        Surat Tawaran Syarikat
+                        Surat Tawaran
                     </button>
                 </div>
 
-                {activeDocTab === 'reply' ? (
+                {activeDocTab === 'letter' ? (
+                    <div className="space-y-4">
+                        {/* Information & Ticked State */}
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+                            <div>
+                                <span className="text-[11px] text-slate-500 font-bold block uppercase">Pengesahan Penghantaran (Tick Pelajar)</span>
+                                <span className="text-xs text-slate-800 font-medium">
+                                    {selectedApp?.application_letter_uploaded_tick ? '✅ Pelajar telah tick "Surat Permohonan Dihantar"' : '❌ Belum ditandakan oleh pelajar'}
+                                </span>
+                            </div>
+                            {selectedApp?.application_letter_uploaded_at && (
+                                <div className="text-right">
+                                    <span className="text-[10px] text-slate-400 block">Tarikh Kemas Kini</span>
+                                    <span className="text-xs font-semibold text-slate-600">{new Date(selectedApp.application_letter_uploaded_at).toLocaleDateString()}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* PDF View */}
+                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '400px' }}>
+                            {selectedApp?.application_letter_image ? (
+                                <iframe 
+                                    src={selectedApp.application_letter_image} 
+                                    className="w-full h-full"
+                                    title="PDF Preview Surat Permohonan"
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 italic gap-2">
+                                    <span>Fail PDF Surat Permohonan tidak ditemui.</span>
+                                    <span className="text-xs font-normal text-slate-400">(Pelajar tidak memuat naik fail)</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions & Verification */}
+                        <div className="flex flex-col md:flex-row gap-3">
+                            {hasSystemAccess && !selectedApp?.application_letter_verified && (
+                                <button 
+                                    onClick={() => selectedApp && handleVerifyApplicationLetter(selectedApp)}
+                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-transform active:scale-95"
+                                >
+                                    <FileCheck size={18} /> Lulus / Sahkan Surat Permohonan
+                                </button>
+                            )}
+                            {selectedApp?.application_letter_image && (
+                                <button 
+                                    onClick={() => {
+                                        if (selectedApp?.application_letter_image) {
+                                            const link = document.createElement('a');
+                                            link.href = selectedApp.application_letter_image;
+                                            link.download = `Surat_Permohonan_${selectedApp.student_id}.pdf`;
+                                            link.click();
+                                        }
+                                    }}
+                                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-transform active:scale-95 text-xs text-center"
+                                >
+                                    <Printer size={16} /> Muat Turun
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedApp?.application_letter_verified && (
+                            <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center gap-3">
+                                <CheckCircle size={20} className="text-green-600" />
+                                <div>
+                                    <p className="text-[11px] font-bold text-green-800 uppercase">Surat Permohonan Telah Disahkan</p>
+                                    <p className="text-[10px] text-green-600 italic">Disahkan oleh: {selectedApp.application_letter_verified_by} pada {selectedApp.application_letter_verified_at ? new Date(selectedApp.application_letter_verified_at).toLocaleString() : '-'}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : activeDocTab === 'reply' ? (
                     <div className="space-y-4">
                         {/* Information & Ticked State */}
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">

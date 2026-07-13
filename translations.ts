@@ -389,5 +389,7 @@ export const translations = {
 };
 
 export const t = (lang: Language, key: keyof typeof translations['ms']) => {
-  return translations[lang][key] || translations['ms'][key];
+  const dict = translations[lang] as Record<string, string>;
+  const fallback = translations['ms'] as Record<string, string>;
+  return dict[key as string] || fallback[key as string] || '';
 };
