@@ -2,8 +2,9 @@
 import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
-import { generateLetter } from '../utils/letterGenerator';
-import { FileCheck, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2 } from 'lucide-react';
+import { generateLetter, generateCoverLetter, getCoverLetterText } from '../utils/letterGenerator';
+import { generateResume } from '../utils/resumeGenerator';
+import { FileCheck, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2, Mail, MapPin, Phone, UserCheck, Copy, Send, ExternalLink, User as UserIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 import { StorageService } from '../services/storage';
@@ -22,6 +23,32 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [modalType, setModalType] = useState<'supervisor' | 'upload' | 'viewReply' | 'letter' | 'statusConfirm' | 'viewPdf' | 'cancelConfirm' | null>(null);
   const [statusConfirmData, setStatusConfirmData] = useState<{ app: Application; newStatus: any } | null>(null);
+  
+  // States for Email Modal
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailTargetApp, setEmailTargetApp] = useState<Application | null>(null);
+  const [emailTargetCompany, setEmailTargetCompany] = useState<Company | undefined>(undefined);
+  const [emailStudentUser, setEmailStudentUser] = useState<User | null>(null);
+  const [emailRecipient, setEmailRecipient] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+
+  const handleOpenEmailModal = (app: Application, company: Company | undefined, student: User) => {
+    setEmailTargetApp(app);
+    setEmailTargetCompany(company);
+    setEmailStudentUser(student);
+    
+    const recipient = company?.company_contact_email || '';
+    const subject = language === 'ms' 
+      ? `Permohonan Penempatan Work-Based Learning (WBL) - ${student.name} (${student.matric_no})`
+      : `Application for Work-Based Learning (WBL) Placement - ${student.name} (${student.matric_no})`;
+    const body = getCoverLetterText(app, company, student, language);
+
+    setEmailRecipient(recipient);
+    setEmailSubject(subject);
+    setEmailBody(body);
+    setIsEmailModalOpen(true);
+  };
   
   // States and refs for dual upload/tick functionality
   const replyFormInputRef = useRef<HTMLInputElement>(null);
@@ -473,6 +500,10 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                         const isPreferred = !!app.student_preferred;
                                         const hasOffer = !!app.student_has_offer;
                                         const isTicked = isPreferred || hasOffer;
+                                        const targetCompany = companies.find(c => 
+                                          c.company_name.trim().toLowerCase() === app.company_name.trim().toLowerCase()
+                                        );
+                                        const studentUser = users.find(u => u.matric_no === app.student_id || u.username === app.created_by) || currentUser;
                                         
                                         const cardClass = isTicked
                                             ? "bg-emerald-50/80 border border-emerald-300 rounded-xl p-4 shadow-sm transition-all"
@@ -480,13 +511,56 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                         
                                         return (
                                             <div key={app.id} className={cardClass}>
-                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                                    <div>
+                                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                                                    <div className="flex-1">
                                                         <div className="flex items-center gap-2">
                                                             <Building2 size={16} className={isTicked ? 'text-emerald-600' : 'text-slate-400'} />
                                                             <h4 className="font-bold text-slate-900 text-sm">{app.company_name}</h4>
                                                         </div>
                                                         <p className="text-xs text-slate-500 mt-0.5 ml-6">{app.company_state}</p>
+
+                                                        {/* Interactive Company Contact & Address Card */}
+                                                        <div className="mt-3 ml-6 p-3 bg-white/90 rounded-lg border border-slate-200/90 shadow-2xs space-y-2 text-xs">
+                                                          <div className="flex items-start gap-2 text-slate-700">
+                                                            <MapPin size={13} className="text-slate-400 mt-0.5 shrink-0" />
+                                                            <span className="font-medium leading-tight">
+                                                              <span className="text-[10px] text-slate-400 font-semibold block uppercase">Alamat Syarikat</span>
+                                                              {targetCompany?.company_address || `${app.company_district}, ${app.company_state}`}
+                                                            </span>
+                                                          </div>
+
+                                                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-slate-700">
+                                                            <div className="flex items-center gap-1.5">
+                                                              <UserCheck size={13} className="text-indigo-500 shrink-0" />
+                                                              <div className="min-w-0">
+                                                                <span className="text-[9px] text-slate-400 font-bold block uppercase">Pegawai PIC</span>
+                                                                <span className="font-bold text-slate-800 text-[11px] truncate block">{targetCompany?.company_contact_person || 'Pengurus HR'}</span>
+                                                              </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-1.5">
+                                                              <Phone size={13} className="text-emerald-500 shrink-0" />
+                                                              <div className="min-w-0">
+                                                                <span className="text-[9px] text-slate-400 font-bold block uppercase">No. Telefon</span>
+                                                                <span className="font-bold text-slate-800 text-[11px] truncate block">{targetCompany?.company_contact_phone || 'Tiada No. Tel'}</span>
+                                                              </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-1.5">
+                                                              <Mail size={13} className="text-blue-500 shrink-0" />
+                                                              <div className="min-w-0">
+                                                                <span className="text-[9px] text-slate-400 font-bold block uppercase">E-mel Syarikat</span>
+                                                                {targetCompany?.company_contact_email ? (
+                                                                  <a href={`mailto:${targetCompany.company_contact_email}`} className="font-extrabold text-blue-600 hover:underline text-[11px] truncate block">
+                                                                    {targetCompany.company_contact_email}
+                                                                  </a>
+                                                                ) : (
+                                                                  <span className="font-medium text-slate-400 text-[11px]">Tiada E-mel</span>
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                        </div>
                                                     </div>
                                                     
                                                     <div className="flex flex-wrap items-center gap-2 ml-6 md:ml-0">
@@ -663,17 +737,45 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                         {currentUser.role === UserRole.STUDENT && (
                                                             <>
                                                                 <button 
-                                                                    onClick={() => { setSelectedApp(app); setModalType('letter'); }} 
-                                                                    className="p-1.5 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors border border-purple-200" 
-                                                                    title={t(language, 'appJanaSurat')}
+                                                                    onClick={() => generateCoverLetter(app, targetCompany, studentUser, language)} 
+                                                                    className="px-2.5 py-1 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-amber-200 shadow-2xs transition-colors" 
+                                                                    title="Jana Surat Iringan (Cover Letter)"
                                                                 >
-                                                                    <Printer size={14} />
+                                                                    <FileText size={12} />
+                                                                    <span>Surat Iringan</span>
+                                                                </button>
+
+                                                                <button 
+                                                                    onClick={() => generateLetter(app, targetCompany, studentUser, language)} 
+                                                                    className="px-2.5 py-1 bg-purple-100 text-purple-800 hover:bg-purple-200 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-purple-200 shadow-2xs transition-colors" 
+                                                                    title="Jana Surat Sokongan Fakulti"
+                                                                >
+                                                                    <Printer size={12} />
+                                                                    <span>Surat Fakulti</span>
+                                                                </button>
+
+                                                                <button 
+                                                                    onClick={() => generateResume(studentUser, language, 'modern-blue', users)} 
+                                                                    className="px-2.5 py-1 bg-slate-100 text-slate-800 hover:bg-slate-200 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-slate-200 shadow-2xs transition-colors" 
+                                                                    title="Jana Resume Pelajar"
+                                                                >
+                                                                    <UserIcon size={12} />
+                                                                    <span>Resume</span>
+                                                                </button>
+
+                                                                <button 
+                                                                    onClick={() => handleOpenEmailModal(app, targetCompany, studentUser)} 
+                                                                    className="px-2.5 py-1 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all" 
+                                                                    title="Hantar E-mel Surat Fakulti, Resume & Surat Iringan"
+                                                                >
+                                                                    <Mail size={12} />
+                                                                    <span>E-Mel Direct</span>
                                                                 </button>
                                                                 
                                                                 {app.application_status === 'Diluluskan' && (
                                                                     <button 
                                                                         onClick={() => openUploadModal(app)}
-                                                                        className="px-2.5 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-blue-200 shadow-sm"
+                                                                        className="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-emerald-200 shadow-2xs transition-colors"
                                                                         title="Hantar Borang & Surat"
                                                                     >
                                                                         <Upload size={12} />
@@ -1219,6 +1321,195 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                 )}
             </div>
         </Modal>
+
+        {/* Modal E-Mel Permohonan Direct */}
+        {isEmailModalOpen && emailTargetApp && (
+          <Modal
+            isOpen={isEmailModalOpen}
+            onClose={() => setIsEmailModalOpen(false)}
+            title="Hantar E-mel Permohonan Penempatan Syarikat"
+          >
+            <div className="space-y-4 text-sm text-slate-700 max-h-[80vh] overflow-y-auto pr-1">
+              {/* Ringkasan Syarikat & Penerima */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                <div className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <Building2 size={18} className="text-blue-600" />
+                  <span>{emailTargetCompany?.company_name || emailTargetApp.company_name}</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-500 block">Pegawai PIC:</span>
+                    <span className="font-medium text-slate-800">{emailTargetCompany?.company_contact_person || 'Pengurus Sumber Manusia'}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500 block">No. Telefon:</span>
+                    <span className="font-medium text-slate-800">{emailTargetCompany?.company_contact_phone || 'Tiada No. Tel'}</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="font-semibold text-slate-500 block">Alamat Syarikat:</span>
+                    <span className="font-medium text-slate-800">{emailTargetCompany?.company_address || `${emailTargetApp.company_district}, ${emailTargetApp.company_state}`}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input E-mel & Subjek */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    E-mel Syarikat Penerima
+                  </label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="email"
+                      value={emailRecipient}
+                      onChange={(e) => setEmailRecipient(e.target.value)}
+                      placeholder="contoh: hr@syarikat.com"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Tajuk / Subjek E-mel
+                  </label>
+                  <input
+                    type="text"
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Cetak & Jana Dokumen Lampiran */}
+              <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200/80 space-y-2">
+                <div className="font-bold text-blue-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                  <FileText size={14} className="text-blue-600" />
+                  <span>Jana / Cetak Dokumen Lampiran Berkaitan:</span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Gunakan butang di bawah untuk menjana & menyimpan dokumen PDF yang ingin dilampirkan bersama e-mel anda:
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => emailStudentUser && generateCoverLetter(emailTargetApp, emailTargetCompany, emailStudentUser, language)}
+                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <FileText size={13} />
+                    <span>Surat Iringan</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => emailStudentUser && generateLetter(emailTargetApp, emailTargetCompany, emailStudentUser, language)}
+                    className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <Printer size={13} />
+                    <span>Surat Sokongan Fakulti</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => emailStudentUser && generateResume(emailStudentUser, language, 'modern-blue', users)}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <UserIcon size={13} />
+                    <span>Resume Pelajar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Kandungan Teks E-mel */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Kandungan E-mel (Surat Iringan Draft)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailBody);
+                      toast.success(language === 'ms' ? 'Teks e-mel berjaya disalin!' : 'Email text copied!');
+                    }}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
+                  >
+                    <Copy size={12} />
+                    <span>Salin Teks</span>
+                  </button>
+                </div>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  rows={9}
+                  className="w-full p-3 text-xs border border-slate-300 rounded-lg font-mono leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50"
+                />
+              </div>
+
+              {/* Butang Tindakan Hantar */}
+              <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEmailModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-colors"
+                >
+                  Tutup
+                </button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailBody);
+                      toast.success('Teks e-mel disalin ke papan klip! Anda boleh tampal di e-mel anda.');
+                    }}
+                    className="px-3 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-slate-300 transition-colors"
+                  >
+                    <Copy size={13} />
+                    <span>Salin Teks E-mel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!emailRecipient) {
+                        toast.error('Sila masukkan e-mel syarikat penerima.');
+                        return;
+                      }
+                      const mailtoUrl = `mailto:${encodeURIComponent(emailRecipient)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      window.location.href = mailtoUrl;
+                      toast.success('Membuka aplikasi e-mel...');
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Send size={13} />
+                    <span>Hantar via App E-mel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!emailRecipient) {
+                        toast.error('Sila masukkan e-mel syarikat penerima.');
+                        return;
+                      }
+                      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailRecipient)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      window.open(gmailUrl, '_blank');
+                      toast.success('Membuka Gmail Web...');
+                    }}
+                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Gmail Web</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Modal>
+        )}
     </div>
   );
 };

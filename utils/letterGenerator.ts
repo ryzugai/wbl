@@ -505,3 +505,247 @@ export const downloadLOIWord = (company: Company) => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+export const getCoverLetterText = (
+  application: Application,
+  company: Company | undefined,
+  student: User,
+  language: 'ms' | 'en' = 'ms'
+): string => {
+  const pic = company?.company_contact_person || 'Pengurus Sumber Manusia / Penyelaras Latihan Industri';
+  const companyName = company?.company_name || application.company_name;
+  const program = student.program || 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian';
+
+  if (language === 'en') {
+    return `Dear ${pic},
+${companyName}
+
+Subject: APPLICATION FOR WORK-BASED LEARNING (WBL) / INDUSTRIAL TRAINING PLACEMENT
+
+With reference to the above matter, I would like to express my keen interest in applying for a Work-Based Learning (WBL) / Industrial Training placement at ${companyName}.
+
+I am currently a final-year student pursuing ${program} at the Faculty of Technology Management and Technopreneurship (FPTT), Universiti Teknikal Malaysia Melaka (UTeM) (Matric No: ${student.matric_no}).
+
+Attached herewith are the required official supporting documents for your kind review and consideration:
+1. UTeM Faculty Support Letter (Surat Sokongan Fakulti)
+2. Student Resume (Curriculum Vitae)
+3. Cover Letter (Surat Iringan Permohonan)
+
+I am eager to contribute my technical, management, and problem-solving skills to your esteemed organization. Should you require any further information, please feel free to contact me at ${student.phone || '-'} or via email at ${student.email || '-'}.
+
+Thank you very much for your time and kind consideration.
+
+Yours sincerely,
+
+${student.name}
+Matric No: ${student.matric_no}
+Phone: ${student.phone || '-'}
+Email: ${student.email || '-'}
+Universiti Teknikal Malaysia Melaka (UTeM)`;
+  }
+
+  return `Kepada ${pic},
+${companyName}
+
+Tuan/Puan,
+
+PERMOHONAN PENEMPATAN WORK-BASED LEARNING (WBL) / LATIHAN INDUSTRI
+
+Dengan segala hormatnya, perkara di atas adalah dirujuk.
+
+Saya ${student.name} (No. Matrik: ${student.matric_no}), pelajar tahun akhir program ${program} dari Fakulti Pengurusan Teknologi dan Teknousahawanan (FPTT), Universiti Teknikal Malaysia Melaka (UTeM) ingin memohon penempatan Work-Based Learning (WBL) / Latihan Industri di syarikat Tuan/Puan.
+
+Bersama-sama e-mel ini, saya sertakan dokumen-dokumen sokongan rasmi untuk pertimbangan pihak Tuan/Puan:
+1. Surat Sokongan Rasmi Fakulti UTeM
+2. Resume Terperinci Pelajar (Curriculum Vitae)
+3. Surat Iringan Permohonan (Cover Letter)
+
+Saya amat berharap dapat diberikan peluang untuk menimba pengalaman praktikal dan menyumbang kemahiran saya di syarikat Tuan/Puan. Sebarang maklumat lanjut, pihak Tuan/Puan boleh menghubungi saya di talian ${student.phone || '-'} atau e-mel ${student.email || '-'}.
+
+Kerjasama dan pertimbangan positif daripada pihak Tuan/Puan amat saya hargai.
+
+Sekian, terima kasih.
+
+Yang benar,
+
+${student.name}
+No. Matrik: ${student.matric_no}
+No. Telefon: ${student.phone || '-'}
+E-mel: ${student.email || '-'}
+Universiti Teknikal Malaysia Melaka (UTeM)`;
+};
+
+export const generateCoverLetter = (
+  application: Application,
+  company: Company | undefined,
+  student: User,
+  language: 'ms' | 'en' = 'ms'
+) => {
+  const letterWindow = window.open('', '_blank');
+  if (!letterWindow) {
+    alert("Pop-up blocked. Sila benarkan pop-up untuk menjana Surat Iringan.");
+    return;
+  }
+
+  const today = new Date();
+  const dateOptions: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = today.toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-GB', dateOptions);
+
+  const pic = company?.company_contact_person || 'PENGURUS SUMBER MANUSIA / PENYELIA LATIHAN INDUSTRI';
+  const companyName = company?.company_name || application.company_name;
+  const companyAddress = company?.company_address || `${application.company_district}, ${application.company_state}`;
+  const programName = student.program || "Ijazah Sarjana Muda Teknousahawanan dengan Kepujian";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="${language}">
+    <head>
+      <meta charset="UTF-8">
+      <title>Surat Iringan Permohonan WBL - ${student.name}</title>
+      <style>
+        @page { size: A4; margin: 20mm 20mm; }
+        body { 
+          font-family: Arial, sans-serif; 
+          font-size: 11pt; 
+          line-height: 1.5; 
+          color: #111827; 
+          max-width: 800px; 
+          margin: 0 auto; 
+          padding: 20px;
+        }
+        .header-section {
+          border-bottom: 2px solid #1e3a8a;
+          padding-bottom: 12px;
+          margin-bottom: 20px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+        .student-info { font-size: 10pt; line-height: 1.35; }
+        .student-name { font-size: 14pt; font-weight: bold; color: #1e3a8a; text-transform: uppercase; margin-bottom: 4px; }
+        .date-ref { text-align: right; font-size: 10pt; color: #374151; font-weight: bold; }
+        .recipient-box {
+          background-color: #f8fafc;
+          border-left: 4px solid #1e3a8a;
+          padding: 12px 16px;
+          margin-bottom: 20px;
+          font-size: 10.5pt;
+          line-height: 1.4;
+          border-radius: 0 6px 6px 0;
+        }
+        .subject {
+          font-weight: bold;
+          font-size: 11pt;
+          text-decoration: underline;
+          text-transform: uppercase;
+          margin-bottom: 15px;
+          color: #0f172a;
+        }
+        p { margin-bottom: 12px; text-align: justify; }
+        .doc-list {
+          margin: 10px 0 15px 20px;
+          padding-left: 10px;
+        }
+        .doc-list li { margin-bottom: 5px; font-weight: bold; color: #1e3a8a; }
+        .signature-block { margin-top: 30px; line-height: 1.4; }
+        .computer-gen {
+          margin-top: 40px;
+          font-size: 8.5pt;
+          font-style: italic;
+          color: #6b7280;
+          border-top: 1px dashed #d1d5db;
+          padding-top: 8px;
+          text-align: center;
+        }
+        .print-btn { 
+          position: fixed; 
+          top: 20px; 
+          right: 20px; 
+          padding: 10px 20px; 
+          background: #1e3a8a; 
+          color: white; 
+          border: none; 
+          cursor: pointer; 
+          border-radius: 6px; 
+          font-weight: bold; 
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+          z-index: 1000; 
+        }
+        @media print { .print-btn { display: none; } }
+      </style>
+    </head>
+    <body>
+      <button class="print-btn" onclick="window.print()">Cetak / Simpan PDF</button>
+
+      <div class="header-section">
+        <div class="student-info">
+          <div class="student-name">${student.name}</div>
+          <div>No. Matrik: <strong>${student.matric_no}</strong></div>
+          <div>No. K/P: ${student.ic_no || '-'}</div>
+          <div>Program: ${programName}</div>
+          <div>Fakulti Pengurusan Teknologi dan Teknousahawanan (FPTT)</div>
+          <div>Universiti Teknikal Malaysia Melaka (UTeM)</div>
+          <div>E-mel: ${student.email || '-'} | No. Tel: ${student.phone || '-'}</div>
+        </div>
+        <div class="date-ref">
+          Tarikh: ${formattedDate}
+        </div>
+      </div>
+
+      <div class="recipient-box">
+        <strong>${pic.toUpperCase()}</strong><br>
+        <strong>${companyName.toUpperCase()}</strong><br>
+        ${companyAddress.replace(/\n/g, '<br>')}<br>
+        ${company?.company_contact_phone ? `Tel: ${company.company_contact_phone}<br>` : ''}
+        ${company?.company_contact_email ? `E-mel: ${company.company_contact_email}` : ''}
+      </div>
+
+      <div style="margin-bottom: 12px; font-weight: bold;">Tuan / Puan,</div>
+
+      <div class="subject">
+        PERMOHONAN PENEMPATAN WORK-BASED LEARNING (WBL) / LATIHAN INDUSTRI
+      </div>
+
+      <p>Dengan segala hormatnya, perkara di atas adalah dirujuk.</p>
+
+      <p>
+        2. Saya, <strong>${student.name.toUpperCase()}</strong> (No. Matrik: <strong>${student.matric_no}</strong>), merupakan pelajar tahun akhir program <strong>${programName}</strong> dari Fakulti Pengurusan Teknologi dan Teknousahawanan (FPTT), Universiti Teknikal Malaysia Melaka (UTeM). Saya ingin mengemukakan permohonan rasmi untuk menjalani penempatan Work-Based Learning (WBL) / Latihan Industri di syarikat Tuan/Puan bagi tempoh pengajian industri yang ditetapkan.
+      </p>
+
+      <p>
+        3. Berdasarkan latar belakang akademik dan pendedahan praktikal yang telah saya terima di UTeM, saya yakin dapat menyesuaikan diri dengan persekitaran kerja profesional di syarikat Tuan/Puan serta memberikan sumbangan yang positif dan berkesan terhadap operasi dan projek syarikat.
+      </p>
+
+      <p>
+        4. Bersama-sama surat iringan ini, saya lampirkan dokumen-dokumen sokongan rasmi bagi permohonan saya:
+      </p>
+
+      <ul class="doc-list">
+        <li>Surat Sokongan Rasmi Fakulti UTeM</li>
+        <li>Resume Terperinci Pelajar (Curriculum Vitae)</li>
+        <li>Borang Akuan / Jawapan Penerimaan Penempatan</li>
+      </ul>
+
+      <p>
+        5. Saya amat berbesar hati sekiranya pihak Tuan/Puan dapat memberikan pertimbangan yang sewajarnya terhadap permohonan ini. Sebarang maklum balas atau perbincangan lanjut boleh disampaikan melalui talian <strong>${student.phone || '-'}</strong> atau e-mel <strong>${student.email || '-'}</strong>.
+      </p>
+
+      <p>Segala kerjasama dan perhatian pihak Tuan/Puan amat saya hargai dan didahului dengan ucapan terima kasih.</p>
+
+      <div class="signature-block">
+        Yang benar,<br><br><br>
+        <strong>(${student.name.toUpperCase()})</strong><br>
+        Pelajar Work-Based Learning (WBL)<br>
+        Universiti Teknikal Malaysia Melaka (UTeM)
+      </div>
+
+      <div class="computer-gen">
+        Surat iringan ini dijana secara digital menerusi Sistem Pengurusan WBL UTeM.
+      </div>
+    </body>
+    </html>
+  `;
+
+  letterWindow.document.write(htmlContent);
+  letterWindow.document.close();
+};
