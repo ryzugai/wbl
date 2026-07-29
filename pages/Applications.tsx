@@ -43,18 +43,20 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     const recipient = company?.company_contact_email || '';
 
     // Calculate CC emails for Coordinator & Faculty Supervisor
+    const defaultCoordinatorEmail = 'guzairy@utem.edu.my';
     const coordinatorUser = users.find(u => u.role === UserRole.COORDINATOR || u.username === 'guzairy' || u.is_jkwbl);
-    const coordinatorEmail = coordinatorUser?.email || COORDINATOR_ACCOUNT.email || 'guzairy@utem.edu.my';
+    const coordinatorEmail = coordinatorUser?.email || COORDINATOR_ACCOUNT.email || defaultCoordinatorEmail;
 
     const supervisorId = app.faculty_supervisor_id || student.faculty_supervisor_id;
     const supervisorUser = users.find(u => u.id === supervisorId || u.staff_id === app.faculty_supervisor_staff_id);
     const supervisorEmail = app.faculty_supervisor_email || student.faculty_supervisor_email || supervisorUser?.email || '';
 
-    const ccList: string[] = [];
-    if (coordinatorEmail && coordinatorEmail.trim()) {
+    const ccList: string[] = ['guzairy@utem.edu.my'];
+    
+    if (coordinatorEmail && coordinatorEmail.trim() && !ccList.some(e => e.toLowerCase() === coordinatorEmail.trim().toLowerCase())) {
       ccList.push(coordinatorEmail.trim());
     }
-    if (supervisorEmail && supervisorEmail.trim() && !ccList.includes(supervisorEmail.trim())) {
+    if (supervisorEmail && supervisorEmail.trim() && !ccList.some(e => e.toLowerCase() === supervisorEmail.trim().toLowerCase())) {
       ccList.push(supervisorEmail.trim());
     }
 
