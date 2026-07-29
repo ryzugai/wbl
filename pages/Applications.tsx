@@ -4,10 +4,11 @@ import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
 import { generateLetter, generateCoverLetter, getCoverLetterText } from '../utils/letterGenerator';
 import { generateResume } from '../utils/resumeGenerator';
-import { FileCheck, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2, Mail, MapPin, Phone, UserCheck, Copy, Send, ExternalLink, User as UserIcon } from 'lucide-react';
+import { FileCheck, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2, Mail, MapPin, Phone, UserCheck, Copy, Send, ExternalLink, User as UserIcon, MailCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 import { StorageService } from '../services/storage';
+import { COORDINATOR_ACCOUNT } from '../constants';
 
 interface ApplicationsProps {
   currentUser: User;
@@ -30,6 +31,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   const [emailTargetCompany, setEmailTargetCompany] = useState<Company | undefined>(undefined);
   const [emailStudentUser, setEmailStudentUser] = useState<User | null>(null);
   const [emailRecipient, setEmailRecipient] = useState('');
+  const [emailCc, setEmailCc] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
 
@@ -39,15 +41,50 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
     setEmailStudentUser(student);
     
     const recipient = company?.company_contact_email || '';
+
+    // Calculate CC emails for Coordinator & Faculty Supervisor
+    const coordinatorUser = users.find(u => u.role === UserRole.COORDINATOR || u.username === 'guzairy' || u.is_jkwbl);
+    const coordinatorEmail = coordinatorUser?.email || COORDINATOR_ACCOUNT.email || 'guzairy@utem.edu.my';
+
+    const supervisorId = app.faculty_supervisor_id || student.faculty_supervisor_id;
+    const supervisorUser = users.find(u => u.id === supervisorId || u.staff_id === app.faculty_supervisor_staff_id);
+    const supervisorEmail = app.faculty_supervisor_email || student.faculty_supervisor_email || supervisorUser?.email || '';
+
+    const ccList: string[] = [];
+    if (coordinatorEmail && coordinatorEmail.trim()) {
+      ccList.push(coordinatorEmail.trim());
+    }
+    if (supervisorEmail && supervisorEmail.trim() && !ccList.includes(supervisorEmail.trim())) {
+      ccList.push(supervisorEmail.trim());
+    }
+
     const subject = language === 'ms' 
-      ? `Permohonan Penempatan Work-Based Learning (WBL) - ${student.name} (${student.matric_no})`
-      : `Application for Work-Based Learning (WBL) Placement - ${student.name} (${student.matric_no})`;
+      ? `Permohonan Penempatan Work-Based Learning (WBL) - ${student.name} (${student.matric_no || app.student_id})`
+      : `Application for Work-Based Learning (WBL) Placement - ${student.name} (${student.matric_no || app.student_id})`;
     const body = getCoverLetterText(app, company, student, language);
 
     setEmailRecipient(recipient);
+    setEmailCc(ccList.join(', '));
     setEmailSubject(subject);
     setEmailBody(body);
     setIsEmailModalOpen(true);
+  };
+
+  const handleMarkAppAsEmailed = async (app: Application) => {
+    try {
+      const updatedApp: Application = {
+        ...app,
+        is_emailed: true,
+        emailed_at: new Date().toISOString()
+      };
+      await StorageService.updateApplication(updatedApp);
+      if (onUpdateApplication) {
+        await onUpdateApplication(updatedApp);
+      }
+      setEmailTargetApp(updatedApp);
+    } catch (err) {
+      console.error('Gagal kemaskini status emel', err);
+    }
   };
   
   // States and refs for dual upload/tick functionality
@@ -513,9 +550,15 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                             <div key={app.id} className={cardClass}>
                                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
                                                     <div className="flex-1">
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
                                                             <Building2 size={16} className={isTicked ? 'text-emerald-600' : 'text-slate-400'} />
                                                             <h4 className="font-bold text-slate-900 text-sm">{app.company_name}</h4>
+                                                            {app.is_emailed && (
+                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-300 shadow-2xs">
+                                                                    <MailCheck size={12} className="text-blue-600" />
+                                                                    <span>Permohonan Telah Di-emel</span>
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <p className="text-xs text-slate-500 mt-0.5 ml-6">{app.company_state}</p>
 
@@ -1357,7 +1400,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    E-mel Syarikat Penerima
+                    E-mel Syarikat Penerima (Kepada / To)
                   </label>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3 top-2.5 text-slate-400" />
@@ -1369,6 +1412,26 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                       className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>CC (Salinan Kepada: Penyelaras WBL & Penyelia Fakulti)</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Auto-diisi dari sistem</span>
+                  </label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-2.5 text-indigo-500" />
+                    <input
+                      type="text"
+                      value={emailCc}
+                      onChange={(e) => setEmailCc(e.target.value)}
+                      placeholder="penyelaras@utem.edu.my, penyelia@utem.edu.my"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium text-indigo-950 bg-indigo-50/20"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Salinan e-mel ini akan dihantar secara automatik kepada Penyelaras WBL dan Penyelia Fakulti anda.
+                  </p>
                 </div>
 
                 <div>
@@ -1479,9 +1542,13 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         toast.error('Sila masukkan e-mel syarikat penerima.');
                         return;
                       }
-                      const mailtoUrl = `mailto:${encodeURIComponent(emailRecipient)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      if (emailTargetApp) {
+                        handleMarkAppAsEmailed(emailTargetApp);
+                      }
+                      const ccQuery = emailCc ? `cc=${encodeURIComponent(emailCc)}&` : '';
+                      const mailtoUrl = `mailto:${encodeURIComponent(emailRecipient)}?${ccQuery}subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
                       window.location.href = mailtoUrl;
-                      toast.success('Membuka aplikasi e-mel...');
+                      toast.success('Membuka aplikasi e-mel & menandakan permohonan sebagai telah di-emel!');
                     }}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all"
                   >
@@ -1496,9 +1563,13 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                         toast.error('Sila masukkan e-mel syarikat penerima.');
                         return;
                       }
-                      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailRecipient)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+                      if (emailTargetApp) {
+                        handleMarkAppAsEmailed(emailTargetApp);
+                      }
+                      const ccQuery = emailCc ? `&cc=${encodeURIComponent(emailCc)}` : '';
+                      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailRecipient)}${ccQuery}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
                       window.open(gmailUrl, '_blank');
-                      toast.success('Membuka Gmail Web...');
+                      toast.success('Membuka Gmail Web & menandakan permohonan sebagai telah di-emel!');
                     }}
                     className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all"
                   >

@@ -117,6 +117,8 @@ export interface Application {
   application_letter_verified_at?: string;
   student_preferred?: boolean;
   student_has_offer?: boolean;
+  is_emailed?: boolean;
+  emailed_at?: string;
   created_by: string;
   created_at: string;
 }
