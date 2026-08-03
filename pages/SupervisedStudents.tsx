@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { User, Application, UserRole } from '../types';
 import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { DocumentViewer } from '../components/DocumentViewer';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
 
@@ -344,36 +345,19 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                 <p className="text-xs text-blue-600 mt-1 uppercase font-bold">{selectedApp?.company_name}</p>
             </div>
 
-            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative shadow-inner" style={{ height: '500px' }}>
-                {selectedApp?.reply_form_image ? (
-                    <iframe 
-                        src={selectedApp.reply_form_image} 
-                        className="w-full h-full"
-                        title="PDF Preview"
-                    />
-                ) : (
-                    <div className="flex items-center justify-center h-full text-slate-400 italic">Fail tidak ditemui.</div>
-                )}
-            </div>
+            <DocumentViewer 
+                fileUrl={selectedApp?.reply_form_image}
+                docTitle="Borang Jawapan Industri"
+                studentName={selectedApp?.student_name}
+                matricNo={selectedApp?.student_id}
+                downloadFileName={`Borang_Jawapan_${selectedApp?.student_id || 'Pelajar'}`}
+            />
 
             <div className="flex flex-col gap-3">
                 <div className="flex gap-3">
                   <button 
-                      onClick={() => {
-                          if (selectedApp?.reply_form_image) {
-                              const link = document.createElement('a');
-                              link.href = selectedApp.reply_form_image;
-                              link.download = `Borang_Jawapan_${selectedApp.student_id}.pdf`;
-                              link.click();
-                          }
-                      }}
-                      className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95"
-                  >
-                      <Printer size={20} /> Muat Turun PDF
-                  </button>
-                  <button 
                       onClick={() => setIsPdfModalOpen(false)}
-                      className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200"
+                      className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 text-xs"
                   >
                       {t(language, 'cancel')}
                   </button>
@@ -382,9 +366,9 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                 {selectedApp?.reply_form_image && !selectedApp.reply_form_verified && (
                     <button 
                         onClick={() => selectedApp && handleVerifyBorang(selectedApp)}
-                        className="w-full py-4 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-all active:scale-[0.98]"
+                        className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-all active:scale-[0.98] text-xs"
                     >
-                        <FileCheck size={20} />
+                        <FileCheck size={18} />
                         Sahkan Borang Jawapan
                     </button>
                 )}

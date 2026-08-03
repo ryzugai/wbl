@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 import { StorageService } from '../services/storage';
 import { COORDINATOR_ACCOUNT } from '../constants';
+import { DocumentViewer } from '../components/DocumentViewer';
 
 interface ApplicationsProps {
   currentUser: User;
@@ -102,135 +103,71 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   const [activeDocTab, setActiveDocTab] = useState<'letter' | 'reply' | 'offer'>('letter');
   const [isUploading, setIsUploading] = useState(false);
   
-  const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl;
+  const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER || currentUser.is_jkwbl;
 
-  const filteredApps = applications.filter(app => {
-    if (currentUser.role === UserRole.STUDENT) return app.created_by === currentUser.username;
-    if (currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) return app.company_name === currentUser.company_affiliation;
-    return true;
-  });
+  const validateAndReadFile = (file: File, docName: string, onSuccess: (base64: string) => void) => {
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error(language === 'ms' 
+        ? `Saiz fail ${docName} melebihi had 5MB (${(file.size / (1024 * 1024)).toFixed(1)}MB). Sila muat naik fail kurang daripada 5MB.` 
+        : `File size exceeds 5MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please upload a file smaller than 5MB.`);
+      return;
+    }
 
-  const handleConfirmStatusChange = async () => {
-    if (!statusConfirmData) return;
-    await onUpdateApplication({ ...statusConfirmData.app, application_status: statusConfirmData.newStatus });
-    setModalType(null);
-    setStatusConfirmData(null);
-    toast.success(language === 'ms' ? 'Status dikemaskini' : 'Status updated');
-  };
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error(language === 'ms' 
+        ? 'Format fail tidak sah. Sila muat naik fail PDF atau Imej (JPG / PNG).' 
+        : 'Invalid format. Please upload a PDF or Image (JPG / PNG) file.');
+      return;
+    }
 
-  const handleCancelApplication = async () => {
-    if (!selectedApp || !onDeleteApplication) return;
-    await onDeleteApplication(selectedApp.id);
-    setModalType(null);
-    setSelectedApp(null);
-  };
-
-  const openUploadModal = (app: Application) => {
-    setSelectedApp(app);
-    setTempReplyFormImage(app.reply_form_image || '');
-    setTempOfferLetterImage(app.offer_letter_image || '');
-    setTempApplicationLetterImage(app.application_letter_image || '');
-    setReplyFormTick(!!app.reply_form_uploaded_tick);
-    setOfferLetterTick(!!app.offer_letter_uploaded_tick);
-    setApplicationLetterTick(!!app.application_letter_uploaded_tick);
-    setActiveDocTab('letter');
-    setModalType('upload');
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const base64String = evt.target?.result as string;
+        onSuccess(base64String);
+      } catch (err) {
+        toast.error("Gagal membaca fail.");
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleApplicationLetterFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSize = 20 * 1024 * 1024; // 20MB
-    if (file.size > maxSize) {
-      toast.error(t(language, 'appFileTooLarge'));
-      return;
-    }
-
-    if (file.type !== 'application/pdf') {
-      toast.error(t(language, 'appInvalidFormat'));
-      return;
-    }
-
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const base64String = evt.target?.result as string;
-        setTempApplicationLetterImage(base64String);
-        setApplicationLetterTick(true);
-        toast.success(language === 'ms' ? 'Surat permohonan sedia disimpan.' : 'Application letter ready to save.');
-      } catch (err) {
-        toast.error("Gagal membaca fail.");
-      } finally {
-        setIsUploading(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    validateAndReadFile(file, 'Surat Permohonan', (base64String) => {
+      setTempApplicationLetterImage(base64String);
+      setApplicationLetterTick(true);
+      toast.success(language === 'ms' ? 'Surat permohonan sedia disimpan.' : 'Application letter ready to save.');
+    });
   };
 
   const handleReplyFormFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSize = 20 * 1024 * 1024; // 20MB
-    if (file.size > maxSize) {
-      toast.error(t(language, 'appFileTooLarge'));
-      return;
-    }
-
-    if (file.type !== 'application/pdf') {
-      toast.error(t(language, 'appInvalidFormat'));
-      return;
-    }
-
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const base64String = evt.target?.result as string;
-        setTempReplyFormImage(base64String);
-        setReplyFormTick(true);
-        toast.success(language === 'ms' ? 'Borang jawapan sedia disimpan.' : 'Reply form ready to save.');
-      } catch (err) {
-        toast.error("Gagal membaca fail.");
-      } finally {
-        setIsUploading(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    validateAndReadFile(file, 'Borang Jawapan', (base64String) => {
+      setTempReplyFormImage(base64String);
+      setReplyFormTick(true);
+      toast.success(language === 'ms' ? 'Borang jawapan sedia disimpan.' : 'Reply form ready to save.');
+    });
   };
 
   const handleOfferLetterFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSize = 20 * 1024 * 1024; // 20MB
-    if (file.size > maxSize) {
-      toast.error(t(language, 'appFileTooLarge'));
-      return;
-    }
-
-    if (file.type !== 'application/pdf') {
-      toast.error(t(language, 'appInvalidFormat'));
-      return;
-    }
-
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const base64String = evt.target?.result as string;
-        setTempOfferLetterImage(base64String);
-        setOfferLetterTick(true);
-        toast.success(language === 'ms' ? 'Surat tawaran sedia disimpan.' : 'Offer letter ready to save.');
-      } catch (err) {
-        toast.error("Gagal membaca fail.");
-      } finally {
-        setIsUploading(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    validateAndReadFile(file, 'Surat Tawaran', (base64String) => {
+      setTempOfferLetterImage(base64String);
+      setOfferLetterTick(true);
+      toast.success(language === 'ms' ? 'Surat tawaran sedia disimpan.' : 'Offer letter ready to save.');
+    });
   };
 
   const handleSaveUploadsAndTicks = async () => {
@@ -930,14 +867,17 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
 
                     <div className="pt-2 border-t border-slate-200">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-bold text-slate-600">Fail PDF Surat Permohonan:</span>
+                            <div>
+                                <span className="text-xs font-bold text-slate-700 block">Fail Surat Permohonan:</span>
+                                <span className="text-[10px] text-slate-400 block">Maksimum 5MB (Format PDF / JPG / PNG)</span>
+                            </div>
                             {tempApplicationLetterImage ? (
                                 <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <CheckCircle size={10} /> Telah Dipilih
                                 </span>
                             ) : (
                                 <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
-                                    Tiada Fail PDF
+                                    Tiada Fail
                                 </span>
                             )}
                         </div>
@@ -946,7 +886,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             type="file" 
                             ref={applicationLetterInputRef} 
                             onChange={handleApplicationLetterFileChange} 
-                            accept="application/pdf" 
+                            accept="application/pdf,image/jpeg,image/png,image/jpg,image/webp" 
                             className="hidden" 
                         />
                         
@@ -954,9 +894,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             <button
                                 type="button"
                                 onClick={() => applicationLetterInputRef.current?.click()}
-                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                             >
-                                <Upload size={14} /> {tempApplicationLetterImage ? "Tukar PDF" : "Muat Naik PDF"}
+                                <Upload size={14} /> {tempApplicationLetterImage ? "Tukar Fail (PDF/Imej)" : "Muat Naik Fail (PDF/Imej)"}
                             </button>
                             {tempApplicationLetterImage && (
                                 <button
@@ -991,14 +931,17 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
 
                     <div className="pt-2 border-t border-slate-200">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-bold text-slate-600">Fail PDF Borang Jawapan:</span>
+                            <div>
+                                <span className="text-xs font-bold text-slate-700 block">Fail Borang Jawapan:</span>
+                                <span className="text-[10px] text-slate-400 block">Maksimum 5MB (Format PDF / JPG / PNG)</span>
+                            </div>
                             {tempReplyFormImage ? (
                                 <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <CheckCircle size={10} /> Telah Dipilih
                                 </span>
                             ) : (
                                 <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
-                                    Tiada Fail PDF
+                                    Tiada Fail
                                 </span>
                             )}
                         </div>
@@ -1007,7 +950,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             type="file" 
                             ref={replyFormInputRef} 
                             onChange={handleReplyFormFileChange} 
-                            accept="application/pdf" 
+                            accept="application/pdf,image/jpeg,image/png,image/jpg,image/webp" 
                             className="hidden" 
                         />
                         
@@ -1015,9 +958,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             <button
                                 type="button"
                                 onClick={() => replyFormInputRef.current?.click()}
-                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                             >
-                                <Upload size={14} /> {tempReplyFormImage ? "Tukar PDF" : "Muat Naik PDF"}
+                                <Upload size={14} /> {tempReplyFormImage ? "Tukar Fail (PDF/Imej)" : "Muat Naik Fail (PDF/Imej)"}
                             </button>
                             {tempReplyFormImage && (
                                 <button
@@ -1032,7 +975,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                     </div>
                 </div>
 
-                {/* SECTION 2: SURAT TAWARAN SYARIKAT */}
+                {/* SECTION 3: SURAT TAWARAN SYARIKAT */}
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
                     <div className="flex items-start gap-2.5">
                         <button 
@@ -1052,14 +995,17 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
 
                     <div className="pt-2 border-t border-slate-200">
                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-bold text-slate-600">Fail PDF Surat Tawaran Syarikat:</span>
+                            <div>
+                                <span className="text-xs font-bold text-slate-700 block">Fail Surat Tawaran Syarikat:</span>
+                                <span className="text-[10px] text-slate-400 block">Maksimum 5MB (Format PDF / JPG / PNG)</span>
+                            </div>
                             {tempOfferLetterImage ? (
                                 <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <CheckCircle size={10} /> Telah Dipilih
                                 </span>
                             ) : (
                                 <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
-                                    Tiada Fail PDF
+                                    Tiada Fail
                                 </span>
                             )}
                         </div>
@@ -1068,7 +1014,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             type="file" 
                             ref={offerLetterInputRef} 
                             onChange={handleOfferLetterFileChange} 
-                            accept="application/pdf" 
+                            accept="application/pdf,image/jpeg,image/png,image/jpg,image/webp" 
                             className="hidden" 
                         />
                         
@@ -1076,9 +1022,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             <button
                                 type="button"
                                 onClick={() => offerLetterInputRef.current?.click()}
-                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                                className="flex-1 py-2 px-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                             >
-                                <Upload size={14} /> {tempOfferLetterImage ? "Tukar PDF" : "Muat Naik PDF"}
+                                <Upload size={14} /> {tempOfferLetterImage ? "Tukar Fail (PDF/Imej)" : "Muat Naik Fail (PDF/Imej)"}
                             </button>
                             {tempOfferLetterImage && (
                                 <button
@@ -1168,21 +1114,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             )}
                         </div>
 
-                        {/* PDF View */}
-                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '400px' }}>
-                            {selectedApp?.application_letter_image ? (
-                                <iframe 
-                                    src={selectedApp.application_letter_image} 
-                                    className="w-full h-full"
-                                    title="PDF Preview Surat Permohonan"
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-slate-400 italic gap-2">
-                                    <span>Fail PDF Surat Permohonan tidak ditemui.</span>
-                                    <span className="text-xs font-normal text-slate-400">(Pelajar tidak memuat naik fail)</span>
-                                </div>
-                            )}
-                        </div>
+                        {/* Document Viewer */}
+                        <DocumentViewer 
+                            fileUrl={selectedApp?.application_letter_image}
+                            docTitle="Surat Permohonan WBL"
+                            studentName={selectedApp?.student_name}
+                            matricNo={selectedApp?.student_id}
+                            downloadFileName={`Surat_Permohonan_${selectedApp?.student_id || 'Pelajar'}`}
+                        />
 
                         {/* Actions & Verification */}
                         <div className="flex flex-col md:flex-row gap-3">
@@ -1192,21 +1131,6 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                     className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-transform active:scale-95"
                                 >
                                     <FileCheck size={18} /> Lulus / Sahkan Surat Permohonan
-                                </button>
-                            )}
-                            {selectedApp?.application_letter_image && (
-                                <button 
-                                    onClick={() => {
-                                        if (selectedApp?.application_letter_image) {
-                                            const link = document.createElement('a');
-                                            link.href = selectedApp.application_letter_image;
-                                            link.download = `Surat_Permohonan_${selectedApp.student_id}.pdf`;
-                                            link.click();
-                                        }
-                                    }}
-                                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-transform active:scale-95 text-xs text-center"
-                                >
-                                    <Printer size={16} /> Muat Turun
                                 </button>
                             )}
                         </div>
@@ -1239,21 +1163,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             )}
                         </div>
 
-                        {/* PDF View */}
-                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '400px' }}>
-                            {selectedApp?.reply_form_image ? (
-                                <iframe 
-                                    src={selectedApp.reply_form_image} 
-                                    className="w-full h-full"
-                                    title="PDF Preview Borang Jawapan"
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-slate-400 italic gap-2">
-                                    <span>Fail PDF Borang Jawapan tidak ditemui.</span>
-                                    <span className="text-xs font-normal text-slate-400">(Pelajar tidak memuat naik fail)</span>
-                                </div>
-                            )}
-                        </div>
+                        {/* Document Viewer */}
+                        <DocumentViewer 
+                            fileUrl={selectedApp?.reply_form_image}
+                            docTitle="Borang Jawapan Industri"
+                            studentName={selectedApp?.student_name}
+                            matricNo={selectedApp?.student_id}
+                            downloadFileName={`Borang_Jawapan_${selectedApp?.student_id || 'Pelajar'}`}
+                        />
 
                         {/* Actions & Verification */}
                         <div className="flex flex-col md:flex-row gap-3">
@@ -1263,21 +1180,6 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                     className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-transform active:scale-95"
                                 >
                                     <FileCheck size={18} /> Lulus / Sahkan Borang Jawapan
-                                </button>
-                            )}
-                            {selectedApp?.reply_form_image && (
-                                <button 
-                                    onClick={() => {
-                                        if (selectedApp?.reply_form_image) {
-                                            const link = document.createElement('a');
-                                            link.href = selectedApp.reply_form_image;
-                                            link.download = `Borang_Jawapan_${selectedApp.student_id}.pdf`;
-                                            link.click();
-                                        }
-                                    }}
-                                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-transform active:scale-95 text-xs text-center"
-                                >
-                                    <Printer size={16} /> Muat Turun
                                 </button>
                             )}
                         </div>
@@ -1310,21 +1212,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                             )}
                         </div>
 
-                        {/* PDF View */}
-                        <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative" style={{ height: '400px' }}>
-                            {selectedApp?.offer_letter_image ? (
-                                <iframe 
-                                    src={selectedApp.offer_letter_image} 
-                                    className="w-full h-full"
-                                    title="PDF Preview Surat Tawaran"
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-slate-400 italic gap-2">
-                                    <span>Fail PDF Surat Tawaran tidak ditemui.</span>
-                                    <span className="text-xs font-normal text-slate-400">(Pelajar tidak memuat naik fail)</span>
-                                </div>
-                            )}
-                        </div>
+                        {/* Document Viewer */}
+                        <DocumentViewer 
+                            fileUrl={selectedApp?.offer_letter_image}
+                            docTitle="Surat Tawaran Syarikat"
+                            studentName={selectedApp?.student_name}
+                            matricNo={selectedApp?.student_id}
+                            downloadFileName={`Surat_Tawaran_${selectedApp?.student_id || 'Pelajar'}`}
+                        />
 
                         {/* Actions & Verification */}
                         <div className="flex flex-col md:flex-row gap-3">
@@ -1334,21 +1229,6 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                     className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-100 transition-transform active:scale-95"
                                 >
                                     <FileCheck size={18} /> Lulus / Sahkan Surat Tawaran
-                                </button>
-                            )}
-                            {selectedApp?.offer_letter_image && (
-                                <button 
-                                    onClick={() => {
-                                        if (selectedApp?.offer_letter_image) {
-                                            const link = document.createElement('a');
-                                            link.href = selectedApp.offer_letter_image;
-                                            link.download = `Surat_Tawaran_${selectedApp.student_id}.pdf`;
-                                            link.click();
-                                        }
-                                    }}
-                                    className="py-3 px-4 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-100 transition-transform active:scale-95 text-xs text-center"
-                                >
-                                    <Printer size={16} /> Muat Turun
                                 </button>
                             )}
                         </div>
