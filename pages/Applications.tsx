@@ -105,6 +105,39 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   
   const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER || currentUser.is_jkwbl;
 
+  const filteredApps = applications.filter(app => {
+    if (currentUser.role === UserRole.STUDENT) return app.created_by === currentUser.username;
+    if (currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) return app.company_name === currentUser.company_affiliation;
+    return true;
+  });
+
+  const handleConfirmStatusChange = async () => {
+    if (!statusConfirmData) return;
+    await onUpdateApplication({ ...statusConfirmData.app, application_status: statusConfirmData.newStatus });
+    setModalType(null);
+    setStatusConfirmData(null);
+    toast.success(language === 'ms' ? 'Status dikemaskini' : 'Status updated');
+  };
+
+  const handleCancelApplication = async () => {
+    if (!selectedApp || !onDeleteApplication) return;
+    await onDeleteApplication(selectedApp.id);
+    setModalType(null);
+    setSelectedApp(null);
+  };
+
+  const openUploadModal = (app: Application) => {
+    setSelectedApp(app);
+    setTempReplyFormImage(app.reply_form_image || '');
+    setTempOfferLetterImage(app.offer_letter_image || '');
+    setTempApplicationLetterImage(app.application_letter_image || '');
+    setReplyFormTick(!!app.reply_form_uploaded_tick);
+    setOfferLetterTick(!!app.offer_letter_uploaded_tick);
+    setApplicationLetterTick(!!app.application_letter_uploaded_tick);
+    setActiveDocTab('letter');
+    setModalType('upload');
+  };
+
   const validateAndReadFile = (file: File, docName: string, onSuccess: (base64: string) => void) => {
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
