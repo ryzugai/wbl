@@ -106,7 +106,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER || currentUser.is_jkwbl;
 
   const filteredApps = applications.filter(app => {
-    if (currentUser.role === UserRole.STUDENT) return app.created_by === currentUser.username;
+    if (currentUser.role === UserRole.STUDENT) {
+      return app.created_by === currentUser.username || (currentUser.matric_no && app.student_id?.toLowerCase() === currentUser.matric_no?.toLowerCase());
+    }
     if (currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) return app.company_name === currentUser.company_affiliation;
     return true;
   });
@@ -787,16 +789,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                                     <span>E-Mel Direct</span>
                                                                 </button>
                                                                 
-                                                                {app.application_status === 'Diluluskan' && (
-                                                                    <button 
-                                                                        onClick={() => openUploadModal(app)}
-                                                                        className="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-emerald-200 shadow-2xs transition-colors"
-                                                                        title="Hantar Borang & Surat"
-                                                                    >
-                                                                        <Upload size={12} />
-                                                                        <span>Hantar Dokumen</span>
-                                                                    </button>
-                                                                )}
+                                                                 <button 
+                                                                    onClick={() => openUploadModal(app)}
+                                                                    className="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-emerald-200 shadow-2xs transition-colors"
+                                                                    title="Hantar Borang & Surat / Muat Naik Dokumen"
+                                                                >
+                                                                    <Upload size={12} />
+                                                                    <span>Hantar Dokumen</span>
+                                                                </button>
                                                                 
                                                                 {app.application_status === 'Menunggu' && (
                                                                     <button 
@@ -811,13 +811,23 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                         )}
                                                         
                                                         {hasSystemAccess && (
-                                                            <button 
-                                                                onClick={() => { if(confirm(language === 'ms' ? 'Padam rekod ini secara kekal?' : 'Delete this record permanently?')) onDeleteApplication?.(app.id); }}
-                                                                className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors border border-slate-200"
-                                                                title="Maintenance: Padam Rekod"
-                                                            >
-                                                                <X size={12} />
-                                                            </button>
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => openUploadModal(app)}
+                                                                    className="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-emerald-200 shadow-2xs transition-colors"
+                                                                    title="Hantar / Muat Naik Dokumen Pelajar"
+                                                                >
+                                                                    <Upload size={12} />
+                                                                    <span>Hantar Dokumen</span>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => { if(confirm(language === 'ms' ? 'Padam rekod ini secara kekal?' : 'Delete this record permanently?')) onDeleteApplication?.(app.id); }}
+                                                                    className="p-1.5 bg-slate-100 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors border border-slate-200"
+                                                                    title="Maintenance: Padam Rekod"
+                                                                >
+                                                                    <X size={12} />
+                                                                </button>
+                                                            </>
                                                         )}
                                                     </div>
                                                 </div>
