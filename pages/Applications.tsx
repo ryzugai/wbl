@@ -149,6 +149,25 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
       return;
     }
 
+    const studentIdentifier = selectedApp?.student_id || selectedApp?.created_by || currentUser.matric_no || currentUser.username;
+    const currentStudentDocsUsage = applications
+      .filter(a => a.student_id === studentIdentifier || a.created_by === studentIdentifier)
+      .reduce((acc, a) => {
+        let size = 0;
+        if (a.application_letter_image && a.application_letter_image !== 'idb_stored') size += a.application_letter_image.length;
+        if (a.reply_form_image && a.reply_form_image !== 'idb_stored') size += a.reply_form_image.length;
+        if (a.offer_letter_image && a.offer_letter_image !== 'idb_stored') size += a.offer_letter_image.length;
+        return acc + size;
+      }, 0);
+
+    const maxQuota = 50 * 1024 * 1024; // 50MB per student
+    if (currentStudentDocsUsage + file.size > maxQuota) {
+      toast.error(language === 'ms'
+        ? `Kuota simpanan dokumen pelajar (50MB) telah dicapai. Sila padam atau gantikan dokumen sedia ada.`
+        : `Student document storage quota (50MB) has been reached. Please remove or replace existing files.`);
+      return;
+    }
+
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       toast.error(language === 'ms' 

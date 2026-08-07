@@ -3,6 +3,7 @@ import { User, Company, Application, UserRole, AdConfig, UserActivity, Notificat
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
+import { IDBDocStorage } from './idbStorage';
 
 const STORAGE_KEYS = {
   USERS: 'wbl_users',
@@ -26,6 +27,70 @@ const firebaseConfig = {
 
 let db: any = null;
 let unsubscribeListeners: (() => void)[] = [];
+let inMemoryApplications: Application[] = [];
+
+const stripHeavyFields = (obj: any): any => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const clone = { ...obj };
+  if (typeof clone.application_letter_image === 'string' && clone.application_letter_image.length > 50000) {
+    clone.application_letter_image = 'idb_stored';
+  }
+  if (typeof clone.reply_form_image === 'string' && clone.reply_form_image.length > 50000) {
+    clone.reply_form_image = 'idb_stored';
+  }
+  if (typeof clone.offer_letter_image === 'string' && clone.offer_letter_image.length > 50000) {
+    clone.offer_letter_image = 'idb_stored';
+  }
+  return clone;
+};
+
+const safeSaveLocalStorage = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn(`localStorage quota exceeded for ${key}, using stripped fallback:`, e);
+    if (Array.isArray(data)) {
+      const stripped = data.map(item => stripHeavyFields(item));
+      try {
+        localStorage.setItem(key, JSON.stringify(stripped));
+      } catch (err2) {
+        console.error('Failed to save stripped array to localStorage:', err2);
+      }
+    }
+  }
+};
+
+const hydrateAppsFromIDB = async () => {
+  try {
+    const docs = await IDBDocStorage.getAllDocuments();
+    let updated = false;
+    inMemoryApplications = inMemoryApplications.map(app => {
+      let appCopy = { ...app };
+      const appLetKey = `${app.id}_app_letter`;
+      const replyKey = `${app.id}_reply_form`;
+      const offerKey = `${app.id}_offer_letter`;
+
+      if (docs[appLetKey] && (!appCopy.application_letter_image || appCopy.application_letter_image === 'idb_stored')) {
+        appCopy.application_letter_image = docs[appLetKey];
+        updated = true;
+      }
+      if (docs[replyKey] && (!appCopy.reply_form_image || appCopy.reply_form_image === 'idb_stored')) {
+        appCopy.reply_form_image = docs[replyKey];
+        updated = true;
+      }
+      if (docs[offerKey] && (!appCopy.offer_letter_image || appCopy.offer_letter_image === 'idb_stored')) {
+        appCopy.offer_letter_image = docs[offerKey];
+        updated = true;
+      }
+      return appCopy;
+    });
+    if (updated) {
+      notifyListeners();
+    }
+  } catch (err) {
+    console.warn('Failed to hydrate apps from IndexedDB:', err);
+  }
+};
 
 const initFirebase = () => {
   try {
@@ -50,8 +115,22 @@ const setupRealtimeListeners = () => {
         data.push(doc.data());
       });
       if (!snapshot.empty || snapshot.metadata.fromCache === false) {
-          localStorage.setItem(storageKey, JSON.stringify(data));
-          notifyListeners(); 
+        if (colName === 'applications') {
+          const firestoreApps = data as Application[];
+          inMemoryApplications = firestoreApps.map(fApp => {
+            const localApp = inMemoryApplications.find(a => a.id === fApp.id);
+            return {
+              ...fApp,
+              application_letter_image: (fApp.application_letter_image && fApp.application_letter_image !== 'idb_stored') ? fApp.application_letter_image : localApp?.application_letter_image,
+              reply_form_image: (fApp.reply_form_image && fApp.reply_form_image !== 'idb_stored') ? fApp.reply_form_image : localApp?.reply_form_image,
+              offer_letter_image: (fApp.offer_letter_image && fApp.offer_letter_image !== 'idb_stored') ? fApp.offer_letter_image : localApp?.offer_letter_image,
+            };
+          });
+          safeSaveLocalStorage(storageKey, inMemoryApplications);
+        } else {
+          safeSaveLocalStorage(storageKey, data);
+        }
+        notifyListeners(); 
       }
     }, (error) => {
         console.error(`Sync Error for ${colName}:`, error);
@@ -67,7 +146,7 @@ const setupRealtimeListeners = () => {
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
-      localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(snapshot.data()));
+      safeSaveLocalStorage(STORAGE_KEYS.AD_CONFIG, snapshot.data());
       notifyListeners();
     }
   });
@@ -131,6 +210,14 @@ const init = () => {
     localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ items: [], isEnabled: false }));
   }
 
+  try {
+    inMemoryApplications = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]');
+  } catch {
+    inMemoryApplications = [];
+  }
+
+  hydrateAppsFromIDB();
+
   initFirebase();
 };
 
@@ -165,7 +252,12 @@ export const StorageService = {
     const batch = writeBatch(db);
     StorageService.getUsers().forEach(u => u.id && batch.set(doc(db, 'users', u.id), sanitizeForFirebase(u)));
     StorageService.getCompanies().forEach(c => c.id && batch.set(doc(db, 'companies', c.id), sanitizeForFirebase(c)));
-    StorageService.getApplications().forEach(a => a.id && batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(a)));
+    StorageService.getApplications().forEach(a => {
+      if (a.id) {
+        const payload = stripHeavyFields(a);
+        batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(payload));
+      }
+    });
     await batch.commit();
   },
 
@@ -415,18 +507,35 @@ export const StorageService = {
     if (db) await deleteDoc(doc(db, 'companies', id));
   },
 
-  getApplications: (): Application[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.APPLICATIONS) || '[]'),
+  getApplications: (): Application[] => inMemoryApplications,
   
   createApplication: async (app: Omit<Application, 'id'>): Promise<Application> => {
     const user = getCurrentUser();
     const timestamp = new Date().toISOString();
-    const newApp = { ...app, id: generateId() };
-    const apps = StorageService.getApplications();
-    apps.push(newApp as Application);
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    const newApp = { ...app, id: generateId() } as Application;
+
+    if (newApp.application_letter_image && newApp.application_letter_image !== 'idb_stored') {
+      await IDBDocStorage.saveDocument(`${newApp.id}_app_letter`, newApp.application_letter_image);
+    }
+    if (newApp.reply_form_image && newApp.reply_form_image !== 'idb_stored') {
+      await IDBDocStorage.saveDocument(`${newApp.id}_reply_form`, newApp.reply_form_image);
+    }
+    if (newApp.offer_letter_image && newApp.offer_letter_image !== 'idb_stored') {
+      await IDBDocStorage.saveDocument(`${newApp.id}_offer_letter`, newApp.offer_letter_image);
+    }
+
+    inMemoryApplications.push(newApp);
+    safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, inMemoryApplications);
     notifyListeners();
 
-    if (db) await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(newApp));
+    if (db) {
+      try {
+        const firebasePayload = stripHeavyFields(newApp);
+        await setDoc(doc(db, 'applications', newApp.id), sanitizeForFirebase(firebasePayload));
+      } catch (e) {
+        console.warn('Firebase sync notice (saved locally in IndexedDB):', e);
+      }
+    }
 
     if (user) {
       user.last_activity_at = timestamp;
@@ -434,11 +543,15 @@ export const StorageService = {
       const uIdx = users.findIndex(u => u.id === user.id);
       if (uIdx !== -1) {
         users[uIdx] = user;
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
       }
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      safeSaveLocalStorage(STORAGE_KEYS.SESSION, user);
       if (db) {
-        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+        try {
+          await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+        } catch (e) {
+          console.warn('Firebase user sync notice:', e);
+        }
       }
 
       await StorageService.logActivity(
@@ -451,20 +564,48 @@ export const StorageService = {
         `Applied for industrial training at: ${newApp.company_name}.`
       );
     }
-    return newApp as Application;
+    return newApp;
   },
 
   updateApplication: async (updatedApp: Application): Promise<Application> => {
-    const apps = StorageService.getApplications();
-    const idx = apps.findIndex(a => a.id === updatedApp.id);
-    const oldApp = idx !== -1 ? apps[idx] : null;
+    if (updatedApp.application_letter_image && updatedApp.application_letter_image !== 'idb_stored') {
+      await IDBDocStorage.saveDocument(`${updatedApp.id}_app_letter`, updatedApp.application_letter_image);
+    } else if (!updatedApp.application_letter_image) {
+      await IDBDocStorage.deleteDocument(`${updatedApp.id}_app_letter`);
+    }
+
+    if (updatedApp.reply_form_image && updatedApp.reply_form_image !== 'idb_stored') {
+      await IDBDocStorage.saveDocument(`${updatedApp.id}_reply_form`, updatedApp.reply_form_image);
+    } else if (!updatedApp.reply_form_image) {
+      await IDBDocStorage.deleteDocument(`${updatedApp.id}_reply_form`);
+    }
+
+    if (updatedApp.offer_letter_image && updatedApp.offer_letter_image !== 'idb_stored') {
+      await IDBDocStorage.saveDocument(`${updatedApp.id}_offer_letter`, updatedApp.offer_letter_image);
+    } else if (!updatedApp.offer_letter_image) {
+      await IDBDocStorage.deleteDocument(`${updatedApp.id}_offer_letter`);
+    }
+
+    const idx = inMemoryApplications.findIndex(a => a.id === updatedApp.id);
+    const oldApp = idx !== -1 ? inMemoryApplications[idx] : null;
 
     if (idx !== -1) {
-        apps[idx] = updatedApp;
-        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
-        notifyListeners();
+      inMemoryApplications[idx] = updatedApp;
+    } else {
+      inMemoryApplications.push(updatedApp);
     }
-    if (db) await setDoc(doc(db, 'applications', updatedApp.id), sanitizeForFirebase(updatedApp), { merge: true });
+
+    safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, inMemoryApplications);
+    notifyListeners();
+
+    if (db) {
+      try {
+        const firebasePayload = stripHeavyFields(updatedApp);
+        await setDoc(doc(db, 'applications', updatedApp.id), sanitizeForFirebase(firebasePayload), { merge: true });
+      } catch (e) {
+        console.warn('Firebase cloud sync notice (saved locally in IndexedDB):', e);
+      }
+    }
 
     // Track user action
     const user = getCurrentUser();
@@ -476,11 +617,15 @@ export const StorageService = {
       const uIdx = users.findIndex(u => u.id === user.id);
       if (uIdx !== -1) {
         users[uIdx] = user;
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
       }
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      safeSaveLocalStorage(STORAGE_KEYS.SESSION, user);
       if (db) {
-        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+        try {
+          await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+        } catch (e) {
+          console.warn('Firebase user sync notice:', e);
+        }
       }
 
       // Detect what changed to log a descriptive message
@@ -527,10 +672,21 @@ export const StorageService = {
   },
 
   deleteApplication: async (id: string): Promise<void> => {
-    const apps = StorageService.getApplications().filter(a => a.id !== id);
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(apps));
+    inMemoryApplications = inMemoryApplications.filter(a => a.id !== id);
+    safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, inMemoryApplications);
     notifyListeners();
-    if (db) await deleteDoc(doc(db, 'applications', id));
+
+    await IDBDocStorage.deleteDocument(`${id}_app_letter`);
+    await IDBDocStorage.deleteDocument(`${id}_reply_form`);
+    await IDBDocStorage.deleteDocument(`${id}_offer_letter`);
+
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'applications', id));
+      } catch (e) {
+        console.warn('Firebase delete application notice:', e);
+      }
+    }
   },
 
   getActivities: (): UserActivity[] => {
