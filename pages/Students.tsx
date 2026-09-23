@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole, Company } from '../types';
-import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity, Mail, Phone, MapPin, GraduationCap, Briefcase, Code, Globe, Languages, Star, BookOpen, Building2 } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity, Mail, Phone, MapPin, GraduationCap, Briefcase, Code, Globe, Languages, Star, BookOpen, Building2, FileCheck2 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
+import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
@@ -661,6 +662,20 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
                           >
                               <FileText size={18} />
                           </button>
+
+                          {item.placement && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const comp = companies?.find(c => c.company_name.toLowerCase().trim() === item.placement?.company_name.toLowerCase().trim());
+                                generatePlacementConfirmationLetter(item.placement!, comp, item, '28 September 2026');
+                              }}
+                              className="p-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs"
+                              title="Jana & Cetak Surat Confirmation Penempatan (Melapor 28 Sep 2026)"
+                            >
+                              <FileCheck2 size={18} />
+                            </button>
+                          )}
 
                           {/* ACTION FOR COORDINATOR OR JKWBL LECTURERS: SELF ASSIGN */}
                           {canSelfAssign && (

@@ -749,3 +749,679 @@ export const generateCoverLetter = (
   letterWindow.document.write(htmlContent);
   letterWindow.document.close();
 };
+
+/**
+ * JANA SURAT PENGESAHAN PENEMPATAN (PLACEMENT CONFIRMATION LETTER)
+ * Format rasmi UTeM untuk pelajar yang telah mendapat tempat melapor diri di syarikat.
+ * Melapor pada 28 September 2026 mengikut format lampiran rasmi.
+ */
+export const generatePlacementConfirmationLetter = (
+  application: Application,
+  company: Company | undefined,
+  student: User,
+  customReportingDate: string = '28 September 2026'
+) => {
+  const letterWindow = window.open('', '_blank');
+  if (!letterWindow) {
+    alert("Pop-up disekat oleh pelayar anda. Sila benarkan pop-up untuk menjana surat pengesahan.");
+    return;
+  }
+
+  const today = new Date();
+  const dateOptions: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedLetterDate = today.toLocaleDateString('en-GB', dateOptions);
+
+  const studentMatricNo = student.matric_no || application.student_id || 'B062210529';
+  const refNumber = `UTEM.600-7/3/6 Jld 2/SEM 2.2526/CL-01 (1)`;
+
+  const studentName = (student.name || application.student_name || '').toUpperCase();
+  const studentIcNo = student.ic_no || '020526050212';
+  const studentProgram = (student.program || application.student_program || 'BACHELOR OF TECHNOPRENEURSHIP WITH HONOURS').toUpperCase();
+
+  const companyName = (company?.company_name || application.company_name || '').toUpperCase();
+
+  // Format Company Address with clean multi-line display matching official letter
+  let formattedAddress = '';
+  if (company?.company_address) {
+    formattedAddress = company.company_address;
+    if (company.company_district && !formattedAddress.toLowerCase().includes(company.company_district.toLowerCase())) {
+      formattedAddress += `,\n${company.company_district}`;
+    }
+    if (company.company_state && !formattedAddress.toLowerCase().includes(company.company_state.toLowerCase())) {
+      formattedAddress += `,\n${company.company_state}`;
+    }
+  } else {
+    const parts = [
+      application.company_name,
+      application.company_district,
+      application.company_state || 'Melaka'
+    ].filter(Boolean);
+    formattedAddress = parts.join(',\n');
+  }
+
+  const formattedAddressHtml = formattedAddress
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join('<br>');
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="ms">
+    <head>
+      <meta charset="UTF-8">
+      <title>Surat Pengesahan Penempatan - ${studentName} (${studentMatricNo})</title>
+      <style>
+        @page {
+          size: A4;
+          margin: 14mm 18mm 14mm 18mm;
+        }
+
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9.5pt;
+          line-height: 1.35;
+          color: #111;
+          margin: 0;
+          padding: 0;
+          background-color: #525659;
+        }
+
+        .action-bar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          background: #1e293b;
+          color: white;
+          padding: 12px 24px;
+          z-index: 9999;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          font-family: Arial, sans-serif;
+        }
+
+        .action-bar-inner {
+          max-width: 900px;
+          margin: 0 auto;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .action-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .action-info strong {
+          font-size: 13px;
+          letter-spacing: 0.3px;
+          color: #f8fafc;
+        }
+
+        .action-info span {
+          font-size: 11px;
+          color: #cbd5e1;
+        }
+
+        .action-buttons {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+        }
+
+        .btn-print {
+          background: linear-gradient(135deg, #059669, #0d9488);
+          color: white;
+          border: none;
+          padding: 8px 18px;
+          border-radius: 6px;
+          font-weight: bold;
+          font-size: 12px;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          transition: all 0.2s;
+        }
+
+        .btn-print:hover {
+          background: linear-gradient(135deg, #047857, #0f766e);
+          transform: translateY(-1px);
+        }
+
+        .btn-close {
+          background: #334155;
+          color: white;
+          border: 1px solid #475569;
+          padding: 8px 14px;
+          border-radius: 6px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-close:hover {
+          background: #475569;
+        }
+
+        .letter-page {
+          width: 210mm;
+          min-height: 297mm;
+          background: white;
+          margin: 65px auto 25px auto;
+          padding: 16mm 20mm 20mm 20mm;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+          position: relative;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .letter-page.page-2 {
+          margin-top: 25px;
+        }
+
+        .page-content-wrap {
+          flex: 1 0 auto;
+        }
+
+        /* HEADER */
+        .header-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 6px;
+        }
+
+        .logo {
+          height: 65px;
+          object-fit: contain;
+        }
+
+        .divider-line {
+          width: 100%;
+          height: 1.5px;
+          background-color: #1a1a1a;
+          margin: 4px 0 6px 0;
+        }
+
+        .faculty-header {
+          text-align: center;
+          margin-bottom: 16px;
+        }
+
+        .faculty-title {
+          font-size: 9.5pt;
+          font-weight: bold;
+          letter-spacing: 0.3px;
+          color: #000;
+        }
+
+        .faculty-contacts {
+          font-size: 8.5pt;
+          color: #222;
+          margin-top: 1px;
+        }
+
+        /* REF & DATE */
+        .ref-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 16px;
+          font-size: 9pt;
+          line-height: 1.35;
+        }
+
+        .ref-col-left {
+          flex: 1;
+        }
+
+        .ref-col-right {
+          text-align: right;
+          font-weight: bold;
+          font-size: 9pt;
+        }
+
+        /* STUDENT INFO */
+        .student-info-block {
+          margin-bottom: 16px;
+          font-size: 9.5pt;
+          line-height: 1.35;
+        }
+
+        .student-name {
+          font-weight: bold;
+          color: #000;
+        }
+
+        .student-meta {
+          color: #222;
+        }
+
+        /* TITLE */
+        .letter-title {
+          font-size: 9.5pt;
+          font-weight: bold;
+          text-align: left;
+          color: #000;
+          margin: 16px 0 14px 0;
+          letter-spacing: 0.2px;
+        }
+
+        .intro-p {
+          margin: 0 0 12px 0;
+          font-size: 9.5pt;
+          color: #111;
+        }
+
+        /* PLACEMENT TABLE */
+        .placement-details-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 16px;
+          font-size: 9.5pt;
+          line-height: 1.4;
+        }
+
+        .placement-details-table td {
+          vertical-align: top;
+          padding: 2px 0;
+        }
+
+        .dt-label {
+          width: 170px;
+          color: #111;
+        }
+
+        .dt-sep {
+          width: 25px;
+          text-align: center;
+        }
+
+        .dt-val {
+          color: #000;
+        }
+
+        /* CLAUSES */
+        .clause-block {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 14px;
+          font-size: 9.5pt;
+          line-height: 1.42;
+          text-align: justify;
+        }
+
+        .clause-num {
+          font-weight: normal;
+          width: 20px;
+          flex-shrink: 0;
+        }
+
+        .clause-content {
+          flex: 1;
+        }
+
+        /* ITEMS TABLE */
+        .items-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 8px;
+          font-size: 9pt;
+          line-height: 1.35;
+        }
+
+        .sub-list {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .sub-list td {
+          vertical-align: top;
+          padding: 2.5px 0;
+        }
+
+        .sub-list .num {
+          width: 24px;
+          font-weight: normal;
+        }
+
+        /* PLIF TABLE */
+        .plif-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 8px;
+          font-size: 9pt;
+          line-height: 1.35;
+        }
+
+        .plif-table td {
+          vertical-align: top;
+          padding: 2px 0;
+        }
+
+        .p-label {
+          width: 80px;
+        }
+
+        .p-sep {
+          width: 20px;
+          text-align: center;
+        }
+
+        .p-val {
+          font-weight: normal;
+        }
+
+        /* SIGN OFF */
+        .signoff-section {
+          margin-top: 25px;
+          font-size: 9.5pt;
+          line-height: 1.35;
+        }
+
+        .signatory-name {
+          font-weight: bold;
+          color: #000;
+        }
+
+        .signatory-title, .signatory-dept, .signatory-role, .signatory-uni {
+          color: #111;
+        }
+
+        .comp-gen-note {
+          font-style: italic;
+          font-size: 8.5pt;
+          color: #444;
+          margin-top: 25px;
+        }
+
+        /* FOOTER DECORATION */
+        .page-footer {
+          margin-top: auto;
+          padding-top: 15px;
+        }
+
+        .page-footer-fixed {
+          position: absolute;
+          bottom: 20mm;
+          left: 20mm;
+          right: 20mm;
+        }
+
+        .footer-bar {
+          width: 100%;
+          height: 8px;
+          background: linear-gradient(to right, #002b66 0%, #004b99 75%, #0066cc 100%);
+          border-radius: 1px;
+          margin-bottom: 8px;
+        }
+
+        .footer-bottom {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .footer-text {
+          font-size: 8pt;
+          font-weight: bold;
+          letter-spacing: 1px;
+          color: #003366;
+          text-transform: uppercase;
+        }
+
+        .cert-box {
+          font-size: 7pt;
+          color: #444;
+          text-align: right;
+        }
+
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+
+          body {
+            background: white !important;
+            padding: 0 !important;
+          }
+
+          .letter-page {
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            min-height: 275mm !important;
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+
+          .letter-page.page-2 {
+            page-break-before: always !important;
+            break-before: page !important;
+            margin-top: 0 !important;
+          }
+
+          .page-footer-fixed {
+            position: absolute;
+            bottom: 5mm;
+            left: 0;
+            right: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+
+      <!-- ACTION BAR FOR SCREEN PREVIEW -->
+      <div class="action-bar no-print">
+        <div class="action-bar-inner">
+          <div class="action-info">
+            <strong>Surat Pengesahan Penempatan (Placement Confirmation Letter)</strong>
+            <span>Pelajar: <strong>${studentName}</strong> (${studentMatricNo}) • Tarikh Melapor: <strong>${customReportingDate}</strong></span>
+          </div>
+          <div class="action-buttons">
+            <button class="btn-print" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+            <button class="btn-close" onclick="window.close()">Tutup</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE 1 -->
+      <div class="letter-page">
+        <div class="page-content-wrap">
+          <table class="header-table">
+            <tr>
+              <td style="width: 25%; vertical-align: middle;">
+                <img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" class="logo" alt="UTeM Logo">
+              </td>
+              <td style="width: 45%; vertical-align: middle; text-align: left; padding-left: 15px; font-size: 8pt; line-height: 1.35;">
+                <div style="font-size: 8.5pt; font-weight: bold; color: #111;">Universiti Teknikal Malaysia Melaka</div>
+                <div>Hang Tuah Jaya,</div>
+                <div>76100 Durian Tunggal,</div>
+                <div>Melaka, Malaysia.</div>
+              </td>
+              <td style="width: 30%; vertical-align: middle; text-align: right; font-size: 8pt; line-height: 1.45; color: #222;">
+                <div>📞 +606 270 1000</div>
+                <div>📠 +606 270 1022</div>
+                <div>🌐 www.utem.edu.my</div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="divider-line"></div>
+
+          <div class="faculty-header">
+            <div class="faculty-title">FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP</div>
+            <div class="faculty-contacts">Tel. No. 06-2708002 | Fax No. 06-2701043</div>
+          </div>
+
+          <div class="ref-container">
+            <div class="ref-col-left">
+              <div>Ruj. Kami (Our Ref) : <strong>${refNumber}</strong></div>
+              <div style="padding-left: 125px;">(${studentMatricNo})</div>
+              <div style="margin-top: 4px;">Ruj. Tuan (Your Ref) :</div>
+            </div>
+            <div class="ref-col-right">
+              ${formattedLetterDate}
+            </div>
+          </div>
+
+          <div class="student-info-block">
+            <div class="student-name">${studentName}</div>
+            <div class="student-meta">${studentIcNo}</div>
+            <div class="student-meta">${studentMatricNo}</div>
+            <div class="student-meta">${studentProgram}</div>
+          </div>
+
+          <div class="letter-title">
+            UTeM STUDENT INDUSTRIAL TRAINING PROGRAMME - PLACEMENT CONFIRMATION
+          </div>
+
+          <p class="intro-p">
+            I'm pleased to confirm the placement of your industrial training programme as per follows :
+          </p>
+
+          <table class="placement-details-table">
+            <tr>
+              <td class="dt-label">Organisation</td>
+              <td class="dt-sep">:</td>
+              <td class="dt-val"><strong>${companyName}</strong></td>
+            </tr>
+            <tr>
+              <td class="dt-label">Address</td>
+              <td class="dt-sep">:</td>
+              <td class="dt-val">${formattedAddressHtml}</td>
+            </tr>
+            <tr>
+              <td class="dt-label">Date of Reporting</td>
+              <td class="dt-sep">:</td>
+              <td class="dt-val"><strong>${customReportingDate}</strong></td>
+            </tr>
+          </table>
+
+          <div class="clause-block">
+            <div class="clause-num">2.</div>
+            <div class="clause-content">
+              Students are required to bring the following items when reporting to the organisation:
+              
+              <table class="items-table">
+                <tr>
+                  <td style="width: 53%; vertical-align: top;">
+                    <table class="sub-list">
+                      <tr><td class="num">i.</td><td>Industrial Training Placement Confirmation Letter to the company</td></tr>
+                      <tr><td class="num">ii.</td><td>Copy of Offer Letter</td></tr>
+                      <tr><td class="num">iii.</td><td>UTeM Matric Card</td></tr>
+                      <tr><td class="num">iv.</td><td>Daily Logbook</td></tr>
+                      <tr><td class="num">v.</td><td>UTeM Insurance Letter</td></tr>
+                    </table>
+                  </td>
+                  <td style="width: 47%; vertical-align: top;">
+                    <table class="sub-list">
+                      <tr><td class="num">vi.</td><td>Resume</td></tr>
+                      <tr><td class="num">vii.</td><td>Passport Size Photo</td></tr>
+                      <tr><td class="num">viii.</td><td>Copy of Identity Card</td></tr>
+                      <tr><td class="num">ix.</td><td>Copy of bank account statement (Only if needed)</td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="clause-block">
+            <div class="clause-num">3.</div>
+            <div class="clause-content">
+              Students are required to fill up <strong>'Industrial Training Information Card'</strong> (available in the Daily Logbook) and send it to the Faculty Industrial Training Coordinator (PLIF) within <strong>one week</strong> after reporting for training. In the case that you have changed your residential / industry address (under the instruction of the organisation only) during the training, please inform the PLIF as soon as possible by filling in the form <strong>'Change of Address during Industrial Training'</strong>.
+            </div>
+          </div>
+
+          <div class="clause-block">
+            <div class="clause-num">4.</div>
+            <div class="clause-content">
+              Should there be any queries and issues pertaining to the industrial training programme, please do not hesitate to contact PLIF as follows :
+              
+              <table class="plif-table">
+                <tr><td class="p-label">Name</td><td class="p-sep">:</td><td class="p-val"><strong>WAN MUHAMMAD IDHAM BIN WAN MAHDI</strong></td></tr>
+                <tr><td class="p-label">Tel No.</td><td class="p-sep">:</td><td class="p-val">06-2708140</td></tr>
+                <tr><td class="p-label">Fax No.</td><td class="p-sep">:</td><td class="p-val">06-2701043</td></tr>
+                <tr><td class="p-label">Email</td><td class="p-sep">:</td><td class="p-val">wan.idham@utem.edu.my</td></tr>
+                <tr><td class="p-label">Url</td><td class="p-sep">:</td><td class="p-val">http://fptt.utem.edu.my/</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="page-footer">
+          <div class="footer-bar"></div>
+          <div class="footer-bottom">
+            <div class="footer-text">SEBUAH UNIVERSITI TEKNIKAL AWAM</div>
+            <div class="cert-box">
+              <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
+                <div style="text-align: center; border: 1px solid #777; padding: 2px 5px; border-radius: 2px; font-size: 6pt; font-weight: bold; line-height: 1;">
+                  <span style="color: #0b4991;">STANDARDS</span><br><span style="color: #c00;">MALAYSIA</span>
+                </div>
+                <div style="font-size: 6pt; color: #555; text-align: left; line-height: 1.1;">
+                  ISO 9001:2015<br>CERT. NO. QMS 01380
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE 2 -->
+      <div class="letter-page page-2">
+        <div class="page-content-wrap">
+          <div class="clause-block" style="margin-top: 10px;">
+            <div class="clause-num">5.</div>
+            <div class="clause-content">
+              Please be reminded that students are subjected to rules & regulations of UTeM and the organisation throughout the industrial training period.
+            </div>
+          </div>
+
+          <div class="signoff-section">
+            <div>Your Sincerely</div>
+            <br><br><br>
+            <div class="signatory-name">PROF. DR. MOHD. SYAIFUL RIZAL BIN ABDUL HAMID</div>
+            <div class="signatory-title">Dean</div>
+            <div class="signatory-dept">FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP</div>
+            <div class="signatory-role">On behalf of Vice Chancellor</div>
+            <div class="signatory-uni">Universiti Teknikal Malaysia Melaka (UTeM)</div>
+            <div class="comp-gen-note">This is computer generated letter, no signature required.</div>
+          </div>
+        </div>
+
+        <div class="page-footer page-footer-fixed">
+          <div class="footer-bar"></div>
+          <div class="footer-bottom">
+            <div class="footer-text">SEBUAH UNIVERSITI TEKNIKAL AWAM</div>
+            <div class="cert-box">
+              <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
+                <div style="text-align: center; border: 1px solid #777; padding: 2px 5px; border-radius: 2px; font-size: 6pt; font-weight: bold; line-height: 1;">
+                  <span style="color: #0b4991;">STANDARDS</span><br><span style="color: #c00;">MALAYSIA</span>
+                </div>
+                <div style="font-size: 6pt; color: #555; text-align: left; line-height: 1.1;">
+                  ISO 9001:2015<br>CERT. NO. QMS 01380
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </body>
+    </html>
+  `;
+
+  letterWindow.document.write(htmlContent);
+  letterWindow.document.close();
+};
+

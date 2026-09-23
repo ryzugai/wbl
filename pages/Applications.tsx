@@ -2,9 +2,9 @@
 import React, { useState, useRef } from 'react';
 import { Application, User, UserRole, Company } from '../types';
 import { Modal } from '../components/Modal';
-import { generateLetter, generateCoverLetter, getCoverLetterText } from '../utils/letterGenerator';
+import { generateLetter, generateCoverLetter, getCoverLetterText, generatePlacementConfirmationLetter } from '../utils/letterGenerator';
 import { generateResume } from '../utils/resumeGenerator';
-import { FileCheck, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2, Mail, MapPin, Phone, UserCheck, Copy, Send, ExternalLink, User as UserIcon, MailCheck } from 'lucide-react';
+import { FileCheck, FileCheck2, FileX, Printer, Upload, Eye, RefreshCcw, AlertTriangle, FileText, CheckCircle, Clock, Trash2, X, CheckCircle2, CheckSquare, Square, Star, Building2, Mail, MapPin, Phone, UserCheck, Copy, Send, ExternalLink, User as UserIcon, MailCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 import { StorageService } from '../services/storage';
@@ -965,6 +965,17 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                         
                                                         {currentUser.role === UserRole.STUDENT && (
                                                             <>
+                                                                {app.application_status === 'Diluluskan' && (
+                                                                    <button 
+                                                                        onClick={() => generatePlacementConfirmationLetter(app, targetCompany, studentUser, '28 September 2026')} 
+                                                                        className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-[11px] font-black flex items-center gap-1.5 shadow-sm transition-all ring-1 ring-emerald-500 animate-pulse-once" 
+                                                                        title="Jana Surat Confirmation untuk Melapor Diri di Syarikat pada 28 September 2026"
+                                                                    >
+                                                                        <FileCheck2 size={13} className="text-emerald-100" />
+                                                                        <span>Surat Confirmation (Melapor Diri 28 Sep 2026)</span>
+                                                                    </button>
+                                                                )}
+
                                                                 <button 
                                                                     onClick={() => generateCoverLetter(app, targetCompany, studentUser, language)} 
                                                                     className="px-2.5 py-1 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-amber-200 shadow-2xs transition-colors" 
@@ -1035,10 +1046,21 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                                         <span>Tetapkan Penempatan</span>
                                                                     </button>
                                                                 ) : (
-                                                                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-black flex items-center gap-1">
-                                                                        <CheckCircle2 size={12} className="text-emerald-600" />
-                                                                        <span>Penempatan Rasmi</span>
-                                                                    </span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-black flex items-center gap-1">
+                                                                            <CheckCircle2 size={12} className="text-emerald-600" />
+                                                                            <span>Penempatan Rasmi</span>
+                                                                        </span>
+                                                                        <button 
+                                                                            type="button"
+                                                                            onClick={() => generatePlacementConfirmationLetter(app, targetCompany, studentUser, '28 September 2026')} 
+                                                                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors" 
+                                                                            title="Cetak Surat Confirmation Penempatan Pelajar (Melapor 28 Sep 2026)"
+                                                                        >
+                                                                            <FileCheck2 size={12} className="text-emerald-600" />
+                                                                            <span>Surat Confirmation</span>
+                                                                        </button>
+                                                                    </div>
                                                                 )}
 
                                                                 {group.apps.length > 1 && app.application_status === 'Diluluskan' && (

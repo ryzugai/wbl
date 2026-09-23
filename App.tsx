@@ -250,7 +250,7 @@ function App() {
         language={language}
         onLanguageChange={setLanguage}
       >
-        {currentView === 'dashboard' && <Dashboard language={language} applications={applications} companies={companies} users={users} />}
+        {currentView === 'dashboard' && <Dashboard language={language} currentUser={currentUser} applications={applications} companies={companies} users={users} />}
         
         {(currentView === 'companies' || currentView === 'addCompany') && (
             <Companies 

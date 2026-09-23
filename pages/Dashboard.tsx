@@ -1,18 +1,20 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Application, Company, User, UserRole, AdConfig } from '../types';
-import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer, Info } from 'lucide-react';
+import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer, Info, FileCheck2, Printer, ArrowRight } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
+import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
 
 interface DashboardProps {
   applications: Application[];
   companies: Company[];
   users: User[];
+  currentUser?: User;
   language: Language;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users, language }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users, currentUser, language }) => {
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [showAd, setShowAd] = useState(true);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
@@ -58,6 +60,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const studentPlacementApp = useMemo(() => {
+    if (!currentUser || currentUser.role !== UserRole.STUDENT) return null;
+    return applications.find(a => 
+      (a.student_id === currentUser.matric_no || a.created_by === currentUser.username) &&
+      a.application_status === 'Diluluskan'
+    ) || null;
+  }, [currentUser, applications]);
+
+  const studentPlacementCompany = useMemo(() => {
+    if (!studentPlacementApp) return undefined;
+    return companies.find(c => 
+      c.company_name.toLowerCase().trim() === studentPlacementApp.company_name.toLowerCase().trim()
+    );
+  }, [studentPlacementApp, companies]);
 
   const timelineProgress = useMemo(() => {
     const now = new Date();
@@ -170,6 +187,49 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                     )}
                 </div>
             </div>
+        </div>
+      )}
+
+      {/* STUDENT PLACEMENT SUCCESS & CONFIRMATION LETTER BANNER */}
+      {studentPlacementApp && currentUser && (
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-700 to-cyan-800 rounded-2xl p-5 text-white shadow-lg border border-emerald-500/30 animate-fadeIn">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-black tracking-wider uppercase">
+                <CheckCircle2 size={14} className="text-emerald-300" />
+                <span>Status Penempatan Rasmi : Berjaya Ditempatkan</span>
+              </div>
+              <h3 className="text-xl font-black tracking-tight text-white">
+                {studentPlacementApp.company_name}
+              </h3>
+              <p className="text-xs text-emerald-100 flex flex-wrap items-center gap-2">
+                <span>📍 {studentPlacementApp.company_district ? `${studentPlacementApp.company_district}, ` : ''}{studentPlacementApp.company_state || 'Melaka'}</span>
+                <span>•</span>
+                <span>📅 Tarikh Melapor Diri di Syarikat: <strong className="text-white underline">28 September 2026</strong></span>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => generatePlacementConfirmationLetter(studentPlacementApp, studentPlacementCompany, currentUser, '28 September 2026')}
+                className="px-4 py-2.5 bg-white text-emerald-900 hover:bg-emerald-50 rounded-xl text-xs font-black flex items-center gap-2 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                title="Jana & Cetak Surat Pengesahan Penempatan (Melapor Diri 28 September 2026)"
+              >
+                <FileCheck2 size={16} className="text-emerald-700" />
+                <span>Jana Surat Confirmation (Melapor Diri 28 Sep 2026)</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-white/15 text-[11px] text-emerald-100 flex flex-wrap items-center gap-x-6 gap-y-1">
+            <span className="font-semibold text-white">Perkara yang perlu dibawa semasa melapor diri (28 Sep 2026):</span>
+            <span>✓ Surat Confirmation Penempatan</span>
+            <span>✓ Salinan Surat Tawaran</span>
+            <span>✓ Kad Matrik UTeM</span>
+            <span>✓ Daily Logbook</span>
+            <span>✓ Resume & Foto Passport</span>
+          </div>
         </div>
       )}
 
