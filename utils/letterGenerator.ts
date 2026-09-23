@@ -813,8 +813,8 @@ export const generatePlacementConfirmationLetter = (
       <title>Surat Pengesahan Penempatan - ${studentName} (${studentMatricNo})</title>
       <style>
         @page {
-          size: A4;
-          margin: 14mm 18mm 14mm 18mm;
+          size: A4 portrait;
+          margin: 8mm 12mm 8mm 12mm;
         }
 
         * {
@@ -825,8 +825,8 @@ export const generatePlacementConfirmationLetter = (
 
         body {
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 9.5pt;
-          line-height: 1.35;
+          font-size: 8.5pt;
+          line-height: 1.25;
           color: #111;
           margin: 0;
           padding: 0;
@@ -840,7 +840,7 @@ export const generatePlacementConfirmationLetter = (
           right: 0;
           background: #1e293b;
           color: white;
-          padding: 12px 24px;
+          padding: 10px 20px;
           z-index: 9999;
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
           font-family: Arial, sans-serif;
@@ -862,7 +862,7 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .action-info strong {
-          font-size: 13px;
+          font-size: 12px;
           letter-spacing: 0.3px;
           color: #f8fafc;
         }
@@ -882,10 +882,10 @@ export const generatePlacementConfirmationLetter = (
           background: linear-gradient(135deg, #059669, #0d9488);
           color: white;
           border: none;
-          padding: 8px 18px;
+          padding: 7px 16px;
           border-radius: 6px;
           font-weight: bold;
-          font-size: 12px;
+          font-size: 11px;
           cursor: pointer;
           box-shadow: 0 2px 6px rgba(0,0,0,0.2);
           transition: all 0.2s;
@@ -900,9 +900,9 @@ export const generatePlacementConfirmationLetter = (
           background: #334155;
           color: white;
           border: 1px solid #475569;
-          padding: 8px 14px;
+          padding: 7px 12px;
           border-radius: 6px;
-          font-size: 12px;
+          font-size: 11px;
           cursor: pointer;
           transition: all 0.2s;
         }
@@ -914,56 +914,57 @@ export const generatePlacementConfirmationLetter = (
         .letter-page {
           width: 210mm;
           min-height: 297mm;
+          max-height: 297mm;
           background: white;
-          margin: 65px auto 25px auto;
-          padding: 16mm 20mm 20mm 20mm;
+          margin: 55px auto 20px auto;
+          padding: 10mm 14mm 10mm 14mm;
           box-shadow: 0 8px 24px rgba(0,0,0,0.3);
           position: relative;
           display: flex;
           flex-direction: column;
-        }
-
-        .letter-page.page-2 {
-          margin-top: 25px;
+          justify-content: space-between;
+          overflow: hidden;
         }
 
         .page-content-wrap {
-          flex: 1 0 auto;
+          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
         }
 
         /* HEADER */
         .header-table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 6px;
+          margin-bottom: 2px;
         }
 
         .logo {
-          height: 65px;
+          height: 48px;
           object-fit: contain;
         }
 
         .divider-line {
           width: 100%;
-          height: 1.5px;
+          height: 1px;
           background-color: #1a1a1a;
-          margin: 4px 0 6px 0;
+          margin: 2px 0 4px 0;
         }
 
         .faculty-header {
           text-align: center;
-          margin-bottom: 16px;
+          margin-bottom: 6px;
         }
 
         .faculty-title {
-          font-size: 9.5pt;
+          font-size: 8.5pt;
           font-weight: bold;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.2px;
           color: #000;
         }
 
         .faculty-contacts {
-          font-size: 8.5pt;
+          font-size: 7.5pt;
           color: #222;
           margin-top: 1px;
         }
@@ -973,9 +974,9 @@ export const generatePlacementConfirmationLetter = (
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 16px;
-          font-size: 9pt;
-          line-height: 1.35;
+          margin-bottom: 6px;
+          font-size: 8pt;
+          line-height: 1.25;
         }
 
         .ref-col-left {
@@ -985,14 +986,14 @@ export const generatePlacementConfirmationLetter = (
         .ref-col-right {
           text-align: right;
           font-weight: bold;
-          font-size: 9pt;
+          font-size: 8pt;
         }
 
         /* STUDENT INFO */
         .student-info-block {
-          margin-bottom: 16px;
-          font-size: 9.5pt;
-          line-height: 1.35;
+          margin-bottom: 6px;
+          font-size: 8.5pt;
+          line-height: 1.25;
         }
 
         .student-name {
@@ -1006,17 +1007,17 @@ export const generatePlacementConfirmationLetter = (
 
         /* TITLE */
         .letter-title {
-          font-size: 9.5pt;
+          font-size: 8.5pt;
           font-weight: bold;
           text-align: left;
           color: #000;
-          margin: 16px 0 14px 0;
-          letter-spacing: 0.2px;
+          margin: 6px 0 5px 0;
+          letter-spacing: 0.1px;
         }
 
         .intro-p {
-          margin: 0 0 12px 0;
-          font-size: 9.5pt;
+          margin: 0 0 5px 0;
+          font-size: 8.5pt;
           color: #111;
         }
 
@@ -1024,23 +1025,23 @@ export const generatePlacementConfirmationLetter = (
         .placement-details-table {
           width: 100%;
           border-collapse: collapse;
-          margin-bottom: 16px;
-          font-size: 9.5pt;
-          line-height: 1.4;
+          margin-bottom: 6px;
+          font-size: 8.5pt;
+          line-height: 1.25;
         }
 
         .placement-details-table td {
           vertical-align: top;
-          padding: 2px 0;
+          padding: 1px 0;
         }
 
         .dt-label {
-          width: 170px;
+          width: 140px;
           color: #111;
         }
 
         .dt-sep {
-          width: 25px;
+          width: 20px;
           text-align: center;
         }
 
@@ -1051,16 +1052,16 @@ export const generatePlacementConfirmationLetter = (
         /* CLAUSES */
         .clause-block {
           display: flex;
-          gap: 8px;
-          margin-bottom: 14px;
-          font-size: 9.5pt;
-          line-height: 1.42;
+          gap: 6px;
+          margin-bottom: 5px;
+          font-size: 8pt;
+          line-height: 1.28;
           text-align: justify;
         }
 
         .clause-num {
           font-weight: normal;
-          width: 20px;
+          width: 16px;
           flex-shrink: 0;
         }
 
@@ -1072,9 +1073,9 @@ export const generatePlacementConfirmationLetter = (
         .items-table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 8px;
-          font-size: 9pt;
-          line-height: 1.35;
+          margin-top: 3px;
+          font-size: 7.8pt;
+          line-height: 1.22;
         }
 
         .sub-list {
@@ -1084,11 +1085,11 @@ export const generatePlacementConfirmationLetter = (
 
         .sub-list td {
           vertical-align: top;
-          padding: 2.5px 0;
+          padding: 1px 0;
         }
 
         .sub-list .num {
-          width: 24px;
+          width: 20px;
           font-weight: normal;
         }
 
@@ -1096,22 +1097,22 @@ export const generatePlacementConfirmationLetter = (
         .plif-table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 8px;
-          font-size: 9pt;
-          line-height: 1.35;
+          margin-top: 3px;
+          font-size: 7.8pt;
+          line-height: 1.22;
         }
 
         .plif-table td {
           vertical-align: top;
-          padding: 2px 0;
+          padding: 1px 0;
         }
 
         .p-label {
-          width: 80px;
+          width: 65px;
         }
 
         .p-sep {
-          width: 20px;
+          width: 16px;
           text-align: center;
         }
 
@@ -1121,9 +1122,9 @@ export const generatePlacementConfirmationLetter = (
 
         /* SIGN OFF */
         .signoff-section {
-          margin-top: 25px;
-          font-size: 9.5pt;
-          line-height: 1.35;
+          margin-top: 5px;
+          font-size: 8pt;
+          line-height: 1.22;
         }
 
         .signatory-name {
@@ -1137,30 +1138,23 @@ export const generatePlacementConfirmationLetter = (
 
         .comp-gen-note {
           font-style: italic;
-          font-size: 8.5pt;
+          font-size: 7.2pt;
           color: #444;
-          margin-top: 25px;
+          margin-top: 4px;
         }
 
         /* FOOTER DECORATION */
         .page-footer {
-          margin-top: auto;
-          padding-top: 15px;
-        }
-
-        .page-footer-fixed {
-          position: absolute;
-          bottom: 20mm;
-          left: 20mm;
-          right: 20mm;
+          margin-top: 6px;
+          padding-top: 4px;
         }
 
         .footer-bar {
           width: 100%;
-          height: 8px;
+          height: 5px;
           background: linear-gradient(to right, #002b66 0%, #004b99 75%, #0066cc 100%);
           border-radius: 1px;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
 
         .footer-bottom {
@@ -1170,15 +1164,15 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .footer-text {
-          font-size: 8pt;
+          font-size: 7pt;
           font-weight: bold;
-          letter-spacing: 1px;
+          letter-spacing: 0.8px;
           color: #003366;
           text-transform: uppercase;
         }
 
         .cert-box {
-          font-size: 7pt;
+          font-size: 6pt;
           color: #444;
           text-align: right;
         }
@@ -1188,9 +1182,12 @@ export const generatePlacementConfirmationLetter = (
             display: none !important;
           }
 
-          body {
+          html, body {
             background: white !important;
             padding: 0 !important;
+            margin: 0 !important;
+            height: 100% !important;
+            overflow: hidden !important;
           }
 
           .letter-page {
@@ -1198,22 +1195,13 @@ export const generatePlacementConfirmationLetter = (
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
-            min-height: 275mm !important;
-            page-break-after: always !important;
-            break-after: page !important;
-          }
-
-          .letter-page.page-2 {
-            page-break-before: always !important;
-            break-before: page !important;
-            margin-top: 0 !important;
-          }
-
-          .page-footer-fixed {
-            position: absolute;
-            bottom: 5mm;
-            left: 0;
-            right: 0;
+            height: 100% !important;
+            max-height: 280mm !important;
+            min-height: auto !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       </style>
@@ -1228,13 +1216,13 @@ export const generatePlacementConfirmationLetter = (
             <span>Pelajar: <strong>${studentName}</strong> (${studentMatricNo}) • Tarikh Melapor: <strong>${customReportingDate}</strong></span>
           </div>
           <div class="action-buttons">
-            <button class="btn-print" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+            <button class="btn-print" onclick="window.print()">🖨️ Cetak / Simpan PDF (1 Muka Surat)</button>
             <button class="btn-close" onclick="window.close()">Tutup</button>
           </div>
         </div>
       </div>
 
-      <!-- PAGE 1 -->
+      <!-- SINGLE PAGE LETTER -->
       <div class="letter-page">
         <div class="page-content-wrap">
           <table class="header-table">
@@ -1242,13 +1230,13 @@ export const generatePlacementConfirmationLetter = (
               <td style="width: 25%; vertical-align: middle;">
                 <img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" class="logo" alt="UTeM Logo">
               </td>
-              <td style="width: 45%; vertical-align: middle; text-align: left; padding-left: 15px; font-size: 8pt; line-height: 1.35;">
-                <div style="font-size: 8.5pt; font-weight: bold; color: #111;">Universiti Teknikal Malaysia Melaka</div>
+              <td style="width: 45%; vertical-align: middle; text-align: left; padding-left: 10px; font-size: 7.5pt; line-height: 1.25;">
+                <div style="font-size: 8pt; font-weight: bold; color: #111;">Universiti Teknikal Malaysia Melaka</div>
                 <div>Hang Tuah Jaya,</div>
                 <div>76100 Durian Tunggal,</div>
                 <div>Melaka, Malaysia.</div>
               </td>
-              <td style="width: 30%; vertical-align: middle; text-align: right; font-size: 8pt; line-height: 1.45; color: #222;">
+              <td style="width: 30%; vertical-align: middle; text-align: right; font-size: 7.5pt; line-height: 1.35; color: #222;">
                 <div>📞 +606 270 1000</div>
                 <div>📠 +606 270 1022</div>
                 <div>🌐 www.utem.edu.my</div>
@@ -1266,8 +1254,8 @@ export const generatePlacementConfirmationLetter = (
           <div class="ref-container">
             <div class="ref-col-left">
               <div>Ruj. Kami (Our Ref) : <strong>${refNumber}</strong></div>
-              <div style="padding-left: 125px;">(${studentMatricNo})</div>
-              <div style="margin-top: 4px;">Ruj. Tuan (Your Ref) :</div>
+              <div style="padding-left: 110px;">(${studentMatricNo})</div>
+              <div style="margin-top: 2px;">Ruj. Tuan (Your Ref) :</div>
             </div>
             <div class="ref-col-right">
               ${formattedLetterDate}
@@ -1349,38 +1337,16 @@ export const generatePlacementConfirmationLetter = (
               Should there be any queries and issues pertaining to the industrial training programme, please do not hesitate to contact PLIF as follows :
               
               <table class="plif-table">
-                <tr><td class="p-label">Name</td><td class="p-sep">:</td><td class="p-val"><strong>WAN MUHAMMAD IDHAM BIN WAN MAHDI</strong></td></tr>
+                <tr><td class="p-label">Name</td><td class="p-sep">:</td><td class="p-val"><strong>DR. MOHD GUZAIRY BIN ABD GHANI</strong></td></tr>
                 <tr><td class="p-label">Tel No.</td><td class="p-sep">:</td><td class="p-val">06-2708140</td></tr>
                 <tr><td class="p-label">Fax No.</td><td class="p-sep">:</td><td class="p-val">06-2701043</td></tr>
-                <tr><td class="p-label">Email</td><td class="p-sep">:</td><td class="p-val">wan.idham@utem.edu.my</td></tr>
+                <tr><td class="p-label">Email</td><td class="p-sep">:</td><td class="p-val">guzairy@utem.edu.my</td></tr>
                 <tr><td class="p-label">Url</td><td class="p-sep">:</td><td class="p-val">http://fptt.utem.edu.my/</td></tr>
               </table>
             </div>
           </div>
-        </div>
 
-        <div class="page-footer">
-          <div class="footer-bar"></div>
-          <div class="footer-bottom">
-            <div class="footer-text">SEBUAH UNIVERSITI TEKNIKAL AWAM</div>
-            <div class="cert-box">
-              <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
-                <div style="text-align: center; border: 1px solid #777; padding: 2px 5px; border-radius: 2px; font-size: 6pt; font-weight: bold; line-height: 1;">
-                  <span style="color: #0b4991;">STANDARDS</span><br><span style="color: #c00;">MALAYSIA</span>
-                </div>
-                <div style="font-size: 6pt; color: #555; text-align: left; line-height: 1.1;">
-                  ISO 9001:2015<br>CERT. NO. QMS 01380
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- PAGE 2 -->
-      <div class="letter-page page-2">
-        <div class="page-content-wrap">
-          <div class="clause-block" style="margin-top: 10px;">
+          <div class="clause-block">
             <div class="clause-num">5.</div>
             <div class="clause-content">
               Please be reminded that students are subjected to rules & regulations of UTeM and the organisation throughout the industrial training period.
@@ -1389,7 +1355,7 @@ export const generatePlacementConfirmationLetter = (
 
           <div class="signoff-section">
             <div>Your Sincerely</div>
-            <br><br><br>
+            <div style="height: 14px;"></div>
             <div class="signatory-name">PROF. DR. MOHD. SYAIFUL RIZAL BIN ABDUL HAMID</div>
             <div class="signatory-title">Dean</div>
             <div class="signatory-dept">FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP</div>
@@ -1399,16 +1365,16 @@ export const generatePlacementConfirmationLetter = (
           </div>
         </div>
 
-        <div class="page-footer page-footer-fixed">
+        <div class="page-footer">
           <div class="footer-bar"></div>
           <div class="footer-bottom">
             <div class="footer-text">SEBUAH UNIVERSITI TEKNIKAL AWAM</div>
             <div class="cert-box">
               <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
-                <div style="text-align: center; border: 1px solid #777; padding: 2px 5px; border-radius: 2px; font-size: 6pt; font-weight: bold; line-height: 1;">
+                <div style="text-align: center; border: 1px solid #777; padding: 1px 4px; border-radius: 2px; font-size: 5.5pt; font-weight: bold; line-height: 1;">
                   <span style="color: #0b4991;">STANDARDS</span><br><span style="color: #c00;">MALAYSIA</span>
                 </div>
-                <div style="font-size: 6pt; color: #555; text-align: left; line-height: 1.1;">
+                <div style="font-size: 5.5pt; color: #555; text-align: left; line-height: 1.1;">
                   ISO 9001:2015<br>CERT. NO. QMS 01380
                 </div>
               </div>
