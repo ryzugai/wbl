@@ -62,14 +62,23 @@ export const Statistics: React.FC<StatisticsProps> = ({ applications, companies,
   }, [applications]);
 
   const companyStats = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts: Record<string, { total: number; placed: number }> = {};
     applications.forEach(app => {
       const name = app.company_name || 'Unknown';
-      counts[name] = (counts[name] || 0) + 1;
+      if (!counts[name]) counts[name] = { total: 0, placed: 0 };
+      counts[name].total += 1;
+      if (app.application_status === 'Diluluskan') {
+        counts[name].placed += 1;
+      }
     });
     return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+      .map(([name, stat]) => ({ 
+        name, 
+        count: stat.placed > 0 ? stat.placed : stat.total,
+        placed: stat.placed,
+        total: stat.total 
+      }))
+      .sort((a, b) => (b.placed - a.placed) || (b.count - a.count))
       .slice(0, 5);
   }, [applications]);
 
@@ -290,6 +299,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ applications, companies,
                         <span className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{c.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
+                        {c.placed > 0 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                            {language === 'ms' ? 'Ditempatkan' : 'Placed'}
+                          </span>
+                        )}
                         <span className="text-xs font-black text-purple-600">{c.count}</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t(language, 'appStudent')}</span>
                     </div>

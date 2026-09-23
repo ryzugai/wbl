@@ -689,6 +689,150 @@ export const StorageService = {
     }
   },
 
+  setStudentPlacement: async ({
+    student,
+    company,
+    targetApplicationId,
+    deleteOtherChoices = true,
+    supervisorId,
+    performedBy
+  }: {
+    student: User;
+    company: { company_name: string; company_state?: string; company_district?: string; company_address?: string };
+    targetApplicationId?: string;
+    deleteOtherChoices?: boolean;
+    supervisorId?: string;
+    performedBy?: User;
+  }): Promise<{ placementApp: Application; deletedCount: number }> => {
+    // 1. If supervisor is selected, update student record
+    let updatedStudent = { ...student };
+    if (supervisorId) {
+      const users = StorageService.getUsers();
+      const lecturer = users.find(u => u.id === supervisorId);
+      if (lecturer) {
+        updatedStudent = {
+          ...updatedStudent,
+          faculty_supervisor_id: lecturer.id,
+          faculty_supervisor_name: lecturer.name,
+          faculty_supervisor_staff_id: lecturer.staff_id || '',
+          faculty_supervisor_email: lecturer.email || ''
+        };
+        await StorageService.updateUser(updatedStudent);
+      }
+    }
+
+    // 2. Find or create the placement application
+    const studentApps = inMemoryApplications.filter(a => 
+      (a.student_id === student.matric_no || a.created_by === student.username)
+    );
+
+    let targetApp: Application | undefined;
+    if (targetApplicationId) {
+      targetApp = studentApps.find(a => a.id === targetApplicationId);
+    }
+    if (!targetApp) {
+      targetApp = studentApps.find(a => a.company_name.trim().toLowerCase() === company.company_name.trim().toLowerCase());
+    }
+
+    let finalApp: Application;
+
+    if (targetApp) {
+      finalApp = {
+        ...targetApp,
+        company_name: company.company_name,
+        company_state: company.company_state || targetApp.company_state,
+        company_district: company.company_district || targetApp.company_district,
+        application_status: 'Diluluskan',
+        student_preferred: true,
+        student_has_offer: true,
+        reply_form_verified: true,
+        faculty_supervisor_id: updatedStudent.faculty_supervisor_id || targetApp.faculty_supervisor_id,
+        faculty_supervisor_name: updatedStudent.faculty_supervisor_name || targetApp.faculty_supervisor_name,
+        faculty_supervisor_staff_id: updatedStudent.faculty_supervisor_staff_id || targetApp.faculty_supervisor_staff_id,
+        faculty_supervisor_email: updatedStudent.faculty_supervisor_email || targetApp.faculty_supervisor_email
+      };
+      await StorageService.updateApplication(finalApp);
+    } else {
+      finalApp = await StorageService.createApplication({
+        student_name: student.name,
+        student_id: student.matric_no || '',
+        student_email: student.email || '',
+        student_program: student.program || '',
+        company_name: company.company_name,
+        company_state: company.company_state || 'Melaka',
+        company_district: company.company_district || '',
+        application_status: 'Diluluskan',
+        student_preferred: true,
+        student_has_offer: true,
+        start_date: new Date().toISOString().split('T')[0],
+        created_by: student.username,
+        created_at: new Date().toISOString(),
+        reply_form_verified: true,
+        faculty_supervisor_id: updatedStudent.faculty_supervisor_id,
+        faculty_supervisor_name: updatedStudent.faculty_supervisor_name,
+        faculty_supervisor_staff_id: updatedStudent.faculty_supervisor_staff_id,
+        faculty_supervisor_email: updatedStudent.faculty_supervisor_email
+      });
+    }
+
+    // 3. Delete other choices if requested
+    let deletedCount = 0;
+    if (deleteOtherChoices) {
+      const othersToDelete = inMemoryApplications.filter(a => 
+        (a.student_id === student.matric_no || a.created_by === student.username) && 
+        a.id !== finalApp.id
+      );
+      for (const other of othersToDelete) {
+        await StorageService.deleteApplication(other.id);
+        deletedCount++;
+      }
+    }
+
+    // 4. Send notification to student
+    try {
+      await StorageService.createNotification({
+        recipient_id: student.id || student.username,
+        recipient_role: UserRole.STUDENT,
+        title_ms: `Penetapan Rasmi Syarikat Penempatan WBL`,
+        title_en: `Official WBL Placement Assignment`,
+        message_ms: `Tahniah! Anda telah ditetapkan secara rasmi di syarikat ${company.company_name} oleh Penyelaras WBL.${deletedCount > 0 ? ` Sebanyak ${deletedCount} permohonan pilihan lain telah dipadamkan.` : ''}`,
+        message_en: `Congratulations! You have been officially assigned to ${company.company_name} by WBL Coordinator.${deletedCount > 0 ? ` ${deletedCount} other application choices have been deleted.` : ''}`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        sender_name: performedBy?.name || 'Penyelaras WBL',
+        application_id: finalApp.id
+      });
+    } catch (e) {
+      console.warn('Failed to send placement notification:', e);
+    }
+
+    // 5. Log activity
+    if (performedBy) {
+      await StorageService.logActivity(
+        performedBy.id,
+        performedBy.username,
+        performedBy.role,
+        performedBy.name,
+        'placement_set_by_coordinator',
+        `Menetapkan syarikat penempatan rasmi "${company.company_name}" untuk pelajar ${student.name} (${student.matric_no})${deletedCount > 0 ? ` dan memadam ${deletedCount} pilihan lain` : ''}.`,
+        `Assigned official placement "${company.company_name}" for student ${student.name} (${student.matric_no})${deletedCount > 0 ? ` and deleted ${deletedCount} other choices` : ''}.`
+      );
+    }
+
+    return { placementApp: finalApp, deletedCount };
+  },
+
+  deleteOtherStudentApplications: async (studentMatricOrUsername: string, keepAppId: string): Promise<number> => {
+    const others = inMemoryApplications.filter(a => 
+      (a.student_id === studentMatricOrUsername || a.created_by === studentMatricOrUsername) && 
+      a.id !== keepAppId
+    );
+    for (const other of others) {
+      await StorageService.deleteApplication(other.id);
+    }
+    return others.length;
+  },
+
   getActivities: (): UserActivity[] => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVITIES) || '[]') as UserActivity[];

@@ -270,8 +270,10 @@ function App() {
                 language={language}
                 users={users} 
                 applications={applications} 
+                companies={companies}
                 currentUser={currentUser}
                 onUpdateApplication={handleUpdateApplication}
+                onDeleteApplication={handleDeleteApplication}
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
             />

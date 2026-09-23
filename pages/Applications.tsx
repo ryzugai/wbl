@@ -105,6 +105,169 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
   
   const hasSystemAccess = currentUser.role === UserRole.COORDINATOR || currentUser.role === UserRole.LECTURER || currentUser.is_jkwbl;
 
+  // Placement Management States (for Coordinator / JKWBL)
+  const [isPlacementModalOpen, setIsPlacementModalOpen] = useState(false);
+  const [placementTargetStudent, setPlacementTargetStudent] = useState<User | null>(null);
+  const [placementTargetGroup, setPlacementTargetGroup] = useState<{ student_name: string; student_id: string; created_by: string; apps: Application[] } | null>(null);
+  const [placementSourceMode, setPlacementSourceMode] = useState<'existing' | 'directory'>('existing');
+  const [selectedPlacementAppId, setSelectedPlacementAppId] = useState<string>('');
+  const [selectedDirectoryCompanyId, setSelectedDirectoryCompanyId] = useState<string>('');
+  const [customPlacementCompanyName, setCustomPlacementCompanyName] = useState<string>('');
+  const [customPlacementCompanyState, setCustomPlacementCompanyState] = useState<string>('Melaka');
+  const [customPlacementCompanyDistrict, setCustomPlacementCompanyDistrict] = useState<string>('');
+  const [placementSupervisorId, setPlacementSupervisorId] = useState<string>('');
+  const [deleteOtherChoicesOption, setDeleteOtherChoicesOption] = useState<boolean>(true);
+  const [isSavingPlacement, setIsSavingPlacement] = useState<boolean>(false);
+
+  const openPlacementModal = (
+    group: { student_name: string; student_id: string; created_by: string; apps: Application[] },
+    preselectedApp?: Application
+  ) => {
+    const studentUser = users.find(u => u.matric_no === group.student_id || u.username === group.created_by) || {
+      id: group.student_id || group.created_by,
+      name: group.student_name,
+      matric_no: group.student_id,
+      username: group.created_by,
+      role: UserRole.STUDENT,
+      program: group.apps[0]?.student_program || ''
+    } as User;
+
+    setPlacementTargetStudent(studentUser);
+    setPlacementTargetGroup(group);
+    setDeleteOtherChoicesOption(true);
+    setPlacementSupervisorId(studentUser.faculty_supervisor_id || group.apps[0]?.faculty_supervisor_id || '');
+    setCustomPlacementCompanyName('');
+    setCustomPlacementCompanyState('Melaka');
+    setCustomPlacementCompanyDistrict('');
+    setSelectedDirectoryCompanyId('');
+
+    if (preselectedApp) {
+      setPlacementSourceMode('existing');
+      setSelectedPlacementAppId(preselectedApp.id);
+    } else if (group.apps.length > 0) {
+      setPlacementSourceMode('existing');
+      const approvedApp = group.apps.find(a => a.application_status === 'Diluluskan');
+      setSelectedPlacementAppId(approvedApp ? approvedApp.id : group.apps[0].id);
+    } else {
+      setPlacementSourceMode('directory');
+      setSelectedPlacementAppId('');
+    }
+
+    setIsPlacementModalOpen(true);
+  };
+
+  const handleConfirmSavePlacement = async () => {
+    if (!placementTargetStudent || !placementTargetGroup) return;
+
+    let targetCompany: { company_name: string; company_state?: string; company_district?: string; company_address?: string };
+
+    if (placementSourceMode === 'existing') {
+      const app = placementTargetGroup.apps.find(a => a.id === selectedPlacementAppId);
+      if (!app) {
+        toast.error(language === 'ms' ? 'Sila pilih salah satu permohonan syarikat sedia ada.' : 'Please select one of the existing applications.');
+        return;
+      }
+      targetCompany = {
+        company_name: app.company_name,
+        company_state: app.company_state,
+        company_district: app.company_district
+      };
+    } else {
+      if (selectedDirectoryCompanyId === 'CUSTOM_NEW') {
+        if (!customPlacementCompanyName.trim()) {
+          toast.error(language === 'ms' ? 'Sila masukkan nama syarikat baharu.' : 'Please enter company name.');
+          return;
+        }
+        targetCompany = {
+          company_name: customPlacementCompanyName.trim(),
+          company_state: customPlacementCompanyState.trim() || 'Melaka',
+          company_district: customPlacementCompanyDistrict.trim()
+        };
+      } else {
+        const comp = companies.find(c => c.id === selectedDirectoryCompanyId);
+        if (!comp) {
+          toast.error(language === 'ms' ? 'Sila pilih syarikat dari direktori.' : 'Please select a company from directory.');
+          return;
+        }
+        targetCompany = {
+          company_name: comp.company_name,
+          company_state: comp.company_state,
+          company_district: comp.company_district,
+          company_address: comp.company_address
+        };
+      }
+    }
+
+    setIsSavingPlacement(true);
+    const loadingToast = toast.loading(language === 'ms' ? 'Menetapkan penempatan pelajar...' : 'Setting student placement...');
+
+    try {
+      const result = await StorageService.setStudentPlacement({
+        student: placementTargetStudent,
+        company: targetCompany,
+        targetApplicationId: placementSourceMode === 'existing' ? selectedPlacementAppId : undefined,
+        deleteOtherChoices: deleteOtherChoicesOption,
+        supervisorId: placementSupervisorId,
+        performedBy: currentUser
+      });
+
+      // Update parent state / trigger storage listener
+      await onUpdateApplication(result.placementApp);
+
+      toast.success(
+        language === 'ms'
+          ? `Penempatan ${placementTargetStudent.name} berjaya ditetapkan di ${targetCompany.company_name}! ${result.deletedCount > 0 ? `${result.deletedCount} pilihan permohonan lain telah dipadam.` : ''} Statistik infografik dikemaskini.`
+          : `Placement set to ${targetCompany.company_name}! Statistics updated.`,
+        { id: loadingToast }
+      );
+
+      setIsPlacementModalOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Ralat menetapkan penempatan', { id: loadingToast });
+    } finally {
+      setIsSavingPlacement(false);
+    }
+  };
+
+  const handleDeleteOtherChoicesOnly = async (
+    group: { student_name: string; student_id: string; created_by: string; apps: Application[] },
+    keepApp: Application
+  ) => {
+    const otherCount = group.apps.filter(a => a.id !== keepApp.id).length;
+    if (otherCount === 0) {
+      toast.error(language === 'ms' ? 'Tiada pilihan permohonan lain untuk dipadam.' : 'No other applications to delete.');
+      return;
+    }
+
+    const confirmMsg = language === 'ms'
+      ? `Padamkan ${otherCount} rekod pilihan permohonan lain bagi pelajar ${group.student_name}? Rekod syarikat "${keepApp.company_name}" akan dikekalkan sebagai penempatan rasmi.`
+      : `Delete ${otherCount} other application choices for ${group.student_name}? "${keepApp.company_name}" will be kept as official placement.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const loadingToast = toast.loading(language === 'ms' ? 'Memadam pilihan permohonan lain...' : 'Deleting other choices...');
+    try {
+      const deletedCount = await StorageService.deleteOtherStudentApplications(group.student_id || group.created_by, keepApp.id);
+      
+      // Update keepApp to ensure it is marked approved and preferred
+      await onUpdateApplication({
+        ...keepApp,
+        application_status: 'Diluluskan',
+        student_preferred: true
+      });
+
+      toast.success(
+        language === 'ms'
+          ? `${deletedCount} pilihan permohonan lain telah dipadam. Statistik infografik dikemaskini serta-merta!`
+          : `${deletedCount} other applications deleted. Infographic statistics updated!`,
+        { id: loadingToast }
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal memadam pilihan', { id: loadingToast });
+    }
+  };
+
   const filteredApps = applications.filter(app => {
     if (currentUser.role === UserRole.STUDENT) {
       return app.created_by === currentUser.username || (currentUser.matric_no && app.student_id?.toLowerCase() === currentUser.matric_no?.toLowerCase());
@@ -521,6 +684,36 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                         </span>
                                       );
                                     })()}
+
+                                    {/* Coordinator Direct Placement Actions */}
+                                    {hasSystemAccess && (
+                                      <div className="pt-2.5 mt-2 border-t border-slate-200/90 flex flex-col gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => openPlacementModal(group)}
+                                          className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg text-[11px] font-black shadow-xs transition-all"
+                                          title="Tetapkan syarikat penempatan rasmi untuk pelajar ini"
+                                        >
+                                          <Building2 size={12} />
+                                          <span>Tetapkan Penempatan</span>
+                                        </button>
+                                        
+                                        {group.apps.length > 1 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const approved = group.apps.find(a => a.application_status === 'Diluluskan') || group.apps[0];
+                                              handleDeleteOtherChoicesOnly(group, approved);
+                                            }}
+                                            className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-extrabold transition-all"
+                                            title="Padam senarai pilihan permohonan lain bagi pelajar ini"
+                                          >
+                                            <Trash2 size={11} className="text-amber-600" />
+                                            <span>Padam Pilihan Lain ({group.apps.length - 1})</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
                                 </div>
                             </td>
                             
@@ -831,6 +1024,35 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
                                                         
                                                         {hasSystemAccess && (
                                                             <>
+                                                                {app.application_status !== 'Diluluskan' ? (
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={() => openPlacementModal(group, app)}
+                                                                        className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg flex items-center gap-1 text-[11px] font-bold shadow-2xs transition-all"
+                                                                        title="Tetapkan syarikat ini sebagai penempatan rasmi dan padam pilihan lain"
+                                                                    >
+                                                                        <CheckCircle2 size={12} />
+                                                                        <span>Tetapkan Penempatan</span>
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-black flex items-center gap-1">
+                                                                        <CheckCircle2 size={12} className="text-emerald-600" />
+                                                                        <span>Penempatan Rasmi</span>
+                                                                    </span>
+                                                                )}
+
+                                                                {group.apps.length > 1 && app.application_status === 'Diluluskan' && (
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteOtherChoicesOnly(group, app)}
+                                                                        className="px-2 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors"
+                                                                        title="Padam senarai pilihan permohonan lain bagi pelajar ini"
+                                                                    >
+                                                                        <Trash2 size={11} />
+                                                                        <span>Padam Pilihan Lain</span>
+                                                                    </button>
+                                                                )}
+
                                                                 <button 
                                                                     onClick={() => openUploadModal(app)}
                                                                     className="px-2.5 py-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 rounded-lg flex items-center gap-1 text-[11px] font-bold border border-emerald-200 shadow-2xs transition-colors"
@@ -1525,6 +1747,236 @@ export const Applications: React.FC<ApplicationsProps> = ({ currentUser, applica
             </div>
           </Modal>
         )}
+
+        {/* MODAL: TETAPKAN PENEMPATAN PELAJAR (PENYELARAS) */}
+        <Modal
+          isOpen={isPlacementModalOpen}
+          onClose={() => setIsPlacementModalOpen(false)}
+          title={language === 'ms' ? 'Tetapkan Syarikat Penempatan Pelajar' : 'Assign Student Placement Company'}
+        >
+          <div className="space-y-4">
+            {/* Student Info Banner */}
+            <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm">
+                    {placementTargetStudent?.name || placementTargetGroup?.student_name}
+                  </h4>
+                  <p className="text-xs text-slate-600 font-mono mt-0.5">
+                    {placementTargetStudent?.matric_no || placementTargetGroup?.student_id} • {placementTargetStudent?.program || 'WBL'}
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-[10px] font-black uppercase rounded-lg border border-blue-200">
+                  {placementTargetGroup?.apps.length || 0} Pilihan Sedia Ada
+                </span>
+              </div>
+            </div>
+
+            {/* Source Mode Switcher */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">Pilihan Sumber Penempatan:</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPlacementSourceMode('existing')}
+                  disabled={!placementTargetGroup || placementTargetGroup.apps.length === 0}
+                  className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all flex items-center gap-2 ${
+                    placementSourceMode === 'existing' 
+                      ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-2xs ring-1 ring-indigo-600' 
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  } ${(!placementTargetGroup || placementTargetGroup.apps.length === 0) ? 'opacity-40 cursor-not-allowed' : ''}`}
+                >
+                  <CheckCircle2 size={15} className={placementSourceMode === 'existing' ? 'text-indigo-600' : 'text-slate-400'} />
+                  <div>
+                    <span className="block font-extrabold">Dari Pilihan Pelajar</span>
+                    <span className="text-[10px] font-normal opacity-80">({placementTargetGroup?.apps.length || 0} syarikat dipohon)</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPlacementSourceMode('directory')}
+                  className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all flex items-center gap-2 ${
+                    placementSourceMode === 'directory' 
+                      ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-2xs ring-1 ring-indigo-600' 
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Building2 size={15} className={placementSourceMode === 'directory' ? 'text-indigo-600' : 'text-slate-400'} />
+                  <div>
+                    <span className="block font-extrabold">Dari Direktori / Baharu</span>
+                    <span className="text-[10px] font-normal opacity-80">({companies.length} syarikat berdaftar)</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Mode: Existing Applications */}
+            {placementSourceMode === 'existing' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">Pilih Syarikat Sebagai Penempatan Rasmi:</label>
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {placementTargetGroup?.apps.map(app => {
+                    const isSelected = selectedPlacementAppId === app.id;
+                    return (
+                      <div
+                        key={app.id}
+                        onClick={() => setSelectedPlacementAppId(app.id)}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                          isSelected 
+                            ? 'border-emerald-500 bg-emerald-50/80 text-emerald-950 shadow-2xs ring-1 ring-emerald-500' 
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Building2 size={14} className={isSelected ? 'text-emerald-600' : 'text-slate-400'} />
+                            <span className="text-xs font-bold truncate">{app.company_name}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5 ml-5">{app.company_state || 'Melaka'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            app.application_status === 'Diluluskan' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {app.application_status}
+                          </span>
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300'}`}>
+                            {isSelected && <span className="text-[10px] font-bold">✓</span>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Mode: Directory or Custom Company */}
+            {placementSourceMode === 'directory' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Pilih Syarikat dari Direktori:</label>
+                  <select
+                    value={selectedDirectoryCompanyId}
+                    onChange={e => setSelectedDirectoryCompanyId(e.target.value)}
+                    className="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">-- Pilih Syarikat dari Sistem ({companies.length} syarikat) --</option>
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.company_name} ({c.company_state})
+                      </option>
+                    ))}
+                    <option value="CUSTOM_NEW">+ Masukkan Maklumat Syarikat Baharu</option>
+                  </select>
+                </div>
+
+                {selectedDirectoryCompanyId === 'CUSTOM_NEW' && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <span className="text-xs font-bold text-slate-700 block">Maklumat Syarikat Baharu:</span>
+                    <input
+                      type="text"
+                      placeholder="Nama Syarikat"
+                      value={customPlacementCompanyName}
+                      onChange={e => setCustomPlacementCompanyName(e.target.value)}
+                      className="w-full text-xs p-2 bg-white border border-slate-300 rounded-lg"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Negeri (cth: Melaka)"
+                        value={customPlacementCompanyState}
+                        onChange={e => setCustomPlacementCompanyState(e.target.value)}
+                        className="w-full text-xs p-2 bg-white border border-slate-300 rounded-lg"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Daerah"
+                        value={customPlacementCompanyDistrict}
+                        onChange={e => setCustomPlacementCompanyDistrict(e.target.value)}
+                        className="w-full text-xs p-2 bg-white border border-slate-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Supervisor Assignment Option */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <UserCheck size={14} className="text-indigo-600" />
+                  <span>Penyelia Fakulti (Pilihan):</span>
+                </label>
+                {placementTargetStudent?.faculty_supervisor_name && (
+                  <span className="text-[10px] text-slate-500">
+                    Sedia ada: <strong className="text-indigo-700">{placementTargetStudent.faculty_supervisor_name}</strong>
+                  </span>
+                )}
+              </div>
+              <select
+                value={placementSupervisorId}
+                onChange={e => setPlacementSupervisorId(e.target.value)}
+                className="w-full text-xs font-semibold p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="">-- Kekalkan atau Tetapkan Penyelia Fakulti --</option>
+                {users.filter(u => u.role === UserRole.LECTURER || u.role === UserRole.COORDINATOR).map(lec => (
+                  <option key={lec.id} value={lec.id}>
+                    {lec.name} ({lec.staff_id || 'Pensyarah'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* DELETE OTHER CHOICES CHECKBOX (KEY REQUIREMENT) */}
+            <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-1">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteOtherChoicesOption}
+                  onChange={e => setDeleteOtherChoicesOption(e.target.checked)}
+                  className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 border-slate-300 cursor-pointer"
+                />
+                <div className="text-xs">
+                  <span className="font-extrabold text-slate-900 block">
+                    Padam senarai pilihan permohonan yang lain bagi pelajar ini
+                  </span>
+                  <span className="text-slate-600 text-[11px] block mt-0.5">
+                    Permohonan pilihan lain yang tidak dipilih akan dipadam daripada sistem secara automatik supaya rekod penempatan bersih dan statistik infografik dikemaskini tepat.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsPlacementModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isSavingPlacement}
+                onClick={handleConfirmSavePlacement}
+                className="px-5 py-2 text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+              >
+                {isSavingPlacement ? (
+                  <span>Menyimpan...</span>
+                ) : (
+                  <>
+                    <CheckCircle2 size={14} />
+                    <span>Sahkan Penempatan & Kemaskini Statistik</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </Modal>
     </div>
   );
 };
