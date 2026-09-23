@@ -1270,11 +1270,11 @@ export const generatePlacementConfirmationLetter = (
           </div>
 
           <div class="letter-title">
-            UTeM STUDENT INDUSTRIAL TRAINING PROGRAMME - PLACEMENT CONFIRMATION
+            UTeM STUDENT WORK-BASED LEARNING PROGRAMME - PLACEMENT CONFIRMATION
           </div>
 
           <p class="intro-p">
-            I'm pleased to confirm the placement of your industrial training programme as per follows :
+            I'm pleased to confirm the placement of your Work-Based Learning programme as per follows :
           </p>
 
           <table class="placement-details-table">
@@ -1304,7 +1304,7 @@ export const generatePlacementConfirmationLetter = (
                 <tr>
                   <td style="width: 53%; vertical-align: top;">
                     <table class="sub-list">
-                      <tr><td class="num">i.</td><td>Industrial Training Placement Confirmation Letter to the company</td></tr>
+                      <tr><td class="num">i.</td><td>Work-Based Learning Placement Confirmation Letter to the company</td></tr>
                       <tr><td class="num">ii.</td><td>Copy of Offer Letter</td></tr>
                       <tr><td class="num">iii.</td><td>UTeM Matric Card</td></tr>
                       <tr><td class="num">iv.</td><td>Daily Logbook</td></tr>
@@ -1327,14 +1327,14 @@ export const generatePlacementConfirmationLetter = (
           <div class="clause-block">
             <div class="clause-num">3.</div>
             <div class="clause-content">
-              Students are required to fill up <strong>'Industrial Training Information Card'</strong> (available in the Daily Logbook) and send it to the Faculty Industrial Training Coordinator (PLIF) within <strong>one week</strong> after reporting for training. In the case that you have changed your residential / industry address (under the instruction of the organisation only) during the training, please inform the PLIF as soon as possible by filling in the form <strong>'Change of Address during Industrial Training'</strong>.
+              Students are required to fill up <strong>'Work-Based Learning Information Card'</strong> (available in the Daily Logbook) and send it to the Faculty Work-Based Learning Coordinator (PLIF) within <strong>one week</strong> after reporting for training. In the case that you have changed your residential / industry address (under the instruction of the organisation only) during the training, please inform the PLIF as soon as possible by filling in the form <strong>'Change of Address during Work-Based Learning'</strong>.
             </div>
           </div>
 
           <div class="clause-block">
             <div class="clause-num">4.</div>
             <div class="clause-content">
-              Should there be any queries and issues pertaining to the industrial training programme, please do not hesitate to contact PLIF as follows :
+              Should there be any queries and issues pertaining to the Work-Based Learning programme, please do not hesitate to contact PLIF as follows :
               
               <table class="plif-table">
                 <tr><td class="p-label">Name</td><td class="p-sep">:</td><td class="p-val"><strong>DR. MOHD GUZAIRY BIN ABD GHANI</strong></td></tr>
@@ -1349,7 +1349,7 @@ export const generatePlacementConfirmationLetter = (
           <div class="clause-block">
             <div class="clause-num">5.</div>
             <div class="clause-content">
-              Please be reminded that students are subjected to rules & regulations of UTeM and the organisation throughout the industrial training period.
+              Please be reminded that students are subjected to rules & regulations of UTeM and the organisation throughout the Work-Based Learning period.
             </div>
           </div>
 
