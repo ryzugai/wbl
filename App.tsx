@@ -21,6 +21,7 @@ import { Analysis } from './pages/Analysis';
 import { PosterFlipbook } from './pages/PosterFlipbook';
 import { UserActivities } from './pages/UserActivities';
 import { DailyLogbook } from './pages/DailyLogbook';
+import { StudentEvaluationPage } from './pages/StudentEvaluationPage';
 import { Toaster, toast } from 'react-hot-toast';
 import { Language } from './translations';
 
@@ -306,6 +307,20 @@ function App() {
                 applications={applications}
                 users={users}
                 language={language}
+            />
+        )}
+
+        {(currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics') && (
+            <StudentEvaluationPage
+                currentUser={currentUser}
+                applications={applications}
+                users={users}
+                language={language}
+                initialTab={
+                  currentView === 'evaluationSettings' ? 'settings' :
+                  currentView === 'evaluationRubrics' ? 'rubrics' : 'evaluations'
+                }
+                onNavigate={setCurrentView}
             />
         )}
 

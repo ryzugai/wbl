@@ -208,4 +208,78 @@ export interface WeeklyLogbook {
   updatedAt: string;
 }
 
+export type EvaluationStatus = 'draft' | 'submitted_by_trainer' | 'verified_by_lecturer' | 'revision_requested';
+
+export interface CourseLecturerAssignment {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  lecturerId: string;
+  lecturerName: string;
+  lecturerStaffId?: string;
+  lecturerEmail?: string;
+  semester?: string;
+  assignedStudentIds?: string[]; // Optional specific students, or cohort-wide if empty
+  updatedAt: string;
+}
+
+export interface StudentEvaluationCriteriaScores {
+  // Bahagian A: Kemahiran Teknikal & Pelaksanaan Tugasan (40 markah)
+  taskKnowledge: number;       // 0 - 10
+  workQuality: number;         // 0 - 10
+  problemSolving: number;      // 0 - 10
+  toolCompetency: number;      // 0 - 10
+  // Bahagian B: Kemahiran Insaniah & Profesionalisme (40 markah)
+  punctuality: number;         // 0 - 10
+  communication: number;       // 0 - 10
+  workEthics: number;          // 0 - 10
+  adaptability: number;        // 0 - 10
+  // Bahagian C: Buku Log & Dokumentasi (20 markah)
+  logbookQuality: number;      // 0 - 10
+  reflectionQuality: number;   // 0 - 10
+}
+
+export interface StudentEvaluation {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentMatric: string;
+  studentProgram: string;
+  companyName: string;
+  companyAddress?: string;
+  courseCode: string;
+  courseName: string;
+  // Pensyarah Kursus
+  lecturerId: string;
+  lecturerName: string;
+  lecturerStaffId?: string;
+  lecturerEmail?: string;
+  // Jurulatih Industri
+  trainerId: string;
+  trainerName: string;
+  trainerPosition?: string;
+  trainerCompany?: string;
+  trainerEmail?: string;
+  trainerPhone?: string;
+  // Markah mengikut rubrik
+  scores: StudentEvaluationCriteriaScores;
+  technicalSubtotal: number;    // / 40
+  softSkillsSubtotal: number;   // / 40
+  logbookSubtotal: number;      // / 20
+  totalScore: number;           // / 100
+  grade: string;                // A+, A, A-, B+, etc.
+  // Ulasan Jurulatih Industri
+  trainerComments: string;
+  trainerRecommendation?: string;
+  submittedAt?: string;
+  // Pengesahan Pensyarah Kursus
+  status: EvaluationStatus;
+  lecturerComments?: string;
+  verifiedAt?: string;
+  verifiedByLecturerName?: string;
+  revisionNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 

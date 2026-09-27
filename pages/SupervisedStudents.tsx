@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock, BookOpen } from 'lucide-react';
+import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock, BookOpen, Award } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { DocumentViewer } from '../components/DocumentViewer';
 import { Language, t } from '../translations';
@@ -329,13 +329,23 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
               <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2">
                  <div className="flex items-center gap-2">
                    {onNavigate && (
-                     <button
-                       onClick={() => onNavigate('dailyLogbook')}
-                       className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-xs"
-                     >
-                       <BookOpen size={12} />
-                       <span>{language === 'ms' ? 'Buku Log Harian' : 'Daily Logbook'}</span>
-                     </button>
+                     <>
+                       <button
+                         onClick={() => onNavigate('dailyLogbook')}
+                         className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                       >
+                         <BookOpen size={12} />
+                         <span>{language === 'ms' ? 'Buku Log Harian' : 'Daily Logbook'}</span>
+                       </button>
+
+                       <button
+                         onClick={() => onNavigate('studentEvaluation')}
+                         className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                       >
+                         <Award size={12} />
+                         <span>{language === 'ms' ? 'Penilaian Pelajar' : 'Evaluation'}</span>
+                       </button>
+                     </>
                    )}
                  </div>
                  {student.activeApp?.reply_form_uploaded_at && (

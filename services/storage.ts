@@ -1,6 +1,6 @@
 
-import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry } from '../types';
-import { COORDINATOR_ACCOUNT } from '../constants';
+import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus } from '../types';
+import { COORDINATOR_ACCOUNT, DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
 import { IDBDocStorage } from './idbStorage';
@@ -13,7 +13,9 @@ const STORAGE_KEYS = {
   AD_CONFIG: 'wbl_ad_config',
   ACTIVITIES: 'wbl_activities',
   NOTIFICATIONS: 'wbl_notifications',
-  LOGBOOKS: 'wbl_weekly_logbooks'
+  LOGBOOKS: 'wbl_weekly_logbooks',
+  COURSE_ASSIGNMENTS: 'wbl_course_lecturer_assignments',
+  EVALUATIONS: 'wbl_student_evaluations'
 };
 
 const firebaseConfig = {
@@ -31,6 +33,8 @@ let unsubscribeListeners: (() => void)[] = [];
 let inMemoryUsers: User[] = [];
 let inMemoryApplications: Application[] = [];
 let inMemoryLogbooks: WeeklyLogbook[] = [];
+let inMemoryCourseAssignments: CourseLecturerAssignment[] = [];
+let inMemoryEvaluations: StudentEvaluation[] = [];
 
 const stripHeavyFields = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -357,6 +361,8 @@ const init = () => {
   if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, []);
   if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, []);
   if (!localStorage.getItem(STORAGE_KEYS.LOGBOOKS)) safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, []);
+  if (!localStorage.getItem(STORAGE_KEYS.COURSE_ASSIGNMENTS)) safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, []);
+  if (!localStorage.getItem(STORAGE_KEYS.EVALUATIONS)) safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, []);
   
   const rawAd = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
   if (!rawAd) {
@@ -379,6 +385,18 @@ const init = () => {
     inMemoryLogbooks = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGBOOKS) || '[]');
   } catch {
     inMemoryLogbooks = [];
+  }
+
+  try {
+    inMemoryCourseAssignments = JSON.parse(localStorage.getItem(STORAGE_KEYS.COURSE_ASSIGNMENTS) || '[]');
+  } catch {
+    inMemoryCourseAssignments = [];
+  }
+
+  try {
+    inMemoryEvaluations = JSON.parse(localStorage.getItem(STORAGE_KEYS.EVALUATIONS) || '[]');
+  } catch {
+    inMemoryEvaluations = [];
   }
 
   cleanAndMigrateLocalStorage();
@@ -1765,6 +1783,531 @@ export const StorageService = {
     safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, all);
     notifyListeners();
     if (db) await deleteDoc(doc(db, 'weekly_logbooks', id));
+  },
+
+  // ==================== COURSE LECTURER ASSIGNMENTS ====================
+  getCourseAssignments: (): CourseLecturerAssignment[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.COURSE_ASSIGNMENTS);
+      if (raw) {
+        const parsed = JSON.parse(raw) as CourseLecturerAssignment[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryCourseAssignments = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+
+    // Seed default course assignments from DEFAULT_WBL_COURSES
+    if (inMemoryCourseAssignments.length === 0) {
+      const users = StorageService.getUsers();
+      const lecturers = users.filter(u => u.role === UserRole.LECTURER || u.role === UserRole.COORDINATOR || u.is_jkwbl);
+      const defaultLecturer = lecturers[0] || {
+        id: COORDINATOR_ACCOUNT.id,
+        name: COORDINATOR_ACCOUNT.name,
+        staff_id: 'UTEM-FPTT-01',
+        email: COORDINATOR_ACCOUNT.email
+      };
+
+      const defaults: CourseLecturerAssignment[] = DEFAULT_WBL_COURSES.map((course, idx) => {
+        const assignedLec = lecturers[idx % Math.max(1, lecturers.length)] || defaultLecturer;
+        return {
+          id: `assign_${course.code.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          courseCode: course.code,
+          courseName: course.name_ms,
+          lecturerId: assignedLec.id,
+          lecturerName: assignedLec.name,
+          lecturerStaffId: (assignedLec as any).staff_id || '',
+          lecturerEmail: assignedLec.email || '',
+          semester: course.semester,
+          updatedAt: new Date().toISOString()
+        };
+      });
+
+      inMemoryCourseAssignments = defaults;
+      safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, defaults);
+      return defaults;
+    }
+
+    return inMemoryCourseAssignments;
+  },
+
+  saveCourseAssignment: async (assignmentData: Partial<CourseLecturerAssignment> & { courseCode: string; lecturerId: string; lecturerName: string }): Promise<CourseLecturerAssignment> => {
+    const all = StorageService.getCourseAssignments();
+    const existingIdx = all.findIndex(a => 
+      (assignmentData.id && a.id === assignmentData.id) || a.courseCode === assignmentData.courseCode
+    );
+
+    const now = new Date().toISOString();
+    let saved: CourseLecturerAssignment;
+
+    if (existingIdx !== -1) {
+      saved = {
+        ...all[existingIdx],
+        ...assignmentData,
+        updatedAt: now
+      };
+      all[existingIdx] = saved;
+    } else {
+      saved = {
+        id: assignmentData.id || `assign_${assignmentData.courseCode.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
+        courseCode: assignmentData.courseCode,
+        courseName: assignmentData.courseName || assignmentData.courseCode,
+        lecturerId: assignmentData.lecturerId,
+        lecturerName: assignmentData.lecturerName,
+        lecturerStaffId: assignmentData.lecturerStaffId || '',
+        lecturerEmail: assignmentData.lecturerEmail || '',
+        semester: assignmentData.semester || 'Semester 7',
+        assignedStudentIds: assignmentData.assignedStudentIds || [],
+        updatedAt: now
+      };
+      all.push(saved);
+    }
+
+    inMemoryCourseAssignments = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'course_assignments', saved.id), sanitizeForFirebase(saved), { merge: true });
+      } catch (e) {
+        console.warn('Firebase course assignment sync notice:', e);
+      }
+    }
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'COURSE_LECTURER_ASSIGNED',
+        `Menetapkan pensyarah ${saved.lecturerName} untuk kursus ${saved.courseCode} (${saved.courseName}).`,
+        `Assigned lecturer ${saved.lecturerName} for course ${saved.courseCode}.`
+      );
+    }
+
+    return saved;
+  },
+
+  deleteCourseAssignment: async (id: string): Promise<void> => {
+    const all = StorageService.getCourseAssignments().filter(a => a.id !== id);
+    inMemoryCourseAssignments = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, all);
+    notifyListeners();
+    if (db) await deleteDoc(doc(db, 'course_assignments', id));
+  },
+
+  // ==================== STUDENT EVALUATION MODULE ====================
+  getEvaluations: (): StudentEvaluation[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.EVALUATIONS);
+      if (raw) {
+        const parsed = JSON.parse(raw) as StudentEvaluation[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryEvaluations = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+
+    // Seed default demo evaluations if empty
+    if (inMemoryEvaluations.length === 0) {
+      const demoEvals: StudentEvaluation[] = [
+        {
+          id: 'eval_demo_1',
+          studentId: 'student_demo_1',
+          studentName: 'Muhammad Amirul bin Razak',
+          studentMatric: 'B062110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          companyName: 'PETRONAS Digital Sdn Bhd',
+          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          courseCode: 'BTMT 3283(i)',
+          courseName: 'Analitik Perniagaan',
+          lecturerId: 'coordinator_guzairy',
+          lecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
+          lecturerStaffId: 'FPTT-001',
+          lecturerEmail: 'guzairy@utem.edu.my',
+          trainerId: 'trainer_azman',
+          trainerName: 'En. Azman bin Khalid',
+          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
+          trainerCompany: 'PETRONAS Digital Sdn Bhd',
+          trainerEmail: 'azman.khalid@petronas.com',
+          trainerPhone: '012-3849102',
+          scores: {
+            taskKnowledge: 9,
+            workQuality: 9,
+            problemSolving: 9,
+            toolCompetency: 8,
+            punctuality: 10,
+            communication: 9,
+            workEthics: 9,
+            adaptability: 9,
+            logbookQuality: 8,
+            reflectionQuality: 8
+          },
+          technicalSubtotal: 35,
+          softSkillsSubtotal: 37,
+          logbookSubtotal: 16,
+          totalScore: 88,
+          grade: 'A',
+          trainerComments: 'Pelajar menunjukkan kemahiran teknikal yang sangat baik dalam analitik data dan pipeline ETL. Cepat belajar alatan baharu dan berdisiplin tinggi.',
+          trainerRecommendation: 'Disyorkan untuk pertimbangan serapan kerja industri selepas tamat pengajian.',
+          submittedAt: '2026-09-20T10:00:00.000Z',
+          status: 'submitted_by_trainer',
+          createdAt: '2026-09-18T08:00:00.000Z',
+          updatedAt: '2026-09-20T10:00:00.000Z'
+        },
+        {
+          id: 'eval_demo_2',
+          studentId: 'student_demo_1',
+          studentName: 'Muhammad Amirul bin Razak',
+          studentMatric: 'B062110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          companyName: 'PETRONAS Digital Sdn Bhd',
+          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          courseCode: 'BTMT 3273(i)',
+          courseName: 'Keusahawanan Digital',
+          lecturerId: 'coordinator_guzairy',
+          lecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
+          lecturerStaffId: 'FPTT-001',
+          lecturerEmail: 'guzairy@utem.edu.my',
+          trainerId: 'trainer_azman',
+          trainerName: 'En. Azman bin Khalid',
+          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
+          trainerCompany: 'PETRONAS Digital Sdn Bhd',
+          trainerEmail: 'azman.khalid@petronas.com',
+          trainerPhone: '012-3849102',
+          scores: {
+            taskKnowledge: 9,
+            workQuality: 10,
+            problemSolving: 9,
+            toolCompetency: 9,
+            punctuality: 10,
+            communication: 9,
+            workEthics: 10,
+            adaptability: 9,
+            logbookQuality: 9,
+            reflectionQuality: 8
+          },
+          technicalSubtotal: 37,
+          softSkillsSubtotal: 38,
+          logbookSubtotal: 17,
+          totalScore: 92,
+          grade: 'A+',
+          trainerComments: 'Prestasi cemerlang dalam menguruskan inisiatif perniagaan digital syarikat dan berkolaborasi dalam pasukan kejuruteraan.',
+          trainerRecommendation: 'Amat memuaskan dan memenuhi tahap kompetensi profesional.',
+          submittedAt: '2026-09-15T14:30:00.000Z',
+          status: 'verified_by_lecturer',
+          lecturerComments: 'Tahniah kepada pelajar atas pencapaian cemerlang dalam kursus Keusahawanan Digital. Markah dan gred disahkan.',
+          verifiedAt: '2026-09-16T11:00:00.000Z',
+          verifiedByLecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
+          createdAt: '2026-09-14T08:00:00.000Z',
+          updatedAt: '2026-09-16T11:00:00.000Z'
+        }
+      ];
+
+      inMemoryEvaluations = demoEvals;
+      safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, demoEvals);
+      return demoEvals;
+    }
+
+    return inMemoryEvaluations;
+  },
+
+  getStudentEvaluations: (studentIdOrMatric: string): StudentEvaluation[] => {
+    const all = StorageService.getEvaluations();
+    return all.filter(e => e.studentId === studentIdOrMatric || e.studentMatric === studentIdOrMatric);
+  },
+
+  getLecturerEvaluations: (lecturerId: string, courseCode?: string): StudentEvaluation[] => {
+    const all = StorageService.getEvaluations();
+    return all.filter(e => {
+      const matchesLec = e.lecturerId === lecturerId;
+      const matchesCourse = !courseCode || e.courseCode === courseCode;
+      return matchesLec && matchesCourse;
+    });
+  },
+
+  getTrainerEvaluations: (trainerId: string, companyName?: string): StudentEvaluation[] => {
+    const all = StorageService.getEvaluations();
+    const cleanComp = (companyName || '').trim().toLowerCase();
+    return all.filter(e => {
+      if (e.trainerId === trainerId) return true;
+      if (cleanComp && e.companyName && e.companyName.trim().toLowerCase() === cleanComp) return true;
+      return false;
+    });
+  },
+
+  saveEvaluation: async (evalData: Partial<StudentEvaluation> & { studentId: string; courseCode: string }): Promise<StudentEvaluation> => {
+    const all = StorageService.getEvaluations();
+    const existingIdx = all.findIndex(e => 
+      (evalData.id && e.id === evalData.id) || (e.studentId === evalData.studentId && e.courseCode === evalData.courseCode)
+    );
+
+    const now = new Date().toISOString();
+    const scores = evalData.scores || {
+      taskKnowledge: 8, workQuality: 8, problemSolving: 8, toolCompetency: 8,
+      punctuality: 8, communication: 8, workEthics: 8, adaptability: 8,
+      logbookQuality: 8, reflectionQuality: 8
+    };
+
+    const technicalSubtotal = (scores.taskKnowledge || 0) + (scores.workQuality || 0) + (scores.problemSolving || 0) + (scores.toolCompetency || 0);
+    const softSkillsSubtotal = (scores.punctuality || 0) + (scores.communication || 0) + (scores.workEthics || 0) + (scores.adaptability || 0);
+    const logbookSubtotal = (scores.logbookQuality || 0) + (scores.reflectionQuality || 0);
+    const totalScore = technicalSubtotal + softSkillsSubtotal + logbookSubtotal;
+    const grade = calculateUTeMGrade(totalScore).grade;
+
+    let saved: StudentEvaluation;
+
+    if (existingIdx !== -1) {
+      saved = {
+        ...all[existingIdx],
+        ...evalData,
+        scores,
+        technicalSubtotal,
+        softSkillsSubtotal,
+        logbookSubtotal,
+        totalScore,
+        grade,
+        updatedAt: now
+      };
+      all[existingIdx] = saved;
+    } else {
+      saved = {
+        id: evalData.id || `eval_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        studentId: evalData.studentId,
+        studentName: evalData.studentName || '',
+        studentMatric: evalData.studentMatric || '',
+        studentProgram: evalData.studentProgram || '',
+        companyName: evalData.companyName || '',
+        companyAddress: evalData.companyAddress || '',
+        courseCode: evalData.courseCode,
+        courseName: evalData.courseName || evalData.courseCode,
+        lecturerId: evalData.lecturerId || '',
+        lecturerName: evalData.lecturerName || '',
+        lecturerStaffId: evalData.lecturerStaffId || '',
+        lecturerEmail: evalData.lecturerEmail || '',
+        trainerId: evalData.trainerId || '',
+        trainerName: evalData.trainerName || '',
+        trainerPosition: evalData.trainerPosition || '',
+        trainerCompany: evalData.trainerCompany || evalData.companyName || '',
+        trainerEmail: evalData.trainerEmail || '',
+        trainerPhone: evalData.trainerPhone || '',
+        scores,
+        technicalSubtotal,
+        softSkillsSubtotal,
+        logbookSubtotal,
+        totalScore,
+        grade,
+        trainerComments: evalData.trainerComments || '',
+        trainerRecommendation: evalData.trainerRecommendation || '',
+        status: evalData.status || 'draft',
+        createdAt: now,
+        updatedAt: now
+      };
+      all.push(saved);
+    }
+
+    inMemoryEvaluations = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'student_evaluations', saved.id), sanitizeForFirebase(saved), { merge: true });
+      } catch (e) {
+        console.warn('Firebase evaluation sync notice:', e);
+      }
+    }
+
+    return saved;
+  },
+
+  submitEvaluationToLecturer: async (id: string): Promise<StudentEvaluation> => {
+    const all = StorageService.getEvaluations();
+    const target = all.find(e => e.id === id);
+    if (!target) throw new Error('Borang penilaian tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const updated: StudentEvaluation = {
+      ...target,
+      status: 'submitted_by_trainer',
+      submittedAt: now,
+      updatedAt: now
+    };
+
+    const newAll = all.map(e => e.id === id ? updated : e);
+    inMemoryEvaluations = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'student_evaluations', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase evaluation submit notice:', e);
+      }
+    }
+
+    // Send notification to course lecturer
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.lecturerId || 'coordinator',
+        recipient_role: UserRole.LECTURER,
+        sender_name: updated.trainerName,
+        title_ms: `Penilaian Pelajar Dihantar - ${updated.courseCode}`,
+        title_en: `Student Evaluation Submitted - ${updated.courseCode}`,
+        message_ms: `Jurulatih Industri (${updated.trainerName}) telah menghantar penilaian pelajar ${updated.studentName} (${updated.studentMatric}) bagi kursus ${updated.courseCode} (${updated.courseName}) untuk pengesahan pensyarah. Markah: ${updated.totalScore}/100 (Gred ${updated.grade}).`,
+        message_en: `Industry Coach (${updated.trainerName}) submitted evaluation for student ${updated.studentName} for course ${updated.courseCode}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'EVALUATION_SUBMITTED',
+        `Menghantar borang penilaian kursus ${updated.courseCode} bagi pelajar ${updated.studentName} (${updated.studentMatric}) kepada pensyarah kursus.`,
+        `Submitted student evaluation for ${updated.studentName}.`
+      );
+    }
+
+    return updated;
+  },
+
+  verifyEvaluationByLecturer: async (id: string, verification: { lecturerComments?: string; verifiedByLecturerName: string }): Promise<StudentEvaluation> => {
+    const all = StorageService.getEvaluations();
+    const target = all.find(e => e.id === id);
+    if (!target) throw new Error('Borang penilaian tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const updated: StudentEvaluation = {
+      ...target,
+      status: 'verified_by_lecturer',
+      lecturerComments: verification.lecturerComments || target.lecturerComments,
+      verifiedByLecturerName: verification.verifiedByLecturerName,
+      verifiedAt: now,
+      updatedAt: now,
+      revisionNotes: undefined
+    };
+
+    const newAll = all.map(e => e.id === id ? updated : e);
+    inMemoryEvaluations = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'student_evaluations', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase evaluation verify notice:', e);
+      }
+    }
+
+    // Send notification to student
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: verification.verifiedByLecturerName,
+        title_ms: `Penilaian Kursus Disahkan - ${updated.courseCode}`,
+        title_en: `Course Evaluation Verified - ${updated.courseCode}`,
+        message_ms: `Pensyarah Kursus (${verification.verifiedByLecturerName}) telah mengesahkan penilaian industri anda bagi kursus ${updated.courseCode} (${updated.courseName}). Gred Akhir: ${updated.grade} (${updated.totalScore}%).`,
+        message_en: `Course Lecturer verified your industrial evaluation for ${updated.courseCode}. Final Grade: ${updated.grade}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    // Send notification to trainer
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.trainerId || 'trainer',
+        recipient_role: UserRole.TRAINER,
+        sender_name: verification.verifiedByLecturerName,
+        title_ms: `Pengesahan Penilaian Selesai - ${updated.studentName}`,
+        title_en: `Evaluation Verification Completed - ${updated.studentName}`,
+        message_ms: `Pensyarah Kursus (${verification.verifiedByLecturerName}) telah mengesahkan penilaian pelajar ${updated.studentName} bagi kursus ${updated.courseCode}.`,
+        message_en: `Course Lecturer verified the evaluation for student ${updated.studentName}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'EVALUATION_VERIFIED',
+        `Mengesahkan borang penilaian kursus ${updated.courseCode} bagi pelajar ${updated.studentName} (${updated.studentMatric}). Gred: ${updated.grade}.`,
+        `Verified course evaluation for student ${updated.studentName}.`
+      );
+    }
+
+    return updated;
+  },
+
+  requestRevisionEvaluation: async (id: string, notes: string, lecturerName: string): Promise<StudentEvaluation> => {
+    const all = StorageService.getEvaluations();
+    const target = all.find(e => e.id === id);
+    if (!target) throw new Error('Borang penilaian tidak dijumpai.');
+
+    const now = new Date().toISOString();
+    const updated: StudentEvaluation = {
+      ...target,
+      status: 'revision_requested',
+      revisionNotes: notes,
+      updatedAt: now
+    };
+
+    const newAll = all.map(e => e.id === id ? updated : e);
+    inMemoryEvaluations = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'student_evaluations', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase evaluation revision request notice:', e);
+      }
+    }
+
+    // Send notification to trainer
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.trainerId || 'trainer',
+        recipient_role: UserRole.TRAINER,
+        sender_name: lecturerName,
+        title_ms: `Semakan Semula Penilaian - ${updated.studentName}`,
+        title_en: `Evaluation Revision Requested - ${updated.studentName}`,
+        message_ms: `Pensyarah Kursus (${lecturerName}) memohon semakan semula bagi penilaian pelajar ${updated.studentName} untuk kursus ${updated.courseCode}. Catatan: "${notes}"`,
+        message_en: `Course Lecturer requested revisions for ${updated.studentName}'s evaluation.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    return updated;
+  },
+
+  deleteEvaluation: async (id: string): Promise<void> => {
+    const all = StorageService.getEvaluations().filter(e => e.id !== id);
+    inMemoryEvaluations = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, all);
+    notifyListeners();
+    if (db) await deleteDoc(doc(db, 'student_evaluations', id));
   },
 
   getFullSystemBackup: () => ({

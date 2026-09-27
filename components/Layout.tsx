@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole, Notification } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2 } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -22,6 +22,41 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const currentYear = new Date().getFullYear();
+
+  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics';
+  const [isEvaluationSubmenuOpen, setIsEvaluationSubmenuOpen] = useState(isEvaluationView);
+  const [pendingEvalCount, setPendingEvalCount] = useState(0);
+
+  useEffect(() => {
+    if (isEvaluationView) {
+      setIsEvaluationSubmenuOpen(true);
+    }
+  }, [isEvaluationView]);
+
+  useEffect(() => {
+    const updateEvalCounts = () => {
+      try {
+        const evals = StorageService.getEvaluations();
+        if (currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR) {
+          const pending = evals.filter(e => 
+            e.status === 'submitted_by_trainer' && 
+            (e.lecturerId === currentUser.id || !e.lecturerId || (e.lecturerName && e.lecturerName.toLowerCase() === currentUser.name.toLowerCase()))
+          );
+          setPendingEvalCount(pending.length);
+        } else if (currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl) {
+          const pending = evals.filter(e => e.status === 'submitted_by_trainer');
+          setPendingEvalCount(pending.length);
+        } else if (currentUser.role === UserRole.TRAINER) {
+          const needRevision = evals.filter(e => e.status === 'revision_requested' && e.trainerId === currentUser.id);
+          setPendingEvalCount(needRevision.length);
+        }
+      } catch {}
+    };
+
+    updateEvalCounts();
+    const unsub = StorageService.subscribe(updateEvalCounts);
+    return () => unsub();
+  }, [currentUser]);
 
   useEffect(() => {
     setIsCloud(StorageService.isCloudEnabled());
@@ -194,6 +229,128 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           {hasSystemAccess && (
              <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pemantauan Buku Log' : 'Logbook Monitoring'} icon={BookOpen} />
           )}
+
+          {/* ========================================================= */}
+          {/* SUBMENU: PENILAIAN PELAJAR (STUDENT EVALUATION MODULE)   */}
+          {/* ========================================================= */}
+          <div className="py-1">
+            <div className={`rounded-xl border transition-all ${
+              isEvaluationView 
+                ? 'border-blue-300 bg-blue-50/40 shadow-xs' 
+                : 'border-slate-200/80 bg-slate-50/60'
+            }`}>
+              {/* Main Submenu Header Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isEvaluationSubmenuOpen) {
+                    setIsEvaluationSubmenuOpen(true);
+                    handleNavigate('studentEvaluation');
+                  } else {
+                    setIsEvaluationSubmenuOpen(!isEvaluationSubmenuOpen);
+                  }
+                }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left ${
+                  isEvaluationView
+                    ? 'bg-blue-600 text-white font-black shadow-sm'
+                    : 'text-slate-700 hover:bg-slate-100 font-bold'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Award size={18} className={isEvaluationView ? 'text-amber-300' : 'text-amber-600'} />
+                  <span className="text-xs">{t(language, 'studentEvaluation')}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {pendingEvalCount > 0 && (
+                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                      isEvaluationView ? 'bg-amber-400 text-slate-900' : 'bg-amber-500 text-white animate-pulse'
+                    }`}>
+                      {pendingEvalCount}
+                    </span>
+                  )}
+                  {isEvaluationSubmenuOpen ? (
+                    <ChevronDown size={14} className={isEvaluationView ? 'text-white' : 'text-slate-400'} />
+                  ) : (
+                    <ChevronRight size={14} className={isEvaluationView ? 'text-white' : 'text-slate-400'} />
+                  )}
+                </div>
+              </button>
+
+              {/* Collapsible Submenu Links */}
+              {isEvaluationSubmenuOpen && (
+                <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
+                  {/* Submenu 1: Borang & Senarai Penilaian */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('studentEvaluation')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      currentView === 'studentEvaluation'
+                        ? 'bg-blue-50 text-blue-700 font-black'
+                        : 'text-slate-600 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'studentEvaluation' ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                      <span>
+                        {isTrainer 
+                          ? (language === 'ms' ? 'Borang & Nilai Pelajar' : 'Student Evaluations')
+                          : isLecturer 
+                          ? (language === 'ms' ? 'Pengesahan Penilaian' : 'Verify Evaluations')
+                          : isStudent
+                          ? (language === 'ms' ? 'Keputusan & Gred' : 'Evaluation Results')
+                          : (language === 'ms' ? 'Semua Penilaian' : 'All Evaluations')}
+                      </span>
+                    </div>
+                    {pendingEvalCount > 0 && (
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 rounded-full">
+                        {pendingEvalCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Submenu 2: Tetapan Pensyarah Kursus (Coordinator & Lecturer) */}
+                  {(hasSystemAccess || isLecturer) && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavigate('evaluationSettings')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'evaluationSettings'
+                          ? 'bg-blue-50 text-blue-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'evaluationSettings' ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                        <span>{t(language, 'courseLecturerSettings')}</span>
+                      </div>
+                      {hasSystemAccess && (
+                        <span className="text-[8px] bg-slate-100 text-slate-500 font-bold px-1 py-0.2 rounded uppercase">
+                          Set
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Submenu 3: Rubrik & Skala Gred */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('evaluationRubrics')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      currentView === 'evaluationRubrics'
+                        ? 'bg-blue-50 text-blue-700 font-black'
+                        : 'text-slate-600 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'evaluationRubrics' ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                      <span>{t(language, 'evaluationSubmenuRubrics')}</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Tab for Lecturers/Supervisors to see their students */}
           {(isSupervisor || hasSystemAccess) && (
