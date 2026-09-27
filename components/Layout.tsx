@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { User, UserRole, Notification } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight } from 'lucide-react';
+import { User, UserRole, Notification, CourseLecturerAssignment } from '../types';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight, GraduationCap, UserPlus } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -23,15 +23,46 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const currentYear = new Date().getFullYear();
 
-  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics';
+  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'courseEnrollment';
   const [isEvaluationSubmenuOpen, setIsEvaluationSubmenuOpen] = useState(isEvaluationView);
   const [pendingEvalCount, setPendingEvalCount] = useState(0);
+
+  const isCourseMonitoringView = currentView === 'lecturerCourseMonitoring';
+  const [isCourseMonitoringSubmenuOpen, setIsCourseMonitoringSubmenuOpen] = useState(isCourseMonitoringView);
+  const [assignedCourses, setAssignedCourses] = useState<CourseLecturerAssignment[]>([]);
 
   useEffect(() => {
     if (isEvaluationView) {
       setIsEvaluationSubmenuOpen(true);
     }
   }, [isEvaluationView]);
+
+  useEffect(() => {
+    if (isCourseMonitoringView) {
+      setIsCourseMonitoringSubmenuOpen(true);
+    }
+  }, [isCourseMonitoringView]);
+
+  useEffect(() => {
+    const loadAssignments = () => {
+      try {
+        const all = StorageService.getCourseAssignments();
+        if (currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR) {
+          const myCourses = all.filter(a => 
+            a.lecturerId === currentUser.id || 
+            (a.lecturerName && currentUser.name && a.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()))
+          );
+          setAssignedCourses(myCourses.length > 0 ? myCourses : all);
+        } else if (currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl) {
+          setAssignedCourses(all);
+        }
+      } catch {}
+    };
+
+    loadAssignments();
+    const unsub = StorageService.subscribe(loadAssignments);
+    return () => unsub();
+  }, [currentUser]);
 
   useEffect(() => {
     const updateEvalCounts = () => {
@@ -309,7 +340,49 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                     )}
                   </button>
 
-                  {/* Submenu 2: Tetapan Pensyarah Kursus (Coordinator & Lecturer) */}
+                  {/* Submenu 2: Pemantauan Kursus Pensyarah (Lecturer & Coordinator) */}
+                  {(isLecturer || hasSystemAccess) && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavigate('lecturerCourseMonitoring')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'lecturerCourseMonitoring'
+                          ? 'bg-blue-50 text-blue-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'lecturerCourseMonitoring' ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                        <span>{language === 'ms' ? 'Pemantauan Kursus Pensyarah' : 'Course Lecturer Monitoring'}</span>
+                      </div>
+                      <span className="text-[8px] bg-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded">
+                        {assignedCourses.length} {language === 'ms' ? 'Kursus' : 'Courses'}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Submenu 3: Enrolmen Kursus Pelajar (Coordinator & JKWBL only) */}
+                  {hasSystemAccess && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavigate('courseEnrollment')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'courseEnrollment'
+                          ? 'bg-blue-50 text-blue-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'courseEnrollment' ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                        <span>{language === 'ms' ? 'Enrolmen Kursus Pelajar' : 'Student Course Enrollment'}</span>
+                      </div>
+                      <span className="text-[8px] bg-emerald-100 text-emerald-700 font-black px-1.5 py-0.5 rounded uppercase">
+                        Enrol
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Submenu 4: Tetapan Pensyarah Kursus (Coordinator & Lecturer) */}
                   {(hasSystemAccess || isLecturer) && (
                     <button
                       type="button"
@@ -332,7 +405,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                     </button>
                   )}
 
-                  {/* Submenu 3: Rubrik & Skala Gred */}
+                  {/* Submenu 5: Rubrik & Skala Gred */}
                   <button
                     type="button"
                     onClick={() => handleNavigate('evaluationRubrics')}
@@ -351,6 +424,115 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
               )}
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* SUBMENU KHAS PENSYARAH: PEMANTAUAN KURSUS, PENILAIAN & PELAJAR           */}
+          {/* ========================================================================= */}
+          {(isLecturer || hasSystemAccess) && (
+            <div className="py-1">
+              <div className={`rounded-xl border transition-all ${
+                isCourseMonitoringView 
+                  ? 'border-indigo-300 bg-indigo-50/50 shadow-xs' 
+                  : 'border-slate-200/80 bg-slate-50/60'
+              }`}>
+                {/* Main Submenu Header Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isCourseMonitoringSubmenuOpen) {
+                      setIsCourseMonitoringSubmenuOpen(true);
+                      handleNavigate('lecturerCourseMonitoring');
+                    } else {
+                      setIsCourseMonitoringSubmenuOpen(!isCourseMonitoringSubmenuOpen);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left ${
+                    isCourseMonitoringView
+                      ? 'bg-indigo-600 text-white font-black shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-100 font-bold'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <GraduationCap size={18} className={isCourseMonitoringView ? 'text-amber-300' : 'text-indigo-600'} />
+                    <div className="flex flex-col">
+                      <span className="text-xs leading-tight">
+                        {language === 'ms' ? 'Pemantauan Kursus Saya' : 'My Course Monitoring'}
+                      </span>
+                      {assignedCourses.length > 0 && (
+                        <span className={`text-[10px] font-medium leading-none mt-0.5 ${
+                          isCourseMonitoringView ? 'text-indigo-100' : 'text-slate-500'
+                        }`}>
+                          {assignedCourses.length} {language === 'ms' ? 'kursus ditugaskan' : 'assigned courses'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pendingEvalCount > 0 && (
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                        isCourseMonitoringView ? 'bg-amber-400 text-slate-900' : 'bg-amber-500 text-white animate-pulse'
+                      }`}>
+                        {pendingEvalCount}
+                      </span>
+                    )}
+                    {isCourseMonitoringSubmenuOpen ? (
+                      <ChevronDown size={14} className={isCourseMonitoringView ? 'text-white' : 'text-slate-400'} />
+                    ) : (
+                      <ChevronRight size={14} className={isCourseMonitoringView ? 'text-white' : 'text-slate-400'} />
+                    )}
+                  </div>
+                </button>
+
+                {/* Submenu Course Links */}
+                {isCourseMonitoringSubmenuOpen && (
+                  <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sessionStorage.removeItem('selectedMonitoringCourseCode');
+                        handleNavigate('lecturerCourseMonitoring');
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'lecturerCourseMonitoring' && !sessionStorage.getItem('selectedMonitoringCourseCode')
+                          ? 'bg-indigo-50 text-indigo-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'lecturerCourseMonitoring' ? 'bg-indigo-600' : 'bg-slate-300'}`} />
+                        <span>{language === 'ms' ? 'Papan Pemantauan Keseluruhan' : 'All Courses Dashboard'}</span>
+                      </div>
+                      <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 rounded-full">
+                        {assignedCourses.length}
+                      </span>
+                    </button>
+
+                    {/* Course items */}
+                    {assignedCourses.map(course => (
+                      <button
+                        key={course.id || course.courseCode}
+                        type="button"
+                        onClick={() => {
+                          sessionStorage.setItem('selectedMonitoringCourseCode', course.courseCode);
+                          handleNavigate('lecturerCourseMonitoring');
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden text-left">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-600" />
+                          <span className="truncate font-medium">{course.courseCode}</span>
+                        </div>
+                        <span className="text-[9px] bg-slate-100 group-hover:bg-indigo-100 text-slate-600 group-hover:text-indigo-800 px-1.5 py-0.5 rounded font-bold shrink-0">
+                          {(course.assignedStudentIds || []).length} {language === 'ms' ? 'pelajar' : 'std'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tab for Lecturers/Supervisors to see their students */}
           {(isSupervisor || hasSystemAccess) && (

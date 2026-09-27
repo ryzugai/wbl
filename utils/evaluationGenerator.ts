@@ -645,3 +645,194 @@ export const generateEvaluationPrint = (
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 };
+
+export interface CourseStudentGradeRecord {
+  studentMatric: string;
+  studentName: string;
+  studentProgram: string;
+  companyName: string;
+  trainerName: string;
+  technicalSubtotal: number;
+  softSkillsSubtotal: number;
+  logbookSubtotal: number;
+  totalScore: number;
+  grade: string;
+  status: 'verified_by_lecturer' | 'submitted_by_trainer' | 'draft' | 'unassessed' | 'revision_requested';
+  verifiedAt?: string;
+}
+
+export const generateCourseGradeSummaryPrint = (
+  courseInfo: {
+    courseCode: string;
+    courseName: string;
+    semester?: string;
+    creditHours?: number;
+    lecturerName: string;
+    lecturerStaffId?: string;
+  },
+  records: CourseStudentGradeRecord[],
+  language: 'ms' | 'en' = 'ms'
+) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert(language === 'ms' 
+      ? "Tetingkap pop-up telah disekat. Sila benarkan pop-up pada pelayar web anda." 
+      : "Pop-up blocked. Please allow pop-ups for this site.");
+    return;
+  }
+
+  const verifiedRecords = records.filter(r => r.status === 'verified_by_lecturer');
+  const avgScore = verifiedRecords.length > 0 
+    ? (verifiedRecords.reduce((sum, r) => sum + r.totalScore, 0) / verifiedRecords.length).toFixed(1)
+    : '0';
+
+  const rowsHtml = records.map((r, i) => {
+    const statusText = 
+      r.status === 'verified_by_lecturer' ? '<span style="color:#059669;font-weight:bold;">Disahkan</span>' :
+      r.status === 'submitted_by_trainer' ? '<span style="color:#d97706;font-weight:bold;">Menunggu Pensyarah</span>' :
+      r.status === 'revision_requested' ? '<span style="color:#dc2626;font-weight:bold;">Semakan Semula</span>' :
+      r.status === 'draft' ? '<span style="color:#4b5563;">Draf</span>' :
+      '<span style="color:#9ca3af;font-style:italic;">Belum Dinilai</span>';
+
+    return `
+      <tr>
+        <td style="text-align: center;">${i + 1}</td>
+        <td><strong>${r.studentMatric}</strong></td>
+        <td>
+          <div style="font-weight: bold; color: #1e293b;">${r.studentName}</div>
+          <div style="font-size: 8pt; color: #64748b;">${r.studentProgram || '-'}</div>
+        </td>
+        <td>
+          <div style="font-size: 8.5pt;">${r.companyName || '-'}</div>
+          <div style="font-size: 7.5pt; color: #64748b;">Jurulatih: ${r.trainerName || '-'}</div>
+        </td>
+        <td style="text-align: center;">${r.status !== 'unassessed' ? r.technicalSubtotal : '-'}</td>
+        <td style="text-align: center;">${r.status !== 'unassessed' ? r.softSkillsSubtotal : '-'}</td>
+        <td style="text-align: center;">${r.status !== 'unassessed' ? r.logbookSubtotal : '-'}</td>
+        <td style="text-align: center; font-weight: bold; font-size: 10pt; color: #1e3a8a;">
+          ${r.status !== 'unassessed' ? r.totalScore : '-'}
+        </td>
+        <td style="text-align: center; font-weight: bold; font-size: 10pt; color: #b45309;">
+          ${r.status !== 'unassessed' ? r.grade : '-'}
+        </td>
+        <td style="text-align: center; font-size: 8.5pt;">${statusText}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="ms">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Ringkasan Markah Kursus WBL - ${courseInfo.courseCode}</title>
+      <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #1e293b; margin: 0; padding: 10px; }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 12px; }
+        .header-title { font-size: 13pt; font-weight: 800; color: #1e3a8a; }
+        .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 6px; margin-bottom: 14px; }
+        .meta-item { font-size: 8.5pt; }
+        .meta-item strong { display: block; color: #475569; font-size: 7.5pt; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th { background: #1e3a8a; color: white; padding: 6px 8px; font-size: 8.5pt; text-align: left; border: 1px solid #cbd5e1; }
+        td { padding: 5px 8px; border: 1px solid #e2e8f0; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        .stats-bar { display: flex; gap: 20px; font-size: 8.5pt; background: #eff6ff; padding: 8px 12px; border-radius: 6px; border: 1px solid #bfdbfe; margin-bottom: 15px; }
+        .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 25px; page-break-inside: avoid; }
+        .sig-box { border-top: 1px solid #94a3b8; padding-top: 6px; font-size: 8.5pt; }
+        @media print {
+          .no-print { display: none; }
+          body { padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="margin-bottom: 10px; text-align: right;">
+        <button onclick="window.print()" style="padding: 8px 18px; background: #1e3a8a; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">
+          Cetak Dokumen (Print)
+        </button>
+      </div>
+
+      <div class="header">
+        <div>
+          <div style="font-size: 9pt; font-weight: bold; color: #64748b;">UNIVERSITI TEKNIKAL MALAYSIA MELAKA (UTeM)</div>
+          <div style="font-size: 8.5pt; color: #475569;">Fakulti Pengurusan Teknologi dan Teknousahawanan (FPTT)</div>
+          <div class="header-title">SENARAI MARKAH & PENGGREDAN KURSUS WBL</div>
+        </div>
+        <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
+          Tarikh Cetakan: ${new Date().toLocaleDateString('ms-MY', { dateStyle: 'long' })}
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <strong>Kod & Nama Kursus</strong>
+          ${courseInfo.courseCode} - ${courseInfo.courseName}
+        </div>
+        <div class="meta-item">
+          <strong>Pensyarah Kursus</strong>
+          ${courseInfo.lecturerName} ${courseInfo.lecturerStaffId ? `(${courseInfo.lecturerStaffId})` : ''}
+        </div>
+        <div class="meta-item">
+          <strong>Semester / Jam Kredit</strong>
+          ${courseInfo.semester || 'Semester 7'} • ${courseInfo.creditHours || 3} Jam Kredit
+        </div>
+        <div class="meta-item">
+          <strong>Status Kohort</strong>
+          ${records.length} Pelajar Dienrol (${verifiedRecords.length} Disahkan)
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div><strong>Jumlah Pelajar Dienrol:</strong> ${records.length}</div>
+        <div><strong>Telah Disahkan Pensyarah:</strong> ${verifiedRecords.length} / ${records.length}</div>
+        <div><strong>Menunggu Pengesahan:</strong> ${records.filter(r => r.status === 'submitted_by_trainer').length}</div>
+        <div><strong>Belum Dinilai Jurulatih:</strong> ${records.filter(r => r.status === 'unassessed').length}</div>
+        <div><strong>Purata Markah Pelajar Disahkan:</strong> ${avgScore} / 100</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 30px; text-align: center;">No.</th>
+            <th style="width: 90px;">No. Matrik</th>
+            <th>Nama Pelajar & Program</th>
+            <th>Organisasi Latihan & Jurulatih</th>
+            <th style="width: 65px; text-align: center;">Teknikal<br>(40m)</th>
+            <th style="width: 65px; text-align: center;">Insaniah<br>(40m)</th>
+            <th style="width: 65px; text-align: center;">Buku Log<br>(20m)</th>
+            <th style="width: 65px; text-align: center;">Jumlah<br>(100m)</th>
+            <th style="width: 50px; text-align: center;">Gred</th>
+            <th style="width: 110px; text-align: center;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <div class="sig-grid">
+        <div class="sig-box">
+          <div><strong>Disediakan & Disahkan oleh:</strong></div>
+          <div style="height: 35px;"></div>
+          <div><strong>${courseInfo.lecturerName}</strong></div>
+          <div>Pensyarah Kursus ${courseInfo.courseCode}</div>
+          <div>FPTT, Universiti Teknikal Malaysia Melaka</div>
+        </div>
+        <div class="sig-box">
+          <div><strong>Disemak oleh:</strong></div>
+          <div style="height: 35px;"></div>
+          <div><strong>Dr. Mohd Guzairy bin Abd Ghani</strong></div>
+          <div>Penyelaras WBL / Timbalan Dekan Akademik</div>
+          <div>FPTT, Universiti Teknikal Malaysia Melaka</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+};

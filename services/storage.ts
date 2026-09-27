@@ -1799,8 +1799,12 @@ export const StorageService = {
     } catch {}
 
     // Seed default course assignments from DEFAULT_WBL_COURSES
+    const users = StorageService.getUsers();
+    const studentUsers = users.filter(u => u.role === UserRole.STUDENT);
+    const defaultStudentIds = studentUsers.map(s => s.id);
+    if (defaultStudentIds.length === 0) defaultStudentIds.push('student_demo_1');
+
     if (inMemoryCourseAssignments.length === 0) {
-      const users = StorageService.getUsers();
       const lecturers = users.filter(u => u.role === UserRole.LECTURER || u.role === UserRole.COORDINATOR || u.is_jkwbl);
       const defaultLecturer = lecturers[0] || {
         id: COORDINATOR_ACCOUNT.id,
@@ -1820,6 +1824,7 @@ export const StorageService = {
           lecturerStaffId: (assignedLec as any).staff_id || '',
           lecturerEmail: assignedLec.email || '',
           semester: course.semester,
+          assignedStudentIds: [...defaultStudentIds],
           updatedAt: new Date().toISOString()
         };
       });
@@ -1827,6 +1832,19 @@ export const StorageService = {
       inMemoryCourseAssignments = defaults;
       safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, defaults);
       return defaults;
+    }
+
+    // Ensure all assignments have valid assignedStudentIds array
+    let needsResave = false;
+    inMemoryCourseAssignments = inMemoryCourseAssignments.map(a => {
+      if (!Array.isArray(a.assignedStudentIds) || a.assignedStudentIds.length === 0) {
+        needsResave = true;
+        return { ...a, assignedStudentIds: [...defaultStudentIds] };
+      }
+      return a;
+    });
+    if (needsResave) {
+      safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, inMemoryCourseAssignments);
     }
 
     return inMemoryCourseAssignments;
@@ -1845,6 +1863,7 @@ export const StorageService = {
       saved = {
         ...all[existingIdx],
         ...assignmentData,
+        assignedStudentIds: assignmentData.assignedStudentIds !== undefined ? assignmentData.assignedStudentIds : all[existingIdx].assignedStudentIds,
         updatedAt: now
       };
       all[existingIdx] = saved;
@@ -1890,6 +1909,166 @@ export const StorageService = {
     }
 
     return saved;
+  },
+
+  enrollStudentsInCourse: async (courseCode: string, studentIds: string[]): Promise<CourseLecturerAssignment> => {
+    const all = StorageService.getCourseAssignments();
+    const idx = all.findIndex(a => a.courseCode === courseCode);
+    if (idx === -1) throw new Error('Kursus tidak ditemui.');
+
+    const current = all[idx];
+    const existingIds = new Set(current.assignedStudentIds || []);
+    studentIds.forEach(id => existingIds.add(id));
+
+    const updated: CourseLecturerAssignment = {
+      ...current,
+      assignedStudentIds: Array.from(existingIds),
+      updatedAt: new Date().toISOString()
+    };
+
+    all[idx] = updated;
+    inMemoryCourseAssignments = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'course_assignments', updated.id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase course assignment sync notice:', e);
+      }
+    }
+
+    // Send notifications to enrolled students
+    const now = new Date().toISOString();
+    const users = StorageService.getUsers();
+    for (const sid of studentIds) {
+      const studentUser = users.find(u => u.id === sid || u.matric_no === sid);
+      if (studentUser) {
+        try {
+          await StorageService.createNotification({
+            recipient_id: studentUser.id,
+            recipient_role: UserRole.STUDENT,
+            sender_name: 'Penyelaras WBL',
+            title_ms: `Enrolmen Kursus: ${updated.courseCode}`,
+            title_en: `Course Enrollment: ${updated.courseCode}`,
+            message_ms: `Anda telah didaftarkan ke dalam kursus ${updated.courseCode} (${updated.courseName}). Pensyarah Kursus: ${updated.lecturerName}.`,
+            message_en: `You have been enrolled in course ${updated.courseCode} (${updated.courseName}) by WBL Coordinator. Course Lecturer: ${updated.lecturerName}.`,
+            is_read: false,
+            created_at: now
+          });
+        } catch {}
+      }
+    }
+
+    // Send notification to course lecturer
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.lecturerId,
+        recipient_role: UserRole.LECTURER,
+        sender_name: 'Penyelaras WBL',
+        title_ms: `Pelajar Baharu Dienrol - ${updated.courseCode}`,
+        title_en: `New Students Enrolled - ${updated.courseCode}`,
+        message_ms: `Penyelaras WBL telah mendaftarkan ${studentIds.length} orang pelajar baharu ke dalam kursus ${updated.courseCode} (${updated.courseName}).`,
+        message_en: `WBL Coordinator enrolled ${studentIds.length} new students into course ${updated.courseCode}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'COURSE_ENROLLMENT_UPDATED',
+        `Mendaftarkan ${studentIds.length} pelajar ke dalam kursus ${updated.courseCode} (${updated.courseName}).`,
+        `Enrolled ${studentIds.length} students into course ${updated.courseCode}.`
+      );
+    }
+
+    return updated;
+  },
+
+  unenrollStudentFromCourse: async (courseCode: string, studentId: string): Promise<CourseLecturerAssignment> => {
+    const all = StorageService.getCourseAssignments();
+    const idx = all.findIndex(a => a.courseCode === courseCode);
+    if (idx === -1) throw new Error('Kursus tidak ditemui.');
+
+    const current = all[idx];
+    const updatedStudentIds = (current.assignedStudentIds || []).filter(id => id !== studentId);
+
+    const updated: CourseLecturerAssignment = {
+      ...current,
+      assignedStudentIds: updatedStudentIds,
+      updatedAt: new Date().toISOString()
+    };
+
+    all[idx] = updated;
+    inMemoryCourseAssignments = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'course_assignments', updated.id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase course assignment sync notice:', e);
+      }
+    }
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'COURSE_STUDENT_UNENROLLED',
+        `Mengeluarkan pelajar daripada kursus ${updated.courseCode} (${updated.courseName}).`,
+        `Unenrolled student from course ${updated.courseCode}.`
+      );
+    }
+
+    return updated;
+  },
+
+  getCourseEnrolledStudentIds: (courseCode: string): string[] => {
+    const assignments = StorageService.getCourseAssignments();
+    const match = assignments.find(a => a.courseCode === courseCode);
+    return match?.assignedStudentIds || [];
+  },
+
+  sendTrainerEvaluationReminder: async (evaluationIdOrData: { studentName: string; studentMatric: string; courseCode: string; trainerId?: string; trainerName?: string; senderName: string }): Promise<void> => {
+    const now = new Date().toISOString();
+    try {
+      await StorageService.createNotification({
+        recipient_id: evaluationIdOrData.trainerId || 'trainer',
+        recipient_role: UserRole.TRAINER,
+        sender_name: evaluationIdOrData.senderName,
+        title_ms: `Peringatan: Penilaian Prestasi Pelajar - ${evaluationIdOrData.studentName}`,
+        title_en: `Reminder: Student Performance Evaluation - ${evaluationIdOrData.studentName}`,
+        message_ms: `Peringatan daripada ${evaluationIdOrData.senderName}: Sila lengkapkan borang penilaian prestasi industri bagi pelajar ${evaluationIdOrData.studentName} (${evaluationIdOrData.studentMatric}) untuk kursus ${evaluationIdOrData.courseCode}.`,
+        message_en: `Reminder from ${evaluationIdOrData.senderName}: Please complete the industrial performance evaluation form for student ${evaluationIdOrData.studentName} for course ${evaluationIdOrData.courseCode}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'EVALUATION_REMINDER_SENT',
+        `Menghantar peringatan penilaian bagi pelajar ${evaluationIdOrData.studentName} (${evaluationIdOrData.courseCode}) kepada Jurulatih Industri.`,
+        `Sent evaluation reminder for ${evaluationIdOrData.studentName}.`
+      );
+    }
   },
 
   deleteCourseAssignment: async (id: string): Promise<void> => {

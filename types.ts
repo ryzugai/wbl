@@ -53,6 +53,7 @@ export interface User {
   resume_work_experience?: string; 
   resume_cgpa?: string;
   resume_courses?: string;
+  enrolled_courses?: string[];
   last_login_at?: string;
   last_activity_at?: string;
 }

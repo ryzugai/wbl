@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, Application, UserRole, StudentEvaluation, CourseLecturerAssignment, EvaluationStatus } from '../types';
 import { StorageService } from '../services/storage';
 import { DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
-import { generateEvaluationPrint } from '../utils/evaluationGenerator';
+import { generateEvaluationPrint, generateCourseGradeSummaryPrint, CourseStudentGradeRecord } from '../utils/evaluationGenerator';
 import { 
   Award, CheckCircle2, Clock, AlertCircle, FileText, Printer, Send, Save, Plus, 
   Trash2, Edit3, UserCheck, ShieldCheck, Building2, Star, Search, Filter, 
-  GraduationCap, BookOpen, Settings, UserCog, Check, Info, ChevronRight, HelpCircle
+  GraduationCap, BookOpen, Settings, UserCog, Check, Info, ChevronRight, HelpCircle,
+  UserPlus, UserMinus, CheckSquare, Bell, ArrowRight, Eye, RefreshCw, BarChart2,
+  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck
 } from 'lucide-react';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
@@ -16,7 +18,7 @@ interface StudentEvaluationPageProps {
   applications: Application[];
   users: User[];
   language: Language;
-  initialTab?: 'evaluations' | 'settings' | 'rubrics';
+  initialTab?: 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment';
   onNavigate?: (view: string) => void;
 }
 
@@ -34,12 +36,30 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   const isLecturer = currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR;
   const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl === true || (currentUser as any).is_admin === true;
 
-  // Active Tab: 'evaluations' | 'settings' | 'rubrics'
-  const [activeTab, setActiveTab] = useState<'evaluations' | 'settings' | 'rubrics'>(initialTab);
+  // Active Tab: 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment'
+  const [activeTab, setActiveTab] = useState<'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment'>(initialTab);
+
+  // Course Monitoring States (for Lecturer & Coordinator)
+  const [selectedMonitoringCourseCode, setSelectedMonitoringCourseCode] = useState<string>('all');
+  const [monitoringSearchQuery, setMonitoringSearchQuery] = useState('');
+  const [monitoringStatusFilter, setMonitoringStatusFilter] = useState<string>('all');
+  const [isSendingReminder, setIsSendingReminder] = useState<string | null>(null);
+
+  // Course Enrollment States (for Coordinator)
+  const [selectedEnrollmentCourseCode, setSelectedEnrollmentCourseCode] = useState<string>('BTMT 3283(i)');
+  const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState('');
+  const [enrollmentProgramFilter, setEnrollmentProgramFilter] = useState('all');
+  const [selectedStudentsToEnroll, setSelectedStudentsToEnroll] = useState<string[]>([]);
+  const [enrollmentActiveSubtab, setEnrollmentActiveSubtab] = useState<'enrolled' | 'available'>('enrolled');
 
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
+    }
+    const navCourse = sessionStorage.getItem('selectedMonitoringCourseCode');
+    if (navCourse) {
+      setSelectedMonitoringCourseCode(navCourse);
+      sessionStorage.removeItem('selectedMonitoringCourseCode');
     }
   }, [initialTab]);
 
@@ -408,6 +428,180 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     }
   };
 
+  // Assigned courses for current lecturer
+  const myAssignedCourses = useMemo(() => {
+    if (isLecturer && !isCoordinator) {
+      const myCourses = courseAssignments.filter(ca => 
+        ca.lecturerId === currentUser.id || 
+        (ca.lecturerName && currentUser.name && ca.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()))
+      );
+      return myCourses.length > 0 ? myCourses : courseAssignments;
+    }
+    return courseAssignments;
+  }, [courseAssignments, currentUser, isLecturer, isCoordinator]);
+
+  // All student users
+  const studentUsersList = useMemo(() => {
+    return users.filter(u => u.role === UserRole.STUDENT);
+  }, [users]);
+
+  // Course Ledger Print Handler
+  const handlePrintCourseLedger = (course: CourseLecturerAssignment) => {
+    const enrolledIds = course.assignedStudentIds || [];
+    const evalStudentIds = evaluations.filter(e => e.courseCode === course.courseCode).map(e => e.studentId);
+    const combinedIds = Array.from(new Set([...enrolledIds, ...evalStudentIds]));
+
+    const records: CourseStudentGradeRecord[] = combinedIds.map(sId => {
+      const studentUser = users.find(u => u.id === sId || u.matric_no === sId);
+      const studentApp = applications.find(a => 
+        (a.student_id === sId || (studentUser && (a.student_id === studentUser.matric_no || a.created_by === studentUser.username))) && 
+        (a.application_status === 'Diluluskan' || a.student_preferred)
+      );
+      const ev = evaluations.find(e => 
+        (e.studentId === sId || (studentUser && (e.studentId === studentUser.id || e.studentMatric === studentUser.matric_no))) && 
+        e.courseCode === course.courseCode
+      );
+
+      return {
+        studentMatric: studentUser?.matric_no || studentApp?.student_id || sId,
+        studentName: studentUser?.name || studentApp?.student_name || 'Pelajar WBL',
+        studentProgram: studentUser?.academic_level || studentApp?.student_program || 'BTEC',
+        companyName: ev?.companyName || studentApp?.company_name || studentUser?.company_affiliation || 'Organisasi Latihan Industri',
+        trainerName: ev?.trainerName || studentUser?.industry_trainer_name || 'Jurulatih Industri',
+        technicalSubtotal: ev?.technicalSubtotal || 0,
+        softSkillsSubtotal: ev?.softSkillsSubtotal || 0,
+        logbookSubtotal: ev?.logbookSubtotal || 0,
+        totalScore: ev?.totalScore || 0,
+        grade: ev?.grade || '-',
+        status: (ev ? ev.status : 'unassessed') as any,
+        verifiedAt: ev?.verifiedAt
+      };
+    });
+
+    generateCourseGradeSummaryPrint(
+      {
+        courseCode: course.courseCode,
+        courseName: course.courseName,
+        semester: course.semester,
+        creditHours: 3,
+        lecturerName: course.lecturerName,
+        lecturerStaffId: course.lecturerStaffId
+      },
+      records,
+      language
+    );
+  };
+
+  // Send single reminder to trainer
+  const handleSendReminderToTrainer = async (studentName: string, studentMatric: string, courseCode: string, trainerId?: string, trainerName?: string) => {
+    try {
+      setIsSendingReminder(`${studentMatric}_${courseCode}`);
+      await StorageService.sendTrainerEvaluationReminder({
+        studentName,
+        studentMatric,
+        courseCode,
+        trainerId,
+        trainerName,
+        senderName: currentUser.name
+      });
+      toast.success(language === 'ms' 
+        ? `Peringatan penilaian bagi ${studentName} berjaya dihantar kepada Jurulatih Industri!` 
+        : `Evaluation reminder for ${studentName} sent to trainer!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghantar peringatan');
+    } finally {
+      setIsSendingReminder(null);
+    }
+  };
+
+  // Send bulk reminders
+  const handleSendBulkReminders = async (unassessedList: any[], courseCode: string) => {
+    if (unassessedList.length === 0) return;
+    try {
+      setIsSaving(true);
+      for (const item of unassessedList) {
+        await StorageService.sendTrainerEvaluationReminder({
+          studentName: item.studentName,
+          studentMatric: item.studentMatric,
+          courseCode,
+          trainerId: item.trainerId,
+          trainerName: item.trainerName,
+          senderName: currentUser.name
+        });
+      }
+      toast.success(language === 'ms' 
+        ? `Peringatan telah dihantar kepada ${unassessedList.length} orang jurulatih industri bagi kursus ${courseCode}!` 
+        : `Sent reminders to ${unassessedList.length} industry trainers!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghantar peringatan');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Coordinator: Enroll selected students
+  const handleEnrollSelectedStudents = async (courseCode: string) => {
+    if (selectedStudentsToEnroll.length === 0) {
+      toast.error(language === 'ms' ? 'Sila tandakan sekurang-kurangnya seorang pelajar.' : 'Please select at least one student.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await StorageService.enrollStudentsInCourse(courseCode, selectedStudentsToEnroll);
+      loadData();
+      setSelectedStudentsToEnroll([]);
+      toast.success(language === 'ms' 
+        ? `Berjaya mendaftarkan ${selectedStudentsToEnroll.length} pelajar ke kursus ${courseCode}!` 
+        : `Successfully enrolled ${selectedStudentsToEnroll.length} students into ${courseCode}!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mendaftar pelajar');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Coordinator: Enroll all available students
+  const handleEnrollAllAvailableStudents = async (courseCode: string, availableStudentIds: string[]) => {
+    if (availableStudentIds.length === 0) {
+      toast.error(language === 'ms' ? 'Tiada pelajar baharu untuk dienrol.' : 'No available students to enroll.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await StorageService.enrollStudentsInCourse(courseCode, availableStudentIds);
+      loadData();
+      setSelectedStudentsToEnroll([]);
+      toast.success(language === 'ms' 
+        ? `Berjaya mendaftarkan semua ${availableStudentIds.length} pelajar ke kursus ${courseCode}!` 
+        : `Successfully enrolled all ${availableStudentIds.length} students into ${courseCode}!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mendaftar pelajar');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Coordinator: Unenroll single student
+  const handleUnenrollSingleStudent = async (courseCode: string, studentId: string, studentName: string) => {
+    if (!window.confirm(language === 'ms' 
+      ? `Adakah anda pasti mahu mengeluarkan pelajar "${studentName}" daripada kursus ${courseCode}?` 
+      : `Are you sure you want to unenroll student "${studentName}" from course ${courseCode}?`)) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await StorageService.unenrollStudentFromCourse(courseCode, studentId);
+      loadData();
+      toast.success(language === 'ms' 
+        ? `Pelajar "${studentName}" berjaya dikeluarkan daripada kursus ${courseCode}.` 
+        : `Student "${studentName}" unenrolled from ${courseCode}.`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengeluarkan pelajar');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -454,7 +648,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        {/* Tab 1: Senarai Penilaian */}
         <button
           onClick={() => {
             setActiveTab('evaluations');
@@ -467,7 +662,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
           }`}
         >
           <Award size={14} />
-          <span>{language === 'ms' ? 'Senarai Penilaian Pelajar' : 'Student Evaluations'}</span>
+          <span>{language === 'ms' ? 'Borang & Senarai Penilaian' : 'Evaluation Forms & List'}</span>
           {stats.pendingVerification > 0 && (
             <span className="ml-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
               {stats.pendingVerification}
@@ -475,7 +670,56 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
           )}
         </button>
 
-        {/* Coordinator Course Lecturer Settings Tab */}
+        {/* Tab 2: Pemantauan Kursus Pensyarah (for Course Lecturer & Coordinator) */}
+        {(isLecturer || isCoordinator) && (
+          <button
+            onClick={() => {
+              setActiveTab('courseMonitoring');
+              if (onNavigate) onNavigate('lecturerCourseMonitoring');
+            }}
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+              activeTab === 'courseMonitoring'
+                ? 'bg-indigo-600 text-white shadow-sm font-black'
+                : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+            }`}
+          >
+            <GraduationCap size={15} />
+            <span>{language === 'ms' ? 'Pemantauan Kursus Pensyarah' : 'Course Lecturer Monitoring'}</span>
+            <span className={`ml-1 text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+              activeTab === 'courseMonitoring' ? 'bg-indigo-400 text-white' : 'bg-indigo-100 text-indigo-800'
+            }`}>
+              {myAssignedCourses.length} {language === 'ms' ? 'Kursus' : 'Courses'}
+            </span>
+            {stats.pendingVerification > 0 && (
+              <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
+                {stats.pendingVerification}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Tab 3: Enrolmen Kursus Pelajar (for Coordinator & JKWBL only) */}
+        {isCoordinator && (
+          <button
+            onClick={() => {
+              setActiveTab('enrollment');
+              if (onNavigate) onNavigate('courseEnrollment');
+            }}
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+              activeTab === 'enrollment'
+                ? 'bg-emerald-600 text-white shadow-sm font-black'
+                : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+            }`}
+          >
+            <UserPlus size={14} />
+            <span>{language === 'ms' ? 'Enrolmen Kursus Pelajar' : 'Student Course Enrollment'}</span>
+            <span className="ml-1 bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+              {studentUsersList.length} {language === 'ms' ? 'Pelajar' : 'Students'}
+            </span>
+          </button>
+        )}
+
+        {/* Tab 4: Coordinator Course Lecturer Settings Tab */}
         {(isCoordinator || isLecturer) && (
           <button
             onClick={() => {
@@ -496,6 +740,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
           </button>
         )}
 
+        {/* Tab 5: Rubrik & Skala Gred */}
         <button
           onClick={() => {
             setActiveTab('rubrics');
@@ -784,6 +1029,926 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: PEMANTAUAN KURSUS PENSYARAH (COURSE LECTURER MONITORING DASHBOARD)   */}
+      {/* ========================================================================= */}
+      {activeTab === 'courseMonitoring' && (isLecturer || isCoordinator) && (
+        <div className="space-y-6">
+          {/* Header & Course Switcher */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
+                    <GraduationCap size={22} />
+                  </span>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800">
+                      {language === 'ms' ? 'Pemantauan Kursus Pensyarah & Penilaian Pelajar' : 'Course Lecturer Monitoring & Assessment'}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {language === 'ms'
+                        ? 'Pantau semua pelajar yang dienrol, semak penilaian prestasi industri yang dihantar oleh jurulatih, dan sahkan gred akademik kursus.'
+                        : 'Monitor enrolled students, review submitted industrial assessments, and verify final course grades.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Course Lecturer Info Card */}
+              <div className="bg-indigo-50/70 border border-indigo-200/80 px-4 py-2.5 rounded-xl text-xs flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
+                  {currentUser.name.charAt(0)}
+                </div>
+                <div>
+                  <div className="font-bold text-indigo-950">{currentUser.name}</div>
+                  <div className="text-[11px] text-indigo-700 font-medium">
+                    {isCoordinator ? 'Penyelaras WBL (Akses Semua Kursus)' : `Pensyarah Kursus FPTT (${myAssignedCourses.length} kursus ditugaskan)`}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Course Selector Tabs / Pills */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 block">
+                {language === 'ms' ? 'Pilih Kursus untuk Dipantau:' : 'Select Course to Monitor:'}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonitoringCourseCode('all')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    selectedMonitoringCourseCode === 'all'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Layers size={14} />
+                  <span>{language === 'ms' ? 'Semua Kursus Saya' : 'All My Courses'}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    selectedMonitoringCourseCode === 'all' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-200 text-slate-800'
+                  }`}>
+                    {myAssignedCourses.length}
+                  </span>
+                </button>
+
+                {myAssignedCourses.map((c) => {
+                  const enrolledCount = (c.assignedStudentIds || []).length;
+                  const pendingCount = evaluations.filter(e => e.courseCode === c.courseCode && e.status === 'submitted_by_trainer').length;
+                  const isSelected = selectedMonitoringCourseCode === c.courseCode;
+
+                  return (
+                    <button
+                      key={c.id || c.courseCode}
+                      type="button"
+                      onClick={() => setSelectedMonitoringCourseCode(c.courseCode)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span>{c.courseCode}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                        isSelected ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-200 text-slate-800'
+                      }`}>
+                        {enrolledCount} {language === 'ms' ? 'pelajar' : 'std'}
+                      </span>
+                      {pendingCount > 0 && (
+                        <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
+                          {pendingCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Render Monitoring Content for Course(s) */}
+          {(() => {
+            // Selected courses to display
+            const targetCourses = selectedMonitoringCourseCode === 'all'
+              ? myAssignedCourses
+              : myAssignedCourses.filter(c => c.courseCode === selectedMonitoringCourseCode);
+
+            if (targetCourses.length === 0) {
+              return (
+                <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
+                  <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+                    <GraduationCap size={32} />
+                  </div>
+                  <h4 className="text-base font-bold text-slate-700">
+                    {language === 'ms' ? 'Tiada Kursus Ditugaskan Buat Masa Ini' : 'No Courses Assigned Yet'}
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    {language === 'ms' 
+                      ? 'Penyelaras WBL belum menetapkan sebarang kursus di bawah akaun anda. Sila hubungi penyelaras untuk tetapan kursus.'
+                      : 'The coordinator has not assigned any courses to your account yet.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return targetCourses.map((currentCourse) => {
+              // Get enrolled student IDs for this course
+              const enrolledIds = currentCourse.assignedStudentIds || [];
+              const evalStudentIds = evaluations.filter(e => e.courseCode === currentCourse.courseCode).map(e => e.studentId);
+              const allTargetStudentIds = Array.from(new Set([...enrolledIds, ...evalStudentIds]));
+
+              // Build student items
+              const studentRows = allTargetStudentIds.map(sId => {
+                const studentUser = users.find(u => u.id === sId || u.matric_no === sId);
+                const studentApp = applications.find(a => 
+                  (a.student_id === sId || (studentUser && (a.student_id === studentUser.matric_no || a.created_by === studentUser.username))) && 
+                  (a.application_status === 'Diluluskan' || a.student_preferred)
+                );
+                const evalData = evaluations.find(e => 
+                  (e.studentId === sId || (studentUser && (e.studentId === studentUser.id || e.studentMatric === studentUser.matric_no))) && 
+                  e.courseCode === currentCourse.courseCode
+                );
+
+                return {
+                  studentId: sId,
+                  studentUser,
+                  studentApp,
+                  studentName: studentUser?.name || studentApp?.student_name || 'Pelajar WBL',
+                  studentMatric: studentUser?.matric_no || studentApp?.student_id || sId,
+                  studentProgram: studentUser?.academic_level || studentApp?.student_program || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                  companyName: evalData?.companyName || studentApp?.company_name || studentUser?.company_affiliation || 'Organisasi Latihan Industri',
+                  companyLocation: studentApp?.company_district ? `${studentApp.company_district}, ${studentApp.company_state}` : (studentUser?.address || '-'),
+                  trainerId: evalData?.trainerId || studentUser?.industry_trainer_id || 'trainer',
+                  trainerName: evalData?.trainerName || studentUser?.industry_trainer_name || 'Jurulatih Industri',
+                  trainerPosition: evalData?.trainerPosition || studentUser?.industry_trainer_position || 'Jurulatih Industri',
+                  trainerPhone: evalData?.trainerPhone || studentUser?.industry_trainer_phone || '-',
+                  trainerEmail: evalData?.trainerEmail || studentUser?.industry_trainer_email || '-',
+                  evaluation: evalData,
+                  status: evalData ? evalData.status : 'unassessed',
+                  totalScore: evalData ? evalData.totalScore : null,
+                  grade: evalData ? evalData.grade : null,
+                  scores: evalData?.scores
+                };
+              });
+
+              // Stats for this course
+              const totalEnrolled = studentRows.length;
+              const countVerified = studentRows.filter(r => r.status === 'verified_by_lecturer').length;
+              const countPendingVerify = studentRows.filter(r => r.status === 'submitted_by_trainer').length;
+              const countUnassessed = studentRows.filter(r => r.status === 'unassessed').length;
+              const countRevision = studentRows.filter(r => r.status === 'revision_requested').length;
+              const verifiedScores = studentRows.filter(r => r.status === 'verified_by_lecturer' && r.totalScore !== null).map(r => r.totalScore!);
+              const avgScore = verifiedScores.length > 0 ? (verifiedScores.reduce((a, b) => a + b, 0) / verifiedScores.length).toFixed(1) : '-';
+
+              // Filter rows by search and status
+              const filteredRows = studentRows.filter(r => {
+                if (monitoringStatusFilter !== 'all' && r.status !== monitoringStatusFilter) {
+                  return false;
+                }
+                if (monitoringSearchQuery.trim()) {
+                  const q = monitoringSearchQuery.toLowerCase();
+                  const match = 
+                    r.studentName.toLowerCase().includes(q) ||
+                    r.studentMatric.toLowerCase().includes(q) ||
+                    r.companyName.toLowerCase().includes(q) ||
+                    r.trainerName.toLowerCase().includes(q);
+                  if (!match) return false;
+                }
+                return true;
+              });
+
+              return (
+                <div key={currentCourse.id || currentCourse.courseCode} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                  {/* Course Title Bar & Actions */}
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-gradient-to-r from-slate-900 to-indigo-950 p-5 rounded-2xl text-white shadow-sm">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-black px-2.5 py-0.5 bg-amber-400 text-slate-900 rounded-lg">
+                          {currentCourse.courseCode}
+                        </span>
+                        <span className="text-xs font-medium text-slate-300">
+                          {currentCourse.semester || 'Semester 7'} • 3 Jam Kredit
+                        </span>
+                        <span className="text-xs bg-indigo-500/40 text-indigo-200 px-2 py-0.5 rounded-full font-semibold">
+                          Pensyarah: {currentCourse.lecturerName}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-black text-white tracking-tight">
+                        {currentCourse.courseName}
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        Kohort ini mempunyai {totalEnrolled} orang pelajar berdaftar penempatan WBL.
+                      </p>
+                    </div>
+
+                    {/* Quick Course Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCourseLedger(currentCourse)}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Printer size={15} />
+                        <span>{language === 'ms' ? 'Cetak Senarai Gred UTeM' : 'Print Grade Ledger'}</span>
+                      </button>
+
+                      {countUnassessed > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const unassessed = studentRows.filter(r => r.status === 'unassessed');
+                            handleSendBulkReminders(unassessed, currentCourse.courseCode);
+                          }}
+                          className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Bell size={14} />
+                          <span>{language === 'ms' ? `Peringatan (${countUnassessed})` : `Remind (${countUnassessed})`}</span>
+                        </button>
+                      )}
+
+                      {isCoordinator && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEnrollmentCourseCode(currentCourse.courseCode);
+                            setActiveTab('enrollment');
+                          }}
+                          className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                        >
+                          <UserPlus size={14} />
+                          <span>{language === 'ms' ? 'Urus Enrolmen' : 'Manage Enrollees'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Cards for this Course */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        {language === 'ms' ? 'Pelajar Dienrol' : 'Enrolled Students'}
+                      </div>
+                      <div className="text-2xl font-black text-slate-800 mt-1">{totalEnrolled}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">Kohort Kursus</div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60">
+                      <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                        {language === 'ms' ? 'Disahkan Pensyarah' : 'Verified by Lecturer'}
+                      </div>
+                      <div className="text-2xl font-black text-emerald-700 mt-1">{countVerified}</div>
+                      <div className="text-[10px] text-emerald-600 mt-0.5 font-bold">
+                        {totalEnrolled > 0 ? `${Math.round((countVerified / totalEnrolled) * 100)}% selesai` : '0%'}
+                      </div>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border transition-all ${
+                      countPendingVerify > 0 
+                        ? 'border-amber-300 bg-amber-50 shadow-xs' 
+                        : 'border-slate-200 bg-slate-50/70'
+                    }`}>
+                      <div className="text-[10px] font-bold text-amber-900 uppercase tracking-wider flex items-center justify-between">
+                        <span>{language === 'ms' ? 'Menunggu Pengesahan' : 'Pending Verify'}</span>
+                        {countPendingVerify > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />}
+                      </div>
+                      <div className="text-2xl font-black text-amber-800 mt-1">{countPendingVerify}</div>
+                      <div className="text-[10px] text-amber-700 mt-0.5">Perlu tindakan pensyarah</div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        {language === 'ms' ? 'Belum Dinilai Jurulatih' : 'Awaiting Trainer'}
+                      </div>
+                      <div className="text-2xl font-black text-slate-700 mt-1">{countUnassessed}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">Borang belum dihantar</div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/60">
+                      <div className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                        {language === 'ms' ? 'Purata Markah Kohort' : 'Cohort Average'}
+                      </div>
+                      <div className="text-2xl font-black text-indigo-800 mt-1">{avgScore}</div>
+                      <div className="text-[10px] text-indigo-600 mt-0.5 font-bold">
+                        Gred purata disahkan
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter & Search Bar */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                    <div className="relative flex-1">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={monitoringSearchQuery}
+                        onChange={(e) => setMonitoringSearchQuery(e.target.value)}
+                        placeholder={language === 'ms' ? 'Cari nama pelajar, no matrik, syarikat, atau jurulatih...' : 'Search student, matric, company...'}
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Filter size={15} className="text-slate-400 shrink-0" />
+                      <select
+                        value={monitoringStatusFilter}
+                        onChange={(e) => setMonitoringStatusFilter(e.target.value)}
+                        className="px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="all">{language === 'ms' ? 'Semua Status Penilaian' : 'All Evaluation Status'}</option>
+                        <option value="submitted_by_trainer">{language === 'ms' ? 'Menunggu Pengesahan Pensyarah' : 'Pending Verification'}</option>
+                        <option value="verified_by_lecturer">{language === 'ms' ? 'Telah Disahkan Pensyarah' : 'Verified by Lecturer'}</option>
+                        <option value="unassessed">{language === 'ms' ? 'Belum Dinilai oleh Jurulatih' : 'Awaiting Trainer'}</option>
+                        <option value="revision_requested">{language === 'ms' ? 'Semakan Semula Diperlukan' : 'Revision Requested'}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Student Table */}
+                  <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="p-3.5 text-center w-12">#</th>
+                          <th className="p-3.5">{language === 'ms' ? 'Pelajar & Matrik' : 'Student & Matric'}</th>
+                          <th className="p-3.5">{language === 'ms' ? 'Organisasi & Jurulatih' : 'Organization & Coach'}</th>
+                          <th className="p-3.5 text-center">{language === 'ms' ? 'Status Penilaian' : 'Status'}</th>
+                          <th className="p-3.5 text-center">{language === 'ms' ? 'Skor & Gred UTeM' : 'Scores & Grade'}</th>
+                          <th className="p-3.5 text-right">{language === 'ms' ? 'Tindakan Pensyarah' : 'Actions'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {filteredRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-slate-400">
+                              {language === 'ms' ? 'Tiada rekod pelajar padan dengan tapisan.' : 'No student records match filter.'}
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredRows.map((row, index) => {
+                            const isSubmitted = row.status === 'submitted_by_trainer';
+                            const isVerified = row.status === 'verified_by_lecturer';
+                            const isUnassessed = row.status === 'unassessed';
+                            const isRevision = row.status === 'revision_requested';
+
+                            return (
+                              <tr 
+                                key={row.studentId} 
+                                className={`transition-colors ${
+                                  isSubmitted 
+                                    ? 'bg-amber-50/40 hover:bg-amber-50/70' 
+                                    : 'hover:bg-slate-50/70'
+                                }`}
+                              >
+                                <td className="p-3.5 text-center font-bold text-slate-400">
+                                  {index + 1}
+                                </td>
+
+                                {/* Student Information */}
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0">
+                                      {row.studentName.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <div className="font-bold text-slate-800">{row.studentName}</div>
+                                      <div className="text-[11px] font-mono text-slate-500">{row.studentMatric}</div>
+                                      <div className="text-[10px] text-slate-400">{row.studentProgram}</div>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Company & Coach Information */}
+                                <td className="p-3.5">
+                                  <div className="space-y-0.5">
+                                    <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                                      <Building2 size={13} className="text-slate-400 shrink-0" />
+                                      <span>{row.companyName}</span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-600 flex items-center gap-1.5">
+                                      <UserCheck size={12} className="text-blue-500 shrink-0" />
+                                      <span>{row.trainerName}</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">
+                                      {row.trainerPhone !== '-' ? `Tel: ${row.trainerPhone}` : row.companyLocation}
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Evaluation Status */}
+                                <td className="p-3.5 text-center">
+                                  {isVerified && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                      <CheckCircle2 size={12} />
+                                      <span>{language === 'ms' ? 'Disahkan Pensyarah' : 'Verified'}</span>
+                                    </span>
+                                  )}
+                                  {isSubmitted && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                                      <Clock size={12} />
+                                      <span>{language === 'ms' ? 'Menunggu Pengesahan' : 'Pending Verification'}</span>
+                                    </span>
+                                  )}
+                                  {isRevision && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
+                                      <AlertCircle size={12} />
+                                      <span>{language === 'ms' ? 'Semakan Semula' : 'Revision'}</span>
+                                    </span>
+                                  )}
+                                  {isUnassessed && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                      <Clock size={12} className="text-slate-400" />
+                                      <span>{language === 'ms' ? 'Belum Dinilai Jurulatih' : 'Awaiting Trainer'}</span>
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Scores & Grade */}
+                                <td className="p-3.5 text-center">
+                                  {row.evaluation ? (
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-sm font-black text-indigo-900">
+                                          {row.totalScore}/100
+                                        </span>
+                                        <span className={`text-xs font-black px-1.5 py-0.2 rounded ${
+                                          row.totalScore! >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                          row.totalScore! >= 65 ? 'bg-blue-100 text-blue-800' :
+                                          'bg-amber-100 text-amber-800'
+                                        }`}>
+                                          Gred {row.grade}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        T:{row.evaluation.technicalSubtotal} | I:{row.evaluation.softSkillsSubtotal} | L:{row.evaluation.logbookSubtotal}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-xs italic">-</span>
+                                  )}
+                                </td>
+
+                                {/* Actions */}
+                                <td className="p-3.5 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {isSubmitted && row.evaluation && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReviewModal(row.evaluation!)}
+                                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center gap-1"
+                                      >
+                                        <ShieldCheck size={13} />
+                                        <span>{language === 'ms' ? 'Semak & Sahkan' : 'Review & Verify'}</span>
+                                      </button>
+                                    )}
+
+                                    {isVerified && row.evaluation && (
+                                      <button
+                                        type="button"
+                                        onClick={() => generateEvaluationPrint(row.evaluation!, language)}
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                        title="Papar / Cetak Slip Rasmi UTeM"
+                                      >
+                                        <Printer size={13} />
+                                        <span>Slip</span>
+                                      </button>
+                                    )}
+
+                                    {isUnassessed && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSendReminderToTrainer(row.studentName, row.studentMatric, currentCourse.courseCode, row.trainerId, row.trainerName)}
+                                        disabled={isSendingReminder === `${row.studentMatric}_${currentCourse.courseCode}`}
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                        title="Hantar peringatan kepada Jurulatih Industri"
+                                      >
+                                        <Bell size={13} className="text-amber-600" />
+                                        <span>{isSendingReminder === `${row.studentMatric}_${currentCourse.courseCode}` ? '...' : 'Peringatan'}</span>
+                                      </button>
+                                    )}
+
+                                    {isCoordinator && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUnenrollSingleStudent(currentCourse.courseCode, row.studentId, row.studentName)}
+                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                                        title="Keluarkan daripada kursus"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: ENROLMEN KURSUS PELAJAR (COORDINATOR COURSE ENROLLMENT MODULE)       */}
+      {/* ========================================================================= */}
+      {activeTab === 'enrollment' && isCoordinator && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl">
+                  <UserPlus size={22} />
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">
+                    {language === 'ms' ? 'Pengurusan Enrolmen Pelajar ke Kursus WBL' : 'Student Course Enrollment Management'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {language === 'ms'
+                      ? 'Penyelaras boleh mendaftarkan pelajar ke dalam kursus-kursus yang ditawarkan, menyemak status kohort, dan membolehkan pensyarah memantau pentaksiran pelajar.'
+                      : 'Coordinator can enroll students into offered courses, track cohort progress, and assign students for lecturer verification.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3.5 py-1.5 rounded-xl font-bold">
+                Jumlah Pelajar Berdaftar: {studentUsersList.length} Orang
+              </div>
+            </div>
+
+            {/* Step 1: Select Offered Course */}
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-2">
+                {language === 'ms' ? '1. Pilih Kursus Ditawarkan untuk Urus Enrolmen:' : '1. Select Offered Course to Manage:'}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {courseAssignments.map((course) => {
+                  const enrolledCount = (course.assignedStudentIds || []).length;
+                  const isSelected = selectedEnrollmentCourseCode === course.courseCode;
+
+                  return (
+                    <div
+                      key={course.id || course.courseCode}
+                      onClick={() => {
+                        setSelectedEnrollmentCourseCode(course.courseCode);
+                        setSelectedStudentsToEnroll([]);
+                      }}
+                      className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-emerald-500 bg-emerald-50/50 shadow-md ring-2 ring-emerald-400'
+                          : 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-xs font-black px-2 py-0.5 bg-emerald-100 text-emerald-900 rounded-md">
+                          {course.courseCode}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                          {course.semester || 'Semester 7'}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-slate-800 mt-2">{course.courseName}</h4>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-200/60">
+                        <span className="truncate">Pensyarah: {course.lecturerName}</span>
+                        <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.2 rounded-full shrink-0">
+                          {enrolledCount} Dienrol
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Step 2: Enrolment Workspace for Selected Course */}
+          {(() => {
+            const currentCourse = courseAssignments.find(c => c.courseCode === selectedEnrollmentCourseCode) || courseAssignments[0];
+            if (!currentCourse) return null;
+
+            const enrolledStudentIds = currentCourse.assignedStudentIds || [];
+            
+            // Available students not yet enrolled in this course
+            const availableStudents = studentUsersList.filter(s => !enrolledStudentIds.includes(s.id) && !enrolledStudentIds.includes(s.matric_no || ''));
+
+            // Filter available students
+            const filteredAvailable = availableStudents.filter(s => {
+              if (enrollmentProgramFilter !== 'all' && s.academic_level !== enrollmentProgramFilter) {
+                return false;
+              }
+              if (enrollmentSearchQuery.trim()) {
+                const q = enrollmentSearchQuery.toLowerCase();
+                const match = s.name.toLowerCase().includes(q) || (s.matric_no && s.matric_no.toLowerCase().includes(q));
+                if (!match) return false;
+              }
+              return true;
+            });
+
+            // Enrolled students list
+            const enrolledStudents = enrolledStudentIds.map(sId => {
+              const u = users.find(user => user.id === sId || user.matric_no === sId);
+              const app = applications.find(a => (a.student_id === sId || (u && (a.student_id === u.matric_no || a.created_by === u.username))) && (a.application_status === 'Diluluskan' || a.student_preferred));
+              return {
+                id: sId,
+                name: u?.name || app?.student_name || 'Pelajar WBL',
+                matric: u?.matric_no || app?.student_id || sId,
+                program: u?.academic_level || app?.student_program || 'BTEC',
+                company: app?.company_name || u?.company_affiliation || 'Belum Ditetapkan',
+                phone: u?.phone || '-'
+              };
+            });
+
+            return (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                {/* Course Header Bar */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                  <div>
+                    <div className="text-xs font-mono font-bold text-emerald-700">{currentCourse.courseCode}</div>
+                    <h3 className="text-base font-black text-slate-800">{currentCourse.courseName}</h3>
+                    <div className="text-xs text-slate-600">
+                      Pensyarah Kursus: <strong>{currentCourse.lecturerName}</strong> {currentCourse.lecturerEmail ? `(${currentCourse.lecturerEmail})` : ''}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-900 bg-white border border-emerald-300 px-3 py-1.5 rounded-lg shadow-xs">
+                      {enrolledStudents.length} Pelajar Telah Dienrol
+                    </span>
+                  </div>
+                </div>
+
+                {/* Subtabs: Enrolled vs Add New */}
+                <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setEnrollmentActiveSubtab('enrolled')}
+                    className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                      enrollmentActiveSubtab === 'enrolled'
+                        ? 'bg-emerald-600 text-white shadow-sm font-black'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <UserCheck size={14} />
+                    <span>{language === 'ms' ? 'Pelajar Sedang Dienrol' : 'Enrolled Students'}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      enrollmentActiveSubtab === 'enrolled' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {enrolledStudents.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEnrollmentActiveSubtab('available')}
+                    className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+                      enrollmentActiveSubtab === 'available'
+                        ? 'bg-emerald-600 text-white shadow-sm font-black'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <UserPlus size={14} />
+                    <span>{language === 'ms' ? '+ Enrol Pelajar Baharu' : '+ Enroll New Students'}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      enrollmentActiveSubtab === 'available' ? 'bg-emerald-800 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {availableStudents.length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* SUBTAB A: PELAJAR SEDANG DIENROL */}
+                {enrollmentActiveSubtab === 'enrolled' && (
+                  <div className="space-y-4">
+                    {enrolledStudents.length === 0 ? (
+                      <div className="p-12 text-center text-slate-400 space-y-2 border border-dashed border-slate-300 rounded-xl">
+                        <UserPlus size={32} className="mx-auto text-slate-300" />
+                        <div className="font-bold text-sm text-slate-600">
+                          {language === 'ms' ? 'Belum Ada Pelajar Dienrol ke Kursus Ini' : 'No Students Enrolled Yet'}
+                        </div>
+                        <p className="text-xs">
+                          {language === 'ms' 
+                            ? 'Klik tab "+ Enrol Pelajar Baharu" untuk mendaftarkan pelajar aktif ke dalam kursus ini.' 
+                            : 'Click "+ Enroll New Students" to add active students to this course.'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setEnrollmentActiveSubtab('available')}
+                          className="mt-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold"
+                        >
+                          + Enrol Pelajar Sekarang
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                              <th className="p-3 text-center w-12">#</th>
+                              <th className="p-3">No. Matrik</th>
+                              <th className="p-3">Nama Pelajar</th>
+                              <th className="p-3">Program</th>
+                              <th className="p-3">Organisasi Latihan</th>
+                              <th className="p-3 text-right">Tindakan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {enrolledStudents.map((s, idx) => (
+                              <tr key={s.id} className="hover:bg-slate-50">
+                                <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                <td className="p-3 font-mono font-bold text-blue-700">{s.matric}</td>
+                                <td className="p-3 font-bold text-slate-800">{s.name}</td>
+                                <td className="p-3 text-slate-500">{s.program}</td>
+                                <td className="p-3 text-slate-600">{s.company}</td>
+                                <td className="p-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUnenrollSingleStudent(currentCourse.courseCode, s.id, s.name)}
+                                    className="px-2.5 py-1 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1"
+                                    title="Keluarkan daripada kursus"
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>Keluarkan</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SUBTAB B: ENROL PELAJAR BAHARU */}
+                {enrollmentActiveSubtab === 'available' && (
+                  <div className="space-y-4">
+                    {/* Bulk Action Toolbar */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div>
+                        <div className="text-xs font-bold text-slate-700">
+                          {language === 'ms' ? 'Tindakan Pendaftaran Berkelompok:' : 'Batch Enrollment Actions:'}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {selectedStudentsToEnroll.length} pelajar dipilih daripada {filteredAvailable.length} pelajar tersedia
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {selectedStudentsToEnroll.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleEnrollSelectedStudents(currentCourse.courseCode)}
+                            disabled={isSaving}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                          >
+                            <UserPlus size={14} />
+                            <span>{language === 'ms' ? `Enrol Pelajar Ditanda (${selectedStudentsToEnroll.length})` : `Enroll Selected (${selectedStudentsToEnroll.length})`}</span>
+                          </button>
+                        )}
+
+                        {filteredAvailable.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allIds = filteredAvailable.map(s => s.id);
+                              handleEnrollAllAvailableStudents(currentCourse.courseCode, allIds);
+                            }}
+                            disabled={isSaving}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                          >
+                            <CheckCheck size={14} />
+                            <span>{language === 'ms' ? `Enrol Semua Pelajar Tersedia (${filteredAvailable.length})` : `Enroll All Available (${filteredAvailable.length})`}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Filter and Search */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="relative flex-1">
+                        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={enrollmentSearchQuery}
+                          onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                          placeholder={language === 'ms' ? 'Cari nama pelajar atau no matrik...' : 'Search student name or matric...'}
+                          className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedStudentsToEnroll.length === filteredAvailable.length) {
+                              setSelectedStudentsToEnroll([]);
+                            } else {
+                              setSelectedStudentsToEnroll(filteredAvailable.map(s => s.id));
+                            }
+                          }}
+                          className="px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1"
+                        >
+                          <CheckSquare size={14} />
+                          <span>{selectedStudentsToEnroll.length === filteredAvailable.length && filteredAvailable.length > 0 ? 'Nyah-pilih Semua' : 'Tanda Semua'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Available Students Table */}
+                    {filteredAvailable.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 border border-slate-200 rounded-xl">
+                        {language === 'ms' 
+                          ? 'Semua pelajar aktif telah dienrol ke dalam kursus ini.' 
+                          : 'All active students are already enrolled in this course.'}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                              <th className="p-3 text-center w-10">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedStudentsToEnroll.length === filteredAvailable.length && filteredAvailable.length > 0}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedStudentsToEnroll(filteredAvailable.map(s => s.id));
+                                    } else {
+                                      setSelectedStudentsToEnroll([]);
+                                    }
+                                  }}
+                                  className="rounded text-emerald-600 focus:ring-emerald-500"
+                                />
+                              </th>
+                              <th className="p-3">No. Matrik</th>
+                              <th className="p-3">Nama Pelajar</th>
+                              <th className="p-3">Program</th>
+                              <th className="p-3">Penempatan Industri</th>
+                              <th className="p-3 text-right">Tindakan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filteredAvailable.map((s) => {
+                              const isChecked = selectedStudentsToEnroll.includes(s.id);
+                              const app = applications.find(a => (a.student_id === s.id || a.student_id === s.matric_no || a.created_by === s.username) && (a.application_status === 'Diluluskan' || a.student_preferred));
+
+                              return (
+                                <tr key={s.id} className={`hover:bg-emerald-50/40 transition-colors ${isChecked ? 'bg-emerald-50/30' : ''}`}>
+                                  <td className="p-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedStudentsToEnroll([...selectedStudentsToEnroll, s.id]);
+                                        } else {
+                                          setSelectedStudentsToEnroll(selectedStudentsToEnroll.filter(id => id !== s.id));
+                                        }
+                                      }}
+                                      className="rounded text-emerald-600 focus:ring-emerald-500"
+                                    />
+                                  </td>
+                                  <td className="p-3 font-mono font-bold text-slate-800">{s.matric_no || '-'}</td>
+                                  <td className="p-3 font-bold text-slate-800">{s.name}</td>
+                                  <td className="p-3 text-slate-500">{s.academic_level || 'BTEC'}</td>
+                                  <td className="p-3 text-slate-600">
+                                    {app?.company_name || s.company_affiliation || (
+                                      <span className="text-slate-400 italic">Belum ditempatkan</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEnrollSelectedStudents(currentCourse.courseCode)}
+                                      onMouseDown={() => setSelectedStudentsToEnroll([s.id])}
+                                      disabled={isSaving}
+                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 shadow-xs"
+                                    >
+                                      <Plus size={13} />
+                                      <span>Enrol</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

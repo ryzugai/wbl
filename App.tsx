@@ -310,7 +310,7 @@ function App() {
             />
         )}
 
-        {(currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics') && (
+        {(currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'lecturerCourseMonitoring' || currentView === 'courseEnrollment') && (
             <StudentEvaluationPage
                 currentUser={currentUser}
                 applications={applications}
@@ -318,7 +318,9 @@ function App() {
                 language={language}
                 initialTab={
                   currentView === 'evaluationSettings' ? 'settings' :
-                  currentView === 'evaluationRubrics' ? 'rubrics' : 'evaluations'
+                  currentView === 'evaluationRubrics' ? 'rubrics' :
+                  currentView === 'lecturerCourseMonitoring' ? 'courseMonitoring' :
+                  currentView === 'courseEnrollment' ? 'enrollment' : 'evaluations'
                 }
                 onNavigate={setCurrentView}
             />
