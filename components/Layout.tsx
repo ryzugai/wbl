@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole, Notification, CourseLecturerAssignment } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight, GraduationCap, UserPlus } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight, GraduationCap, UserPlus, ClipboardCheck } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -28,8 +28,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const [pendingEvalCount, setPendingEvalCount] = useState(0);
 
   const isCourseMonitoringView = currentView === 'lecturerCourseMonitoring';
-  const [isCourseMonitoringSubmenuOpen, setIsCourseMonitoringSubmenuOpen] = useState(isCourseMonitoringView);
+  const [isLecturerCourseSubmenuOpen, setIsLecturerCourseSubmenuOpen] = useState(true);
+  const [isTrainerCourseSubmenuOpen, setIsTrainerCourseSubmenuOpen] = useState(true);
+  const [isCoordinatorCourseSubmenuOpen, setIsCoordinatorCourseSubmenuOpen] = useState(true);
   const [assignedCourses, setAssignedCourses] = useState<CourseLecturerAssignment[]>([]);
+  const [allSemesterCourses, setAllSemesterCourses] = useState<CourseLecturerAssignment[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [evaluations, setEvaluations] = useState<any[]>([]);
 
   useEffect(() => {
     if (isEvaluationView) {
@@ -39,21 +44,42 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
 
   useEffect(() => {
     if (isCourseMonitoringView) {
-      setIsCourseMonitoringSubmenuOpen(true);
+      setIsLecturerCourseSubmenuOpen(true);
+      setIsCoordinatorCourseSubmenuOpen(true);
     }
   }, [isCourseMonitoringView]);
+
+  useEffect(() => {
+    const loadAppData = () => {
+      try {
+        setApplications(StorageService.getApplications());
+        setEvaluations(StorageService.getEvaluations());
+      } catch {}
+    };
+    loadAppData();
+    const unsub = StorageService.subscribe(loadAppData);
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const loadAssignments = () => {
       try {
         const all = StorageService.getCourseAssignments();
+        setAllSemesterCourses(all);
+
         if (currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR) {
           const myCourses = all.filter(a => 
             a.lecturerId === currentUser.id || 
-            (a.lecturerName && currentUser.name && a.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()))
+            (a.lecturerEmail && currentUser.email && a.lecturerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+            (a.lecturerName && currentUser.name && (
+              a.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+              currentUser.name.toLowerCase().includes(a.lecturerName.toLowerCase())
+            ))
           );
-          setAssignedCourses(myCourses.length > 0 ? myCourses : all);
+          setAssignedCourses(myCourses.length > 0 ? myCourses : all.slice(0, 2));
         } else if (currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl) {
+          setAssignedCourses(all);
+        } else if (currentUser.role === UserRole.TRAINER) {
           setAssignedCourses(all);
         }
       } catch {}
@@ -63,6 +89,67 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
     const unsub = StorageService.subscribe(loadAssignments);
     return () => unsub();
   }, [currentUser]);
+
+  // Navigate to course with synchronization
+  const handleCourseNavigate = (courseCode: string, view: 'monitoring' | 'evaluation') => {
+    if (view === 'monitoring') {
+      if (courseCode === 'all') {
+        sessionStorage.removeItem('selectedMonitoringCourseCode');
+      } else {
+        sessionStorage.setItem('selectedMonitoringCourseCode', courseCode);
+      }
+      handleNavigate('lecturerCourseMonitoring');
+    } else {
+      if (courseCode === 'all') {
+        sessionStorage.removeItem('selectedEvaluationCourseCode');
+      } else {
+        sessionStorage.setItem('selectedEvaluationCourseCode', courseCode);
+      }
+      handleNavigate('studentEvaluation');
+    }
+    window.dispatchEvent(new CustomEvent('wblCourseSelected', { detail: { courseCode, view } }));
+  };
+
+  // Get Trainer Course Stats
+  const getTrainerCourseStats = (courseCode: string) => {
+    const trainerComp = (currentUser.company_affiliation || '').trim().toLowerCase();
+    const myTrainees = applications.filter(a => 
+      (a.application_status === 'Diluluskan' || a.student_preferred) &&
+      (!trainerComp || (a.company_name && a.company_name.toLowerCase().includes(trainerComp)))
+    );
+    const courseEvals = evaluations.filter(e => e.courseCode === courseCode);
+    
+    let completed = 0;
+    myTrainees.forEach(t => {
+      const hasEval = courseEvals.find(e => e.studentId === t.student_id || e.studentMatric === t.student_id);
+      if (hasEval && (hasEval.status === 'submitted_by_trainer' || hasEval.status === 'verified_by_lecturer')) {
+        completed++;
+      }
+    });
+
+    const pending = Math.max(0, myTrainees.length - completed);
+    return { count: myTrainees.length, pending, completed };
+  };
+
+  // Get Coordinator Course Stats
+  const getCoordinatorCourseStats = (course: CourseLecturerAssignment) => {
+    const enrolledCount = (course.assignedStudentIds || []).length;
+    const courseEvals = evaluations.filter(e => e.courseCode === course.courseCode);
+    const pendingVerify = courseEvals.filter(e => e.status === 'submitted_by_trainer').length;
+    const verified = courseEvals.filter(e => e.status === 'verified_by_lecturer').length;
+    return { enrolledCount, pendingVerify, verified };
+  };
+
+  // Get Lecturer Course Stats
+  const getLecturerCourseStats = (course: CourseLecturerAssignment) => {
+    const enrolledCount = (course.assignedStudentIds || []).length;
+    const courseEvals = evaluations.filter(e => e.courseCode === course.courseCode);
+    const pendingMyVerify = courseEvals.filter(e => 
+      e.status === 'submitted_by_trainer' && 
+      (e.lecturerId === currentUser.id || !e.lecturerId || (e.lecturerName && e.lecturerName.toLowerCase() === currentUser.name.toLowerCase()))
+    ).length;
+    return { enrolledCount, pendingMyVerify };
+  };
 
   useEffect(() => {
     const updateEvalCounts = () => {
@@ -426,26 +513,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           </div>
 
           {/* ========================================================================= */}
-          {/* SUBMENU KHAS PENSYARAH: PEMANTAUAN KURSUS, PENILAIAN & PELAJAR           */}
+          {/* 1. SUBMENU KHAS PENSYARAH: KURSUS PENGAJARAN SAYA (LECTURER ONLY)         */}
           {/* ========================================================================= */}
-          {(isLecturer || hasSystemAccess) && (
+          {isLecturer && !hasSystemAccess && (
             <div className="py-1">
               <div className={`rounded-xl border transition-all ${
                 isCourseMonitoringView 
                   ? 'border-indigo-300 bg-indigo-50/50 shadow-xs' 
                   : 'border-slate-200/80 bg-slate-50/60'
               }`}>
-                {/* Main Submenu Header Button */}
+                {/* Header Button */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!isCourseMonitoringSubmenuOpen) {
-                      setIsCourseMonitoringSubmenuOpen(true);
-                      handleNavigate('lecturerCourseMonitoring');
-                    } else {
-                      setIsCourseMonitoringSubmenuOpen(!isCourseMonitoringSubmenuOpen);
-                    }
-                  }}
+                  onClick={() => setIsLecturerCourseSubmenuOpen(!isLecturerCourseSubmenuOpen)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left ${
                     isCourseMonitoringView
                       ? 'bg-indigo-600 text-white font-black shadow-sm'
@@ -455,16 +535,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                   <div className="flex items-center gap-2.5">
                     <GraduationCap size={18} className={isCourseMonitoringView ? 'text-amber-300' : 'text-indigo-600'} />
                     <div className="flex flex-col">
-                      <span className="text-xs leading-tight">
-                        {language === 'ms' ? 'Pemantauan Kursus Saya' : 'My Course Monitoring'}
+                      <span className="text-xs leading-tight font-black">
+                        {language === 'ms' ? 'Kursus Pengajaran Saya' : 'My Teaching Courses'}
                       </span>
-                      {assignedCourses.length > 0 && (
-                        <span className={`text-[10px] font-medium leading-none mt-0.5 ${
-                          isCourseMonitoringView ? 'text-indigo-100' : 'text-slate-500'
-                        }`}>
-                          {assignedCourses.length} {language === 'ms' ? 'kursus ditugaskan' : 'assigned courses'}
-                        </span>
-                      )}
+                      <span className={`text-[10px] font-medium leading-none mt-0.5 ${
+                        isCourseMonitoringView ? 'text-indigo-100' : 'text-slate-500'
+                      }`}>
+                        {assignedCourses.length} {language === 'ms' ? 'kursus ditugaskan' : 'assigned courses'}
+                      </span>
                     </div>
                   </div>
 
@@ -476,7 +554,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                         {pendingEvalCount}
                       </span>
                     )}
-                    {isCourseMonitoringSubmenuOpen ? (
+                    {isLecturerCourseSubmenuOpen ? (
                       <ChevronDown size={14} className={isCourseMonitoringView ? 'text-white' : 'text-slate-400'} />
                     ) : (
                       <ChevronRight size={14} className={isCourseMonitoringView ? 'text-white' : 'text-slate-400'} />
@@ -485,49 +563,285 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                 </button>
 
                 {/* Submenu Course Links */}
-                {isCourseMonitoringSubmenuOpen && (
+                {isLecturerCourseSubmenuOpen && (
                   <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
                     <button
                       type="button"
-                      onClick={() => {
-                        sessionStorage.removeItem('selectedMonitoringCourseCode');
-                        handleNavigate('lecturerCourseMonitoring');
-                      }}
+                      onClick={() => handleCourseNavigate('all', 'monitoring')}
                       className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                        currentView === 'lecturerCourseMonitoring' && !sessionStorage.getItem('selectedMonitoringCourseCode')
+                        currentView === 'lecturerCourseMonitoring' && (!sessionStorage.getItem('selectedMonitoringCourseCode') || sessionStorage.getItem('selectedMonitoringCourseCode') === 'all')
                           ? 'bg-indigo-50 text-indigo-700 font-black'
                           : 'text-slate-600 hover:bg-slate-50 font-medium'
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'lecturerCourseMonitoring' ? 'bg-indigo-600' : 'bg-slate-300'}`} />
-                        <span>{language === 'ms' ? 'Papan Pemantauan Keseluruhan' : 'All Courses Dashboard'}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                        <span>{language === 'ms' ? 'Papan Pemantauan Kursus Saya' : 'My Courses Dashboard'}</span>
                       </div>
                       <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 rounded-full">
                         {assignedCourses.length}
                       </span>
                     </button>
 
-                    {/* Course items */}
-                    {assignedCourses.map(course => (
-                      <button
-                        key={course.id || course.courseCode}
-                        type="button"
-                        onClick={() => {
-                          sessionStorage.setItem('selectedMonitoringCourseCode', course.courseCode);
-                          handleNavigate('lecturerCourseMonitoring');
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group"
-                      >
-                        <div className="flex items-center gap-2 overflow-hidden text-left">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-600" />
-                          <span className="truncate font-medium">{course.courseCode}</span>
-                        </div>
-                        <span className="text-[9px] bg-slate-100 group-hover:bg-indigo-100 text-slate-600 group-hover:text-indigo-800 px-1.5 py-0.5 rounded font-bold shrink-0">
-                          {(course.assignedStudentIds || []).length} {language === 'ms' ? 'pelajar' : 'std'}
-                        </span>
-                      </button>
-                    ))}
+                    {assignedCourses.length === 0 ? (
+                      <div className="px-3 py-2 text-[11px] text-slate-400 italic">
+                        {language === 'ms' ? 'Tiada kursus ditugaskan lagi' : 'No courses assigned yet'}
+                      </div>
+                    ) : (
+                      assignedCourses.map(course => {
+                        const stats = getLecturerCourseStats(course);
+                        return (
+                          <button
+                            key={course.id || course.courseCode}
+                            type="button"
+                            onClick={() => handleCourseNavigate(course.courseCode, 'monitoring')}
+                            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group"
+                            title={`${course.courseCode} - ${course.courseName}`}
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden text-left">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-600" />
+                              <div className="flex flex-col truncate">
+                                <span className="truncate font-semibold">{course.courseCode}</span>
+                                <span className="text-[9px] text-slate-400 truncate">{course.courseName}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 ml-1">
+                              {stats.pendingMyVerify > 0 && (
+                                <span className="text-[9px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                                  {stats.pendingMyVerify}
+                                </span>
+                              )}
+                              <span className="text-[9px] bg-slate-100 group-hover:bg-indigo-100 text-slate-600 group-hover:text-indigo-800 px-1.5 py-0.5 rounded font-bold">
+                                {stats.enrolledCount} {language === 'ms' ? 'pelajar' : 'std'}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 2. SUBMENU KHAS JURULATIH INDUSTRI: PENILAIAN KURSUS SEMESTER SEMASA       */}
+          {/* ========================================================================= */}
+          {isTrainer && (
+            <div className="py-1">
+              <div className={`rounded-xl border transition-all ${
+                currentView === 'studentEvaluation' 
+                  ? 'border-blue-300 bg-blue-50/50 shadow-xs' 
+                  : 'border-slate-200/80 bg-slate-50/60'
+              }`}>
+                {/* Header Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsTrainerCourseSubmenuOpen(!isTrainerCourseSubmenuOpen)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left ${
+                    currentView === 'studentEvaluation'
+                      ? 'bg-blue-600 text-white font-black shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-100 font-bold'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <ClipboardCheck size={18} className={currentView === 'studentEvaluation' ? 'text-amber-300' : 'text-blue-600'} />
+                    <div className="flex flex-col">
+                      <span className="text-xs leading-tight font-black">
+                        {language === 'ms' ? 'Penilaian Kursus Semester Semasa' : 'Course Assessments (Current Sem)'}
+                      </span>
+                      <span className={`text-[10px] font-medium leading-none mt-0.5 ${
+                        currentView === 'studentEvaluation' ? 'text-blue-100' : 'text-slate-500'
+                      }`}>
+                        {allSemesterCourses.length} {language === 'ms' ? 'kursus aktif' : 'active courses'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pendingEvalCount > 0 && (
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                        currentView === 'studentEvaluation' ? 'bg-amber-400 text-slate-900' : 'bg-amber-500 text-white animate-pulse'
+                      }`}>
+                        {pendingEvalCount}
+                      </span>
+                    )}
+                    {isTrainerCourseSubmenuOpen ? (
+                      <ChevronDown size={14} className={currentView === 'studentEvaluation' ? 'text-white' : 'text-slate-400'} />
+                    ) : (
+                      <ChevronRight size={14} className={currentView === 'studentEvaluation' ? 'text-white' : 'text-slate-400'} />
+                    )}
+                  </div>
+                </button>
+
+                {/* Submenu Course Links for Trainer */}
+                {isTrainerCourseSubmenuOpen && (
+                  <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleCourseNavigate('all', 'evaluation')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'studentEvaluation' && (!sessionStorage.getItem('selectedEvaluationCourseCode') || sessionStorage.getItem('selectedEvaluationCourseCode') === 'all')
+                          ? 'bg-blue-50 text-blue-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                        <span>{language === 'ms' ? 'Semua Penilaian Pelajar' : 'All Student Evaluations'}</span>
+                      </div>
+                      <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 rounded-full">
+                        {allSemesterCourses.length}
+                      </span>
+                    </button>
+
+                    {allSemesterCourses.map(course => {
+                      const stats = getTrainerCourseStats(course.courseCode);
+                      return (
+                        <button
+                          key={course.id || course.courseCode}
+                          type="button"
+                          onClick={() => handleCourseNavigate(course.courseCode, 'evaluation')}
+                          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
+                          title={`${course.courseCode} - ${course.courseName}`}
+                        >
+                          <div className="flex items-center gap-2 overflow-hidden text-left">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-600" />
+                            <div className="flex flex-col truncate">
+                              <span className="truncate font-semibold">{course.courseCode}</span>
+                              <span className="text-[9px] text-slate-400 truncate">{course.courseName}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0 ml-1">
+                            {stats.pending > 0 ? (
+                              <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">
+                                {stats.pending} {language === 'ms' ? 'perlu nilai' : 'pending'}
+                              </span>
+                            ) : stats.completed > 0 ? (
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                                ✓ {stats.completed} {language === 'ms' ? 'selesai' : 'done'}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
+                                {stats.count} {language === 'ms' ? 'pelatih' : 'intern'}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* 3. SUBMENU KHAS PENYELARAS: PEMANTAUAN SEMUA KURSUS (SEMESTER SEMASA)     */}
+          {/* ========================================================================= */}
+          {hasSystemAccess && (
+            <div className="py-1">
+              <div className={`rounded-xl border transition-all ${
+                isCourseMonitoringView 
+                  ? 'border-indigo-300 bg-indigo-50/50 shadow-xs' 
+                  : 'border-slate-200/80 bg-slate-50/60'
+              }`}>
+                {/* Header Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsCoordinatorCourseSubmenuOpen(!isCoordinatorCourseSubmenuOpen)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left ${
+                    isCourseMonitoringView
+                      ? 'bg-indigo-600 text-white font-black shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-100 font-bold'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <ShieldCheck size={18} className={isCourseMonitoringView ? 'text-amber-300' : 'text-indigo-600'} />
+                    <div className="flex flex-col">
+                      <span className="text-xs leading-tight font-black">
+                        {language === 'ms' ? 'Pemantauan Semua Kursus (Semester Semasa)' : 'All Courses Monitoring (Current Sem)'}
+                      </span>
+                      <span className={`text-[10px] font-medium leading-none mt-0.5 ${
+                        isCourseMonitoringView ? 'text-indigo-100' : 'text-slate-500'
+                      }`}>
+                        {allSemesterCourses.length} {language === 'ms' ? 'kursus dipantau' : 'monitored courses'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pendingEvalCount > 0 && (
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                        isCourseMonitoringView ? 'bg-amber-400 text-slate-900' : 'bg-amber-500 text-white animate-pulse'
+                      }`}>
+                        {pendingEvalCount}
+                      </span>
+                    )}
+                    {isCoordinatorCourseSubmenuOpen ? (
+                      <ChevronDown size={14} className={isCourseMonitoringView ? 'text-white' : 'text-slate-400'} />
+                    ) : (
+                      <ChevronRight size={14} className={isCourseMonitoringView ? 'text-white' : 'text-slate-400'} />
+                    )}
+                  </div>
+                </button>
+
+                {/* Submenu Course Links for Coordinator */}
+                {isCoordinatorCourseSubmenuOpen && (
+                  <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleCourseNavigate('all', 'monitoring')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'lecturerCourseMonitoring' && (!sessionStorage.getItem('selectedMonitoringCourseCode') || sessionStorage.getItem('selectedMonitoringCourseCode') === 'all')
+                          ? 'bg-indigo-50 text-indigo-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                        <span>{language === 'ms' ? 'Papan Pemantauan Keseluruhan' : 'All Courses Overview'}</span>
+                      </div>
+                      <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 rounded-full">
+                        {allSemesterCourses.length}
+                      </span>
+                    </button>
+
+                    {allSemesterCourses.map(course => {
+                      const stats = getCoordinatorCourseStats(course);
+                      return (
+                        <button
+                          key={course.id || course.courseCode}
+                          type="button"
+                          onClick={() => handleCourseNavigate(course.courseCode, 'monitoring')}
+                          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group"
+                          title={`${course.courseCode} - ${course.courseName} (${course.lecturerName})`}
+                        >
+                          <div className="flex items-center gap-2 overflow-hidden text-left">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-600" />
+                            <div className="flex flex-col truncate">
+                              <span className="truncate font-semibold">{course.courseCode}</span>
+                              <span className="text-[9px] text-slate-400 truncate">
+                                {course.lecturerName ? course.lecturerName.split(' ')[0] : 'Pensyarah'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0 ml-1">
+                            {stats.pendingVerify > 0 && (
+                              <span className="text-[9px] bg-amber-500 text-white font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                                {stats.pendingVerify}
+                              </span>
+                            )}
+                            <span className="text-[9px] bg-slate-100 group-hover:bg-indigo-100 text-slate-600 group-hover:text-indigo-800 px-1.5 py-0.5 rounded font-bold">
+                              {stats.enrolledCount} {language === 'ms' ? 'pelajar' : 'std'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

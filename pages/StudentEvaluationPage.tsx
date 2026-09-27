@@ -15,7 +15,7 @@ import {
   Trash2, Edit3, UserCheck, ShieldCheck, Building2, Star, Search, Filter, 
   GraduationCap, BookOpen, Settings, UserCog, Check, Info, ChevronRight, HelpCircle,
   UserPlus, UserMinus, CheckSquare, Bell, ArrowRight, Eye, RefreshCw, BarChart2,
-  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck, Sliders, ChevronDown
+  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck, Sliders, ChevronDown, Users
 } from 'lucide-react';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
@@ -75,7 +75,28 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       setSelectedMonitoringCourseCode(navCourse);
       sessionStorage.removeItem('selectedMonitoringCourseCode');
     }
+    const evalCourse = sessionStorage.getItem('selectedEvaluationCourseCode');
+    if (evalCourse) {
+      setSelectedCourseFilter(evalCourse);
+      setActiveTab('evaluations');
+      sessionStorage.removeItem('selectedEvaluationCourseCode');
+    }
   }, [initialTab]);
+
+  useEffect(() => {
+    const handleCourseSelected = (e: any) => {
+      const { courseCode, view } = e.detail || {};
+      if (view === 'monitoring') {
+        setSelectedMonitoringCourseCode(courseCode || 'all');
+        setActiveTab('courseMonitoring');
+      } else if (view === 'evaluation') {
+        setSelectedCourseFilter(courseCode || 'all');
+        setActiveTab('evaluations');
+      }
+    };
+    window.addEventListener('wblCourseSelected', handleCourseSelected);
+    return () => window.removeEventListener('wblCourseSelected', handleCourseSelected);
+  }, []);
 
   // Data state
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>([]);
@@ -204,26 +225,39 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   }, [filteredEvaluations]);
 
   // Handle open Evaluation Form (new or edit)
-  const handleOpenForm = (existing?: StudentEvaluation) => {
+  const handleOpenForm = (existing?: StudentEvaluation, presetStudent?: any, presetCourseCode?: string) => {
     if (existing) {
       setEditingEvaluation(existing);
     } else {
-      // Default template
-      const defaultCourse = courseAssignments[0] || {
-        courseCode: 'BTMT 3283(i)',
-        courseName: 'Analitik Perniagaan',
+      // Determine default course
+      const targetCourseCode = presetCourseCode || (selectedCourseFilter !== 'all' ? selectedCourseFilter : 'BTMT 3273(i)');
+      const defaultCourse = courseAssignments.find(ca => ca.courseCode === targetCourseCode) || courseAssignments[0] || {
+        courseCode: 'BTMT 3273(i)',
+        courseName: 'Keusahawanan Digital',
         lecturerId: facultyLecturers[0]?.id || '',
         lecturerName: facultyLecturers[0]?.name || 'Pensyarah Kursus FPTT'
       };
 
-      const firstApp = myCompanyStudents[0];
-      const studentUser = firstApp ? users.find(u => u.matric_no === firstApp.student_id || u.username === firstApp.created_by) : null;
+      const firstApp = presetStudent || myCompanyStudents[0];
+      const studentUser = firstApp 
+        ? users.find(u => 
+            (presetStudent?.studentId && (u.id === presetStudent.studentId || u.matric_no === presetStudent.studentId)) ||
+            (firstApp.student_id && (u.matric_no === firstApp.student_id || u.id === firstApp.student_id)) ||
+            (firstApp.studentMatric && u.matric_no === firstApp.studentMatric) ||
+            (firstApp.created_by && u.username === firstApp.created_by)
+          ) 
+        : null;
+
+      const studentName = presetStudent?.studentName || firstApp?.student_name || studentUser?.name || '';
+      const studentMatric = presetStudent?.studentMatric || firstApp?.student_id || firstApp?.studentMatric || studentUser?.matric_no || '';
+      const studentId = studentUser?.id || presetStudent?.studentId || firstApp?.student_id || studentMatric || 'student';
+      const studentProgram = presetStudent?.studentProgram || firstApp?.student_program || studentUser?.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)';
 
       const template: Partial<StudentEvaluation> = {
-        studentId: studentUser?.id || firstApp?.student_id || '',
-        studentName: firstApp?.student_name || '',
-        studentMatric: firstApp?.student_id || '',
-        studentProgram: firstApp?.student_program || 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+        studentId,
+        studentName,
+        studentMatric,
+        studentProgram,
         companyName: currentUser.company_affiliation || firstApp?.company_name || 'Syarikat Penempatan Industri',
         companyAddress: firstApp?.company_district ? `${firstApp.company_district}, ${firstApp.company_state}` : '',
         courseCode: defaultCourse.courseCode,
@@ -447,9 +481,13 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     if (isLecturer && !isCoordinator) {
       const myCourses = courseAssignments.filter(ca => 
         ca.lecturerId === currentUser.id || 
-        (ca.lecturerName && currentUser.name && ca.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()))
+        (ca.lecturerEmail && currentUser.email && ca.lecturerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+        (ca.lecturerName && currentUser.name && (
+          ca.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+          currentUser.name.toLowerCase().includes(ca.lecturerName.toLowerCase())
+        ))
       );
-      return myCourses.length > 0 ? myCourses : courseAssignments;
+      return myCourses.length > 0 ? myCourses : courseAssignments.slice(0, 2);
     }
     return courseAssignments;
   }, [courseAssignments, currentUser, isLecturer, isCoordinator]);
@@ -848,6 +886,312 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </div>
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* PANEL KHAS PENILAIAN JURULATIH INDUSTRI MENGIKUT KURSUS SEMESTER SEMASA  */}
+          {/* ========================================================================= */}
+          {isTrainer && (
+            <div className="space-y-4">
+              {selectedCourseFilter !== 'all' ? (
+                (() => {
+                  const currentCourse = courseAssignments.find(c => c.courseCode === selectedCourseFilter);
+                  const trainerComp = (currentUser.company_affiliation || '').trim().toLowerCase();
+                  const matchingTrainees = applications.filter(a => 
+                    (a.application_status === 'Diluluskan' || a.student_preferred) &&
+                    (!trainerComp || (a.company_name && a.company_name.toLowerCase().includes(trainerComp)))
+                  );
+
+                  return (
+                    <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 p-6 rounded-2xl text-white shadow-md space-y-5">
+                      {/* Course Header Bar */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-4">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-3 py-1 bg-amber-400 text-slate-950 rounded-lg font-black text-xs font-mono">
+                              {selectedCourseFilter}
+                            </span>
+                            <span className="text-xs text-blue-200">
+                              {currentCourse?.semester || 'Semester 7'} • 3 Jam Kredit
+                            </span>
+                            <span className="text-xs bg-blue-500/30 text-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
+                              {matchingTrainees.length} {language === 'ms' ? 'Pelatih Syarikat Anda' : 'Company Trainees'}
+                            </span>
+                          </div>
+                          <h3 className="text-xl font-black text-white tracking-tight">
+                            {currentCourse?.courseName || selectedCourseFilter}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-blue-200/90 pt-0.5">
+                            <span>
+                              🏢 {currentUser.company_affiliation || 'Syarikat Penempatan Industri'}
+                            </span>
+                            <span>
+                              👨‍🏫 {language === 'ms' ? 'Pensyarah Pengesah FPTT:' : 'Course Lecturer:'} <strong className="text-white">{currentCourse?.lecturerName || 'Pensyarah Kursus'}</strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenForm(undefined, undefined, selectedCourseFilter)}
+                            className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-black text-xs shadow-md transition-all flex items-center gap-1.5"
+                          >
+                            <Plus size={16} />
+                            <span>{language === 'ms' ? '+ Nilai Pelajar Kursus Ini' : '+ Evaluate Student'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCourseFilter('all')}
+                            className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-xs transition-colors"
+                          >
+                            {language === 'ms' ? 'Tunjuk Semua Kursus' : 'Show All Courses'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Trainees List for This Course */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-blue-200 uppercase tracking-wider flex items-center gap-1.5">
+                            <Users size={14} className="text-amber-400" />
+                            <span>{language === 'ms' ? 'Senarai Pelatih Syarikat untuk Dinilai (Rubrik UTeM)' : 'Company Trainees to Evaluate (UTeM Rubric)'}</span>
+                          </h4>
+                          <span className="text-[11px] text-blue-200/70">
+                            {language === 'ms' ? 'Pilih "Nilai Sekarang" untuk membuka borang rubrik 4-tahap' : 'Click "Evaluate Now" to open 4-band rubric form'}
+                          </span>
+                        </div>
+
+                        {matchingTrainees.length === 0 ? (
+                          <div className="bg-white/5 border border-white/10 p-6 rounded-xl text-center space-y-2">
+                            <p className="text-xs text-blue-200">
+                              {language === 'ms' 
+                                ? 'Tiada pelatih ditemui untuk syarikat anda pada masa ini.' 
+                                : 'No trainees currently registered under your company.'}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenForm(undefined, undefined, selectedCourseFilter)}
+                              className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700"
+                            >
+                              {language === 'ms' ? 'Isi Borang Penilaian Manual' : 'Fill Form Manually'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            {matchingTrainees.map(tr => {
+                              const trEval = evaluations.find(e => 
+                                (e.studentId === tr.student_id || e.studentMatric === tr.student_id || e.studentName === tr.student_name) && 
+                                e.courseCode === selectedCourseFilter
+                              );
+
+                              const isVerified = trEval?.status === 'verified_by_lecturer';
+                              const isSubmitted = trEval?.status === 'submitted_by_trainer';
+                              const isRevision = trEval?.status === 'revision_requested';
+                              const isDraft = trEval?.status === 'draft';
+
+                              return (
+                                <div 
+                                  key={tr.id} 
+                                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
+                                    isVerified 
+                                      ? 'bg-emerald-950/40 border-emerald-500/40' 
+                                      : isSubmitted
+                                      ? 'bg-amber-950/30 border-amber-500/40'
+                                      : isRevision
+                                      ? 'bg-rose-950/40 border-rose-500/40'
+                                      : 'bg-white/10 border-white/15 hover:border-white/30'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-0.5">
+                                      <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                                        <span>{tr.student_name}</span>
+                                      </div>
+                                      <div className="text-[11px] text-amber-300 font-mono font-semibold">
+                                        {tr.student_id}
+                                      </div>
+                                      <div className="text-[10px] text-blue-200/80 truncate max-w-[240px]">
+                                        {tr.student_program || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)'}
+                                      </div>
+                                    </div>
+
+                                    {/* Evaluation Status Badge */}
+                                    <div className="shrink-0">
+                                      {isVerified ? (
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-400 text-slate-950 flex items-center gap-1 shadow-xs">
+                                          <CheckCircle2 size={11} />
+                                          <span>✓ Disahkan Pensyarah</span>
+                                        </span>
+                                      ) : isSubmitted ? (
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 flex items-center gap-1 animate-pulse">
+                                          <Clock size={11} />
+                                          <span>Menunggu Pengesahan</span>
+                                        </span>
+                                      ) : isRevision ? (
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-400 text-slate-950 flex items-center gap-1">
+                                          <AlertCircle size={11} />
+                                          <span>Perlu Pembetulan</span>
+                                        </span>
+                                      ) : isDraft ? (
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/20 text-white border border-white/20">
+                                          Draf Disimpan
+                                        </span>
+                                      ) : (
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/10 text-blue-200 border border-white/20">
+                                          Belum Dinilai
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Score & Action Row */}
+                                  <div className="flex items-center justify-between border-t border-white/10 pt-3">
+                                    <div className="text-xs">
+                                      {trEval ? (
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-black text-amber-300">
+                                            {trEval.totalScore}/100
+                                          </span>
+                                          <span className="px-1.5 py-0.2 rounded font-black text-[10px] bg-white/20 text-white">
+                                            Gred {trEval.grade}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[11px] text-blue-200/70">
+                                          {language === 'ms' ? 'Belum dinilai untuk kursus ini' : 'Not yet evaluated'}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-1.5">
+                                      {trEval ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenForm(trEval)}
+                                            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                                          >
+                                            <Edit3 size={12} />
+                                            <span>{isVerified ? (language === 'ms' ? 'Lihat Borang' : 'View') : (language === 'ms' ? 'Kemaskini' : 'Edit')}</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => generateEvaluationPrint(trEval, language)}
+                                            className="p-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs transition-colors"
+                                            title="Cetak Borang Penilaian Rasmi"
+                                          >
+                                            <Printer size={13} />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenForm(undefined, tr, selectedCourseFilter)}
+                                          className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-black text-xs transition-all shadow flex items-center gap-1.5"
+                                        >
+                                          <Award size={13} />
+                                          <span>{language === 'ms' ? '📝 Nilai Pelajar Sekarang (Rubrik UTeM)' : 'Evaluate Now'}</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                /* Course Cards Grid for Trainer when viewing 'all' */
+                <div className="bg-white p-5 rounded-2xl border border-blue-200/80 shadow-sm space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                        <Award size={16} className="text-blue-600" />
+                        <span>{language === 'ms' ? 'Submenu Penilaian Mengikut Kursus Semester Semasa' : 'Course Assessments for Current Semester'}</span>
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {language === 'ms' 
+                          ? 'Pilih mana-mana kursus semester semasa di bawah untuk membuat penilaian bagi pelatih industri syarikat anda.'
+                          : 'Select any current semester course to evaluate your company trainees.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {courseAssignments.map(course => {
+                      const trainerComp = (currentUser.company_affiliation || '').trim().toLowerCase();
+                      const trainees = applications.filter(a => 
+                        (a.application_status === 'Diluluskan' || a.student_preferred) &&
+                        (!trainerComp || (a.company_name && a.company_name.toLowerCase().includes(trainerComp)))
+                      );
+                      const courseEvals = evaluations.filter(e => e.courseCode === course.courseCode);
+                      const completedCount = trainees.filter(t => {
+                        const ev = courseEvals.find(e => e.studentId === t.student_id || e.studentMatric === t.student_id);
+                        return ev && (ev.status === 'submitted_by_trainer' || ev.status === 'verified_by_lecturer');
+                      }).length;
+                      const pendingCount = Math.max(0, trainees.length - completedCount);
+
+                      return (
+                        <div 
+                          key={course.id || course.courseCode} 
+                          className="p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/30 transition-all flex flex-col justify-between gap-3 group"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-xs font-black px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                                {course.courseCode}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {course.semester || 'Semester 7'}
+                              </span>
+                            </div>
+                            <div className="font-bold text-xs text-slate-800 group-hover:text-blue-700 transition-colors">
+                              {course.courseName}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              Pensyarah: {course.lecturerName || 'FPTT'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-slate-200/70 pt-2">
+                            <div className="text-[10px]">
+                              {pendingCount > 0 ? (
+                                <span className="font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                                  {pendingCount} belum dinilai
+                                </span>
+                              ) : trainees.length > 0 ? (
+                                <span className="font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                  ✓ Semua dinilai
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">
+                                  {trainees.length} pelatih
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCourseFilter(course.courseCode)}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-xs"
+                            >
+                              <span>Nilai Kursus Ini</span>
+                              <ChevronRight size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Filters Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
