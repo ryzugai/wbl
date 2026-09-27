@@ -2,13 +2,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, Application, UserRole, StudentEvaluation, CourseLecturerAssignment, EvaluationStatus } from '../types';
 import { StorageService } from '../services/storage';
 import { DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
-import { generateEvaluationPrint, generateCourseGradeSummaryPrint, CourseStudentGradeRecord } from '../utils/evaluationGenerator';
+import { generateEvaluationPrint, generateCourseGradeSummaryPrint, generateCourseRubricPrint, CourseStudentGradeRecord } from '../utils/evaluationGenerator';
+import { 
+  UTEM_PORTFOLIO_SCHEMES, 
+  UTEM_WEEKLY_ASSESSMENTS, 
+  CoursePortfolioScheme, 
+  WeeklyAssessmentConfig,
+  RubricCriterion
+} from '../constants/utemWblRubrics';
 import { 
   Award, CheckCircle2, Clock, AlertCircle, FileText, Printer, Send, Save, Plus, 
   Trash2, Edit3, UserCheck, ShieldCheck, Building2, Star, Search, Filter, 
   GraduationCap, BookOpen, Settings, UserCog, Check, Info, ChevronRight, HelpCircle,
   UserPlus, UserMinus, CheckSquare, Bell, ArrowRight, Eye, RefreshCw, BarChart2,
-  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck
+  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck, Sliders, ChevronDown
 } from 'lucide-react';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
@@ -38,6 +45,13 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
 
   // Active Tab: 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment'
   const [activeTab, setActiveTab] = useState<'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment'>(initialTab);
+
+  // Official UTeM Rubrics View State (matching lampiran)
+  const [selectedRubricCourseCode, setSelectedRubricCourseCode] = useState<string>('BTMT 3273(i)');
+  const [rubricViewMode, setRubricViewMode] = useState<'portfolio' | 'weekly' | 'grading'>('portfolio');
+  const [expandedRubricPart, setExpandedRubricPart] = useState<string | null>('Bahagian A');
+  const [selectedWeeklyWeek, setSelectedWeeklyWeek] = useState<number>(1);
+  const [formScoringMode, setFormScoringMode] = useState<'rubric' | 'slider'>('rubric');
 
   // Course Monitoring States (for Lecturer & Coordinator)
   const [selectedMonitoringCourseCode, setSelectedMonitoringCourseCode] = useState<string>('all');
@@ -2049,92 +2063,519 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: PANDUAN RUBRIK & SKALA GRED UTEM                                   */}
+      {/* TAB 3: PANDUAN RUBRIK & SKALA GRED UTEM (MENGIKUT LAMPIRAN RASMI)          */}
       {/* ========================================================================= */}
       {activeTab === 'rubrics' && (
         <div className="space-y-6">
+          {/* Header & Course Switcher */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-              <BookOpen size={20} className="text-blue-600" />
-              <span>{language === 'ms' ? 'Rubrik & Kriteria Penilaian Prestasi Industri Pelajar (WBL)' : 'WBL Student Industrial Rubrics'}</span>
-            </h3>
-            <p className="text-xs text-slate-500">
-              {language === 'ms'
-                ? 'Penilaian prestasi industri merangkumi 3 komponen utama iaitu Kemahiran Teknikal (40%), Kemahiran Insaniah (40%), dan Rekod Buku Log (20%).'
-                : 'Evaluation covers Technical Skills (40%), Soft Skills (40%), and Logbook (20%).'}
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              {/* Part A */}
-              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/30 space-y-2">
-                <div className="font-bold text-sm text-blue-900 flex items-center justify-between">
-                  <span>Bahagian A: Kemahiran Teknikal</span>
-                  <span className="px-2 py-0.5 bg-blue-200 text-blue-800 rounded-full text-xs font-black">40%</span>
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2.5 bg-blue-100 text-blue-700 rounded-xl">
+                  <BookOpen size={24} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-black text-slate-800">
+                      {language === 'ms' 
+                        ? 'Rubrik & Skema Pemarkahan Rasmi WBL (Ikut Lampiran FPTT UTeM)' 
+                        : 'Official UTeM FPTT WBL Assessment Rubrics & Schemes'}
+                    </h3>
+                    <span className="text-[10px] bg-blue-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Lampiran 2026/2027
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {language === 'ms'
+                      ? 'Rujukan lengkap rubrik 4-tahap pencapaian (Lemah, Sederhana, Baik, Cemerlang), nisbah JI (60%) vs TPF (40%), dan pentaksiran mingguan buku log.'
+                      : 'Complete 4-band performance rubric, JI (60%) vs TPF (40%) evaluation ratios, and weekly logbook milestones.'}
+                  </p>
                 </div>
-                <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4">
-                  <li>Pengetahuan & Pemahaman Tugasan (10m)</li>
-                  <li>Kualiti & Ketepatan Hasil Kerja (10m)</li>
-                  <li>Keupayaan Menyelesaikan Masalah & Inisiatif (10m)</li>
-                  <li>Kecekapan Penggunaan Alatan & Sistem Industri (10m)</li>
-                </ul>
               </div>
 
-              {/* Part B */}
-              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 space-y-2">
-                <div className="font-bold text-sm text-emerald-900 flex items-center justify-between">
-                  <span>Bahagian B: Kemahiran Insaniah</span>
-                  <span className="px-2 py-0.5 bg-emerald-200 text-emerald-800 rounded-full text-xs font-black">40%</span>
-                </div>
-                <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4">
-                  <li>Kedatangan & Ketepatan Masa (10m)</li>
-                  <li>Komunikasi Berkesan & Kerja Berpasukan (10m)</li>
-                  <li>Etika Kerja, Integriti & SOP Keselamatan (10m)</li>
-                  <li>Kebolehsuaian & Minat Pembelajaran (10m)</li>
-                </ul>
-              </div>
-
-              {/* Part C */}
-              <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/30 space-y-2">
-                <div className="font-bold text-sm text-purple-900 flex items-center justify-between">
-                  <span>Bahagian C: Buku Log Latihan</span>
-                  <span className="px-2 py-0.5 bg-purple-200 text-purple-800 rounded-full text-xs font-black">20%</span>
-                </div>
-                <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4">
-                  <li>Ketelitian Rekod Harian Buku Log (10m)</li>
-                  <li>Refleksi Pembelajaran Mingguan (10m)</li>
-                </ul>
+              {/* Action: Print Official Rubric */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => generateCourseRubricPrint(selectedRubricCourseCode, language)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+                >
+                  <Printer size={15} />
+                  <span>{language === 'ms' ? 'Cetak Skema Rubrik PDF' : 'Print Rubric Scheme'}</span>
+                </button>
               </div>
             </div>
 
-            {/* Grading Scale Table */}
-            <div className="pt-4 border-t border-slate-100">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 mb-2">
-                Skala Penggredan Akademik UTeM:
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                {[
-                  { range: '90 - 100', grade: 'A+', status: 'Cemerlang' },
-                  { range: '80 - 89', grade: 'A', status: 'Cemerlang' },
-                  { range: '75 - 79', grade: 'A-', status: 'Kepujian' },
-                  { range: '70 - 74', grade: 'B+', status: 'Kepujian' },
-                  { range: '65 - 69', grade: 'B', status: 'Lulus' },
-                  { range: '60 - 64', grade: 'B-', status: 'Lulus' },
-                  { range: '55 - 59', grade: 'C+', status: 'Lulus' },
-                  { range: '50 - 54', grade: 'C', status: 'Lulus' },
-                  { range: '40 - 49', grade: 'D', status: 'Lulus Bersyarat' },
-                  { range: '0 - 39', grade: 'E', status: 'Gagal' },
-                ].map(g => (
-                  <div key={g.grade} className="p-2 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-                    <div>
-                      <span className="font-black text-sm text-slate-800">{g.grade}</span>
-                      <span className="text-[10px] text-slate-400 block">{g.range}%</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-600">{g.status}</span>
-                  </div>
-                ))}
+            {/* Course Selector Tabs */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">
+                {language === 'ms' ? 'Pilih Kursus Ditawarkan untuk Lihat Rubrik Rasmi:' : 'Select Offered Course to View Official Rubrics:'}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {Object.keys(UTEM_PORTFOLIO_SCHEMES).map((cCode) => {
+                  const s = UTEM_PORTFOLIO_SCHEMES[cCode];
+                  const isSelected = selectedRubricCourseCode === cCode;
+                  return (
+                    <button
+                      key={cCode}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRubricCourseCode(cCode);
+                        const firstPart = s?.parts[0]?.partCode || 'Bahagian A';
+                        setExpandedRubricPart(firstPart);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      <span className="font-mono">{cCode}</span>
+                      <span className={`text-[10px] hidden sm:inline ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {s.courseName}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+
+            {/* Rubric View Mode Subtabs */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRubricViewMode('portfolio')}
+                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  rubricViewMode === 'portfolio'
+                    ? 'bg-indigo-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <FileText size={14} />
+                <span>{language === 'ms' ? 'Borang & Rubrik Penilaian (Bahagian A - D)' : 'Portfolio Rubrics (Parts A - D)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRubricViewMode('weekly')}
+                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  rubricViewMode === 'weekly'
+                    ? 'bg-indigo-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Clock size={14} />
+                <span>{language === 'ms' ? 'Pentaksiran Mingguan Buku Log (Minggu 1 - 5)' : 'Weekly Logbook Tasks (Weeks 1 - 5)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRubricViewMode('grading')}
+                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  rubricViewMode === 'grading'
+                    ? 'bg-indigo-600 text-white shadow-xs font-black'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Award size={14} />
+                <span>{language === 'ms' ? 'Skala Penggredan Akademik UTeM' : 'UTeM Grading Scale'}</span>
+              </button>
             </div>
           </div>
+
+          {/* Active Course Scheme Overview */}
+          {(() => {
+            const currentScheme = UTEM_PORTFOLIO_SCHEMES[selectedRubricCourseCode] || UTEM_PORTFOLIO_SCHEMES['BTMT 3273(i)'];
+            const weeklyTasks = UTEM_WEEKLY_ASSESSMENTS[selectedRubricCourseCode] || [];
+
+            if (!currentScheme) return null;
+
+            return (
+              <div className="space-y-6">
+                {/* Course Metadata Banner */}
+                <div className="bg-gradient-to-r from-blue-950 via-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-black px-2.5 py-0.5 bg-amber-400 text-slate-950 rounded-lg">
+                        {currentScheme.courseCode}
+                      </span>
+                      <span className="text-xs text-indigo-200">
+                        {currentScheme.creditHours} Jam Kredit
+                      </span>
+                      <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-indigo-100 font-semibold">
+                        FPTT 2u2i Work-Based Learning
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-black text-white">
+                      {currentScheme.courseName}
+                    </h3>
+                  </div>
+
+                  <div className="bg-white/10 border border-white/20 px-4 py-2.5 rounded-xl text-xs flex items-center gap-4">
+                    <div>
+                      <span className="text-[10px] text-indigo-200 block uppercase font-bold tracking-wider">
+                        Nisbah Penilai Rasmi
+                      </span>
+                      <span className="font-black text-amber-300 text-sm">
+                        {currentScheme.evaluatorRatio}
+                      </span>
+                    </div>
+                    <div className="border-l border-white/20 pl-4">
+                      <span className="text-[10px] text-indigo-200 block uppercase font-bold tracking-wider">
+                        Jurulatih Industri
+                      </span>
+                      <span className="font-black text-emerald-300 text-sm">
+                        {currentScheme.jiTotalPercent}% Markah
+                      </span>
+                    </div>
+                    <div className="border-l border-white/20 pl-4">
+                      <span className="text-[10px] text-indigo-200 block uppercase font-bold tracking-wider">
+                        Pensyarah Fakulti
+                      </span>
+                      <span className="font-black text-blue-300 text-sm">
+                        {currentScheme.tpfTotalPercent}% Markah
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SUBVIEW 1: PORTFOLIO RUBRICS (PARTS A - D) */}
+                {rubricViewMode === 'portfolio' && (
+                  <div className="space-y-6">
+                    {/* Component Summary Table */}
+                    {currentScheme.componentsSummary && currentScheme.componentsSummary.length > 0 && (
+                      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <Layers size={16} className="text-blue-600" />
+                            <span>1. Jadual Komponen Penilaian, Domain Pembelajaran & Hasil Pembelajaran (CLO/PLO)</span>
+                          </h4>
+                          <span className="text-xs text-slate-500 font-medium">
+                            {currentScheme.componentsSummary.length} Komponen Pentaksiran
+                          </span>
+                        </div>
+
+                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                                <th className="p-3 text-center w-10">No.</th>
+                                <th className="p-3">Komponen Penilaian Industri</th>
+                                <th className="p-3">Domain Pembelajaran</th>
+                                <th className="p-3">Hasil Pembelajaran (CLO / PLO)</th>
+                                <th className="p-3">Penilai</th>
+                                <th className="p-3 text-center w-24">Pemberat</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {currentScheme.componentsSummary.map((comp) => (
+                                <tr key={comp.no} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="p-3 text-center font-bold text-slate-500">{comp.no}</td>
+                                  <td className="p-3 font-bold text-slate-800">{comp.componentName}</td>
+                                  <td className="p-3 text-slate-600">{comp.domain}</td>
+                                  <td className="p-3 font-mono font-bold text-blue-700">{comp.clo} • {comp.plo}</td>
+                                  <td className="p-3">
+                                    <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                                      comp.evaluator.includes('JI') && !comp.evaluator.includes('TPF')
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : comp.evaluator.includes('TPF') && !comp.evaluator.includes('JI')
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-indigo-100 text-indigo-800'
+                                    }`}>
+                                      {comp.evaluator}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-center font-black text-slate-800 bg-slate-50/50">
+                                    {comp.weightPercent}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Detailed Rubrics Accordion / Cards per Part */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                          <CheckCircle2 size={16} className="text-emerald-600" />
+                          <span>2. Matriks Rubrik Prestasi 4-Tahap Pencapaian (Skor 1 hingga 4)</span>
+                        </h4>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="flex items-center gap-1 font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded">1: Lemah</span>
+                          <span className="flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">2: Sederhana</span>
+                          <span className="flex items-center gap-1 font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">3: Baik</span>
+                          <span className="flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">4: Cemerlang</span>
+                        </div>
+                      </div>
+
+                      {/* Part Tabs Selector */}
+                      <div className="flex flex-wrap gap-2">
+                        {currentScheme.parts.map((p) => {
+                          const isPartActive = expandedRubricPart === p.partCode;
+                          return (
+                            <button
+                              key={p.partCode}
+                              type="button"
+                              onClick={() => setExpandedRubricPart(p.partCode)}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                                isPartActive
+                                  ? 'bg-slate-900 text-white shadow-sm font-black ring-2 ring-blue-500'
+                                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                              }`}
+                            >
+                              <span>{p.partCode}</span>
+                              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                isPartActive ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {p.weightagePercent}%
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Render Active Part Details */}
+                      {(() => {
+                        const activePart = currentScheme.parts.find(p => p.partCode === expandedRubricPart) || currentScheme.parts[0];
+                        if (!activePart) return null;
+
+                        return (
+                          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                            {/* Part Header */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50 border border-slate-200 p-4 rounded-xl">
+                              <div>
+                                <div className="text-xs font-black text-blue-700 uppercase tracking-wider">{activePart.partCode}</div>
+                                <h4 className="text-base font-black text-slate-800">{activePart.partTitle}</h4>
+                                <p className="text-xs text-slate-600 mt-1 max-w-2xl">{activePart.description}</p>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs font-black bg-blue-100 text-blue-800 px-3 py-1 rounded-lg">
+                                  Pemberat: {activePart.weightagePercent}%
+                                </span>
+                                <span className="text-xs font-bold bg-slate-200 text-slate-700 px-3 py-1 rounded-lg">
+                                  Penilai: {activePart.evaluator}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Criteria List */}
+                            <div className="space-y-4">
+                              {activePart.criteria.map((criterion, idx) => (
+                                <div key={criterion.id || idx} className="p-4 rounded-xl border border-slate-200/90 bg-white shadow-xs space-y-3">
+                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-2">
+                                    <div className="font-black text-xs text-slate-800 flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black flex items-center justify-center">
+                                        {idx + 1}
+                                      </span>
+                                      <span>{criterion.title}</span>
+                                    </div>
+                                    {criterion.clo && (
+                                      <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                                        {criterion.clo}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* 4 Performance Band Grid */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                    {/* Level 1: Lemah */}
+                                    <div className="p-3 rounded-xl border border-red-200 bg-red-50/50 space-y-1">
+                                      <div className="flex items-center justify-between text-xs font-black text-red-900 border-b border-red-200/60 pb-1">
+                                        <span>Skor 1: Lemah</span>
+                                        <span className="text-[10px] bg-red-200 text-red-900 px-1.5 py-0.2 rounded font-mono">0 - 49%</span>
+                                      </div>
+                                      <p className="text-[11px] text-red-950/80 leading-relaxed pt-1">
+                                        {criterion.levels[1]}
+                                      </p>
+                                    </div>
+
+                                    {/* Level 2: Sederhana */}
+                                    <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50 space-y-1">
+                                      <div className="flex items-center justify-between text-xs font-black text-amber-900 border-b border-amber-200/60 pb-1">
+                                        <span>Skor 2: Sederhana</span>
+                                        <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-mono">50 - 64%</span>
+                                      </div>
+                                      <p className="text-[11px] text-amber-950/80 leading-relaxed pt-1">
+                                        {criterion.levels[2]}
+                                      </p>
+                                    </div>
+
+                                    {/* Level 3: Baik */}
+                                    <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/50 space-y-1">
+                                      <div className="flex items-center justify-between text-xs font-black text-blue-900 border-b border-blue-200/60 pb-1">
+                                        <span>Skor 3: Baik</span>
+                                        <span className="text-[10px] bg-blue-200 text-blue-900 px-1.5 py-0.2 rounded font-mono">65 - 79%</span>
+                                      </div>
+                                      <p className="text-[11px] text-blue-950/80 leading-relaxed pt-1">
+                                        {criterion.levels[3]}
+                                      </p>
+                                    </div>
+
+                                    {/* Level 4: Cemerlang */}
+                                    <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-1">
+                                      <div className="flex items-center justify-between text-xs font-black text-emerald-900 border-b border-emerald-200/60 pb-1">
+                                        <span>Skor 4: Cemerlang</span>
+                                        <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-mono">80 - 100%</span>
+                                      </div>
+                                      <p className="text-[11px] text-emerald-950/80 leading-relaxed pt-1">
+                                        {criterion.levels[4]}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* SUBVIEW 2: WEEKLY LOGBOOK TASKS (WEEKS 1 - 5) */}
+                {rubricViewMode === 'weekly' && (
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                          <Clock size={16} className="text-indigo-600" />
+                          <span>Tugasan Mingguan Buku Log & Skema Pentaksiran (Minggu 1 - 5)</span>
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          Setiap minggu dinilai sebanyak 12 markah berasaskan 3 bidang penilaian utama (4 markah setiap bidang).
+                        </p>
+                      </div>
+
+                      <span className="text-xs font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg">
+                        Maksimum: 12 Markah / Minggu
+                      </span>
+                    </div>
+
+                    {weeklyTasks.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 border border-slate-200 rounded-xl">
+                        Tiada data tugasan mingguan spesifik bagi kursus ini. Sila rujuk skema portfolio komprehensif.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {weeklyTasks.map((w) => (
+                          <div key={w.week} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3 hover:border-indigo-300 transition-all">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-200/80 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-xs px-2.5 py-1 bg-indigo-600 text-white rounded-lg">
+                                  Minggu {w.week}
+                                </span>
+                                <h5 className="font-black text-sm text-slate-800">{w.taskTitle}</h5>
+                              </div>
+                              <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded">
+                                {w.cloStatement}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                              {/* Task Highlights */}
+                              <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Aktiviti & Sorotan Tugasan Pelajar:
+                                </span>
+                                <ul className="text-xs text-slate-700 space-y-1 list-disc pl-4">
+                                  {w.taskHighlights.map((h, hIdx) => (
+                                    <li key={hIdx}>{h}</li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              {/* 3 Assessment Areas */}
+                              <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
+                                    3 Bidang Penilaian Mingguan (12 Markah):
+                                  </span>
+                                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.2 rounded">
+                                    4m setiap bidang
+                                  </span>
+                                </div>
+                                <ol className="text-xs text-slate-700 space-y-1.5 list-decimal pl-4">
+                                  {w.areas.map((area) => (
+                                    <li key={area.id} className="font-medium">
+                                      {area.title}
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SUBVIEW 3: UTEM ACADEMIC GRADING SCALE */}
+                {rubricViewMode === 'grading' && (
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                          <Award size={18} className="text-amber-500" />
+                          <span>Skala Penggredan Akademik Universiti Teknikal Malaysia Melaka (UTeM)</span>
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          Skala pemarkahan rasmi dan nilai mata gred (GPA) bagi program Sarjana Muda WBL.
+                        </p>
+                      </div>
+
+                      <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
+                        Gred Lulus Minimum: C (50%)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {[
+                        { grade: 'A+', range: '90 - 100', pointer: '4.00', status: 'Cemerlang', color: 'emerald' },
+                        { grade: 'A', range: '80 - 89', pointer: '4.00', status: 'Cemerlang', color: 'emerald' },
+                        { grade: 'A-', range: '75 - 79', pointer: '3.67', status: 'Kepujian', color: 'blue' },
+                        { grade: 'B+', range: '70 - 74', pointer: '3.33', status: 'Kepujian', color: 'blue' },
+                        { grade: 'B', range: '65 - 69', pointer: '3.00', status: 'Lulus', color: 'slate' },
+                        { grade: 'B-', range: '60 - 64', pointer: '2.67', status: 'Lulus', color: 'slate' },
+                        { grade: 'C+', range: '55 - 59', pointer: '2.33', status: 'Lulus', color: 'amber' },
+                        { grade: 'C', range: '50 - 54', pointer: '2.00', status: 'Lulus', color: 'amber' },
+                        { grade: 'D', range: '40 - 49', pointer: '1.00', status: 'Lulus Bersyarat', color: 'orange' },
+                        { grade: 'E', range: '0 - 39', pointer: '0.00', status: 'Gagal', color: 'red' },
+                      ].map((item) => (
+                        <div
+                          key={item.grade}
+                          className={`p-3.5 rounded-xl border transition-all ${
+                            item.grade.startsWith('A')
+                              ? 'border-emerald-200 bg-emerald-50/50'
+                              : item.grade.startsWith('B')
+                              ? 'border-blue-200 bg-blue-50/50'
+                              : item.grade.startsWith('C')
+                              ? 'border-amber-200 bg-amber-50/50'
+                              : item.grade === 'D'
+                              ? 'border-orange-200 bg-orange-50/50'
+                              : 'border-red-200 bg-red-50/50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <span className="text-xl font-black text-slate-800">{item.grade}</span>
+                            <span className="font-mono text-xs font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                              {item.pointer}
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold text-slate-700 mt-1">{item.range}%</div>
+                          <div className="text-[10px] font-bold text-slate-500 mt-0.5">{item.status}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2242,46 +2683,172 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                 </div>
               </div>
 
+              {/* Scoring Mode Switcher */}
+              <div className="bg-white p-3.5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700">Mod Pengisian Markah:</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                    Mengikut Lampiran Rubrik Rasmi UTeM
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormScoringMode('rubric')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      formScoringMode === 'rubric'
+                        ? 'bg-blue-600 text-white shadow-xs font-black'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <BookOpen size={13} />
+                    <span>Mod Rubrik 4-Tahap</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormScoringMode('slider')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      formScoringMode === 'slider'
+                        ? 'bg-blue-600 text-white shadow-xs font-black'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Sliders size={13} />
+                    <span>Mod Slider (0-10)</span>
+                  </button>
+                </div>
+              </div>
+
               {/* RUBRIC SCORING INPUTS */}
               {/* Part A */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <h4 className="font-bold text-slate-800 text-sm">
-                    {language === 'ms' ? 'Bahagian A: Kemahiran Teknikal & Pelaksanaan Tugasan (40 Markah)' : 'Part A: Technical Skills (40 Marks)'}
-                  </h4>
-                  <span className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {language === 'ms' ? 'Bahagian A: Kemahiran Teknikal & Pelaksanaan Tugasan (40 Markah)' : 'Part A: Technical Skills (40 Marks)'}
+                    </h4>
+                    <span className="text-[11px] text-slate-500">CLO1 & CLO3 • Domain Kognitif & Psikomotor Industri</span>
+                  </div>
+                  <span className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
                     {editingEvaluation.technicalSubtotal || 0} / 40
                   </span>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {[
-                    { key: 'taskKnowledge', label: '1. Pengetahuan & Pemahaman Tugasan Kerja (Task Knowledge)', desc: 'Memahami prinsip, skop kerja, dan konsep teori yang diaplikasikan.' },
-                    { key: 'workQuality', label: '2. Kualiti & Ketepatan Hasil Kerja (Work Quality & Accuracy)', desc: 'Menghasilkan kerja yang teliti dan mematuhi standard industri.' },
-                    { key: 'problemSolving', label: '3. Keupayaan Menyelesaikan Masalah & Inisiatif (Problem Solving)', desc: 'Mampu menganalisis isu dan mengemukakan solusi kreatif.' },
-                    { key: 'toolCompetency', label: '4. Kecekapan Penggunaan Alatan & Sistem Industri (Tools Competency)', desc: 'Cekap mengendalikan perisian, mesin atau sistem IT syarikat.' },
+                    { 
+                      key: 'taskKnowledge', 
+                      label: '1. Pengetahuan & Pemahaman Tugasan Kerja (Task Knowledge)', 
+                      desc: 'Memahami prinsip, skop kerja, dan konsep teori yang diaplikasikan.',
+                      levels: {
+                        1: 'Sukar memahami prinsip dan konsep teori asas tugasan firma.',
+                        2: 'Memahami tugasan asas tetapi memerlukan pemantauan berterusan.',
+                        3: 'Memahami skop kerja dengan jelas dan mengaplikasikan teori dengan betul.',
+                        4: 'Penguasaan konsep sangat mantap dan berupaya menghubungkaitkan teori lanjutan.'
+                      }
+                    },
+                    { 
+                      key: 'workQuality', 
+                      label: '2. Kualiti & Ketepatan Hasil Kerja (Work Quality & Accuracy)', 
+                      desc: 'Menghasilkan kerja yang teliti dan mematuhi standard industri.',
+                      levels: {
+                        1: 'Hasil kerja cuai, banyak kesilapan dan tidak menepati standard industri.',
+                        2: 'Hasil kerja memerlukan semakan berulang daripada penyelia industri.',
+                        3: 'Kerja kemas, teliti, memenuhi spesifikasi dan standard kualiti industri.',
+                        4: 'Kualiti kerja cemerlang bertaraf profesional industri, sangat teliti dan sifar ralat.'
+                      }
+                    },
+                    { 
+                      key: 'problemSolving', 
+                      label: '3. Keupayaan Menyelesaikan Masalah & Inisiatif (Problem Solving)', 
+                      desc: 'Mampu menganalisis isu dan mengemukakan solusi kreatif.',
+                      levels: {
+                        1: 'Pasif, menunggu arahan dan tidak mampu menyelesaikan masalah operasi asas.',
+                        2: 'Mampu menyelesaikan masalah rutin tetapi sukar bagi isu kompleks.',
+                        3: 'Mampu menganalisis isu dan mencadangkan penyelesaian secara berdikari.',
+                        4: 'Sangat inovatif, pantas mengatasi cabaran dan mengemukakan solusi kreatif bernilai tambah.'
+                      }
+                    },
+                    { 
+                      key: 'toolCompetency', 
+                      label: '4. Kecekapan Penggunaan Alatan & Sistem Industri (Tools Competency)', 
+                      desc: 'Cekap mengendalikan perisian, mesin atau sistem IT syarikat.',
+                      levels: {
+                        1: 'Lemah dalam pengendalian perisian/mesin kerja dan kerap melakukan kesilapan.',
+                        2: 'Mengendalikan alatan asas tetapi memerlukan bimbingan berterusan.',
+                        3: 'Cekap mengendalikan perkakasan, perisian dan sistem kerja firma.',
+                        4: 'Sangat mahir, cekap dan mampu membimbing rakan lain menggunakan sistem industri.'
+                      }
+                    },
                   ].map(crit => {
                     const val = (editingEvaluation.scores as any)?.[crit.key] || 0;
+                    const activeLevel = val <= 4 ? 1 : val <= 6 ? 2 : val <= 8 ? 3 : 4;
+                    const levelDescriptor = crit.levels[activeLevel as 1|2|3|4];
+
                     return (
-                      <div key={crit.key} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="font-bold text-xs text-slate-800">{crit.label}</div>
-                          <div className="text-[11px] text-slate-500">{crit.desc}</div>
+                      <div key={crit.key} className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-2.5">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-bold text-xs text-slate-800">{crit.label}</div>
+                            <div className="text-[11px] text-slate-500">{crit.desc}</div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {formScoringMode === 'slider' && (
+                              <input
+                                type="range"
+                                min="0"
+                                max="10"
+                                value={val}
+                                onChange={(e) => updateScoreField(crit.key as any, parseInt(e.target.value) || 0)}
+                                className="w-24 accent-blue-600"
+                              />
+                            )}
+                            <span className="w-12 text-center font-black text-xs text-blue-800 bg-white py-1 px-1.5 rounded-lg border border-slate-200 shadow-xs">
+                              {val} / 10
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            value={val}
-                            onChange={(e) => updateScoreField(crit.key as any, parseInt(e.target.value) || 0)}
-                            className="w-24 accent-blue-600"
-                          />
-                          <span className="w-10 text-center font-black text-xs text-blue-800 bg-white py-1 px-1.5 rounded-lg border border-slate-200">
-                            {val} / 10
-                          </span>
+                        {/* 4-Level Rubric Buttons */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                          {[
+                            { lvl: 1, label: '1: Lemah', score: 3, bgActive: 'bg-red-600 text-white', borderActive: 'border-red-600' },
+                            { lvl: 2, label: '2: Sederhana', score: 6, bgActive: 'bg-amber-600 text-white', borderActive: 'border-amber-600' },
+                            { lvl: 3, label: '3: Baik', score: 8, bgActive: 'bg-blue-600 text-white', borderActive: 'border-blue-600' },
+                            { lvl: 4, label: '4: Cemerlang', score: 10, bgActive: 'bg-emerald-600 text-white', borderActive: 'border-emerald-600' }
+                          ].map(btn => {
+                            const isThisLvl = activeLevel === btn.lvl;
+                            return (
+                              <button
+                                key={btn.lvl}
+                                type="button"
+                                onClick={() => updateScoreField(crit.key as any, btn.score)}
+                                className={`py-1 px-2 rounded-lg text-[11px] font-bold transition-all border flex items-center justify-center gap-1 ${
+                                  isThisLvl
+                                    ? `${btn.bgActive} shadow-xs font-black ring-1 ring-offset-1`
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {isThisLvl && <Check size={12} />}
+                                <span>{btn.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
+
+                        {/* Active Rubric Descriptor Feedback */}
+                        {levelDescriptor && (
+                          <div className={`p-2 rounded-lg text-[11px] border leading-relaxed flex items-start gap-1.5 ${
+                            activeLevel === 4 ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
+                            activeLevel === 3 ? 'bg-blue-50 border-blue-200 text-blue-900' :
+                            activeLevel === 2 ? 'bg-amber-50 border-amber-200 text-amber-900' :
+                            'bg-red-50 border-red-200 text-red-900'
+                          }`}>
+                            <Info size={13} className="shrink-0 mt-0.5" />
+                            <span><strong>Skor {activeLevel}:</strong> {levelDescriptor}</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -2291,42 +2858,132 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               {/* Part B */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <h4 className="font-bold text-slate-800 text-sm">
-                    {language === 'ms' ? 'Bahagian B: Kemahiran Insaniah & Profesionalisme (40 Markah)' : 'Part B: Soft Skills & Professionalism (40 Marks)'}
-                  </h4>
-                  <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {language === 'ms' ? 'Bahagian B: Kemahiran Insaniah & Profesionalisme (40 Markah)' : 'Part B: Soft Skills & Professionalism (40 Marks)'}
+                    </h4>
+                    <span className="text-[11px] text-slate-500">CLO4 • Kepimpinan, Autonomi, Kerja Berpasukan & Etika Kerja</span>
+                  </div>
+                  <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
                     {editingEvaluation.softSkillsSubtotal || 0} / 40
                   </span>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {[
-                    { key: 'punctuality', label: '1. Disiplin, Kedatangan & Ketepatan Masa (Punctuality & Attendance)', desc: 'Mematuhi jadual kerja dan menepati masa penyerahan tugasan.' },
-                    { key: 'communication', label: '2. Komunikasi & Kerjasama Berpasukan (Communication & Teamwork)', desc: 'Berkomunikasi secara profesional dan aktif dalam pasukan.' },
-                    { key: 'workEthics', label: '3. Integriti, Etika Kerja & SOP Keselamatan (Ethics & Safety)', desc: 'Amanah menjaga kerahsiaan syarikat dan mematuhi SOP.' },
-                    { key: 'adaptability', label: '4. Kebolehsuaian & Sikap Terhadap Pembelajaran (Adaptability)', desc: 'Bermotivasi tinggi dan terbuka menerima maklum balas pembetulan.' },
+                    { 
+                      key: 'punctuality', 
+                      label: '1. Disiplin, Kedatangan & Ketepatan Masa (Punctuality & Attendance)', 
+                      desc: 'Mematuhi jadual kerja dan menepati masa penyerahan tugasan.',
+                      levels: {
+                        1: 'Kerap lewat, tidak mematuhi jadual kerja dan menangguhkan penyerahan tugasan.',
+                        2: 'Kadang-kala lewat dan memerlukan peringatan berulang mengenai kehadiran.',
+                        3: 'Sentiasa hadir tepat pada masanya dan menepati tarikh akhir tugasan.',
+                        4: 'Komitmen kehadiran 100% sempurna, sangat berdisiplin dan menjadi teladan.'
+                      }
+                    },
+                    { 
+                      key: 'communication', 
+                      label: '2. Komunikasi & Kerjasama Berpasukan (Communication & Teamwork)', 
+                      desc: 'Berkomunikasi secara profesional dan aktif dalam pasukan.',
+                      levels: {
+                        1: 'Sukar berinteraksi, pasif dan kerap menimbulkan salah faham dalam kerja.',
+                        2: 'Komunikasi terhad dan kurang yakin menyampaikan idea kepada rakan.',
+                        3: 'Berkomunikasi secara jelas, sopan dan bekerjasama baik dengan rakan.',
+                        4: 'Komunikasi korporat cemerlang, berkarisma, dan aktif membina hubungan positif.'
+                      }
+                    },
+                    { 
+                      key: 'workEthics', 
+                      label: '3. Integriti, Etika Kerja & SOP Keselamatan (Ethics & Safety)', 
+                      desc: 'Amanah menjaga kerahsiaan syarikat dan mematuhi SOP.',
+                      levels: {
+                        1: 'Mengabaikan kod etika, membocorkan kerahsiaan atau melanggar SOP keselamatan.',
+                        2: 'Mematuhi peraturan hanya apabila diawasi oleh pihak pengurusan.',
+                        3: 'Berintegriti tinggi, amanah menjaga kerahsiaan dan mematuhi SOP OSHA/5S.',
+                        4: 'Mempamerkan integriti profesional luar biasa dan budaya keselamatan terbaik.'
+                      }
+                    },
+                    { 
+                      key: 'adaptability', 
+                      label: '4. Kebolehsuaian & Sikap Terhadap Pembelajaran (Adaptability)', 
+                      desc: 'Bermotivasi tinggi dan terbuka menerima maklum balas pembetulan.',
+                      levels: {
+                        1: 'Sukar menyesuaikan diri, defensif terhadap teguran dan tidak berminat belajar.',
+                        2: 'Mengambil masa lama untuk menyesuaikan diri dengan budaya firma.',
+                        3: 'Mudah menyesuaikan diri dan terbuka menerima maklum balas pembetulan.',
+                        4: 'Sangat tangkas (agile), berdaya tahan tinggi dan proaktif menimba ilmu baharu.'
+                      }
+                    },
                   ].map(crit => {
                     const val = (editingEvaluation.scores as any)?.[crit.key] || 0;
+                    const activeLevel = val <= 4 ? 1 : val <= 6 ? 2 : val <= 8 ? 3 : 4;
+                    const levelDescriptor = crit.levels[activeLevel as 1|2|3|4];
+
                     return (
-                      <div key={crit.key} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="font-bold text-xs text-slate-800">{crit.label}</div>
-                          <div className="text-[11px] text-slate-500">{crit.desc}</div>
+                      <div key={crit.key} className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-2.5">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-bold text-xs text-slate-800">{crit.label}</div>
+                            <div className="text-[11px] text-slate-500">{crit.desc}</div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {formScoringMode === 'slider' && (
+                              <input
+                                type="range"
+                                min="0"
+                                max="10"
+                                value={val}
+                                onChange={(e) => updateScoreField(crit.key as any, parseInt(e.target.value) || 0)}
+                                className="w-24 accent-emerald-600"
+                              />
+                            )}
+                            <span className="w-12 text-center font-black text-xs text-emerald-800 bg-white py-1 px-1.5 rounded-lg border border-slate-200 shadow-xs">
+                              {val} / 10
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            value={val}
-                            onChange={(e) => updateScoreField(crit.key as any, parseInt(e.target.value) || 0)}
-                            className="w-24 accent-emerald-600"
-                          />
-                          <span className="w-10 text-center font-black text-xs text-emerald-800 bg-white py-1 px-1.5 rounded-lg border border-slate-200">
-                            {val} / 10
-                          </span>
+                        {/* 4-Level Rubric Buttons */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                          {[
+                            { lvl: 1, label: '1: Lemah', score: 3, bgActive: 'bg-red-600 text-white', borderActive: 'border-red-600' },
+                            { lvl: 2, label: '2: Sederhana', score: 6, bgActive: 'bg-amber-600 text-white', borderActive: 'border-amber-600' },
+                            { lvl: 3, label: '3: Baik', score: 8, bgActive: 'bg-blue-600 text-white', borderActive: 'border-blue-600' },
+                            { lvl: 4, label: '4: Cemerlang', score: 10, bgActive: 'bg-emerald-600 text-white', borderActive: 'border-emerald-600' }
+                          ].map(btn => {
+                            const isThisLvl = activeLevel === btn.lvl;
+                            return (
+                              <button
+                                key={btn.lvl}
+                                type="button"
+                                onClick={() => updateScoreField(crit.key as any, btn.score)}
+                                className={`py-1 px-2 rounded-lg text-[11px] font-bold transition-all border flex items-center justify-center gap-1 ${
+                                  isThisLvl
+                                    ? `${btn.bgActive} shadow-xs font-black ring-1 ring-offset-1`
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {isThisLvl && <Check size={12} />}
+                                <span>{btn.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
+
+                        {/* Active Rubric Descriptor Feedback */}
+                        {levelDescriptor && (
+                          <div className={`p-2 rounded-lg text-[11px] border leading-relaxed flex items-start gap-1.5 ${
+                            activeLevel === 4 ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
+                            activeLevel === 3 ? 'bg-blue-50 border-blue-200 text-blue-900' :
+                            activeLevel === 2 ? 'bg-amber-50 border-amber-200 text-amber-900' :
+                            'bg-red-50 border-red-200 text-red-900'
+                          }`}>
+                            <Info size={13} className="shrink-0 mt-0.5" />
+                            <span><strong>Skor {activeLevel}:</strong> {levelDescriptor}</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -2336,40 +2993,110 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               {/* Part C */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <h4 className="font-bold text-slate-800 text-sm">
-                    {language === 'ms' ? 'Bahagian C: Buku Log Latihan & Dokumentasi (20 Markah)' : 'Part C: Logbook & Documentation (20 Marks)'}
-                  </h4>
-                  <span className="text-xs font-black text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {language === 'ms' ? 'Bahagian C: Buku Log Latihan & Dokumentasi (20 Markah)' : 'Part C: Logbook & Documentation (20 Marks)'}
+                    </h4>
+                    <span className="text-[11px] text-slate-500">CLO2 • Ketelitian Rekod Harian & Refleksi Pembelajaran</span>
+                  </div>
+                  <span className="text-xs font-black text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
                     {editingEvaluation.logbookSubtotal || 0} / 20
                   </span>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {[
-                    { key: 'logbookQuality', label: '1. Ketelitian & Konsistensi Rekod Buku Log Harian (Logbook Regularity)', desc: 'Merekod aktiviti setiap hari secara teratur dan lengkap.' },
-                    { key: 'reflectionQuality', label: '2. Refleksi Pembelajaran Mingguan (Weekly Reflection)', desc: 'Menghuraikan kemahiran baharu dan cabaran yang diselesaikan.' },
+                    { 
+                      key: 'logbookQuality', 
+                      label: '1. Ketelitian & Konsistensi Rekod Buku Log Harian (Logbook Regularity)', 
+                      desc: 'Merekod aktiviti setiap hari secara teratur dan lengkap.',
+                      levels: {
+                        1: 'Catatan tidak lengkap, banyak hari/minggu tertinggal dan lewat diserahkan.',
+                        2: 'Catatan ringkas, tidak konsisten dan bukti bergambar/dokumen terhad.',
+                        3: 'Catatan lengkap setiap hari dan disemak secara berkala oleh Jurulatih.',
+                        4: 'Catatan sangat terperinci, kemas, konsisten dan disertakan bukti kerja lengkap.'
+                      }
+                    },
+                    { 
+                      key: 'reflectionQuality', 
+                      label: '2. Refleksi Pembelajaran Mingguan (Weekly Reflection)', 
+                      desc: 'Menghuraikan kemahiran baharu dan cabaran yang diselesaikan.',
+                      levels: {
+                        1: 'Tiada catatan refleksi atau sekadar menyalin semula huraian kerja.',
+                        2: 'Refleksi pembelajaran terlalu umum dan tidak menunjukkan pemikiran matang.',
+                        3: 'Refleksi menghubungkaitkan pengalaman amali dengan teori akademik.',
+                        4: 'Refleksi sangat kritikal, mendalam dan mencadangkan penambahbaikan diri.'
+                      }
+                    },
                   ].map(crit => {
                     const val = (editingEvaluation.scores as any)?.[crit.key] || 0;
+                    const activeLevel = val <= 4 ? 1 : val <= 6 ? 2 : val <= 8 ? 3 : 4;
+                    const levelDescriptor = crit.levels[activeLevel as 1|2|3|4];
+
                     return (
-                      <div key={crit.key} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="font-bold text-xs text-slate-800">{crit.label}</div>
-                          <div className="text-[11px] text-slate-500">{crit.desc}</div>
+                      <div key={crit.key} className="p-3.5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-2.5">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-bold text-xs text-slate-800">{crit.label}</div>
+                            <div className="text-[11px] text-slate-500">{crit.desc}</div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {formScoringMode === 'slider' && (
+                              <input
+                                type="range"
+                                min="0"
+                                max="10"
+                                value={val}
+                                onChange={(e) => updateScoreField(crit.key as any, parseInt(e.target.value) || 0)}
+                                className="w-24 accent-purple-600"
+                              />
+                            )}
+                            <span className="w-12 text-center font-black text-xs text-purple-800 bg-white py-1 px-1.5 rounded-lg border border-slate-200 shadow-xs">
+                              {val} / 10
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            value={val}
-                            onChange={(e) => updateScoreField(crit.key as any, parseInt(e.target.value) || 0)}
-                            className="w-24 accent-purple-600"
-                          />
-                          <span className="w-10 text-center font-black text-xs text-purple-800 bg-white py-1 px-1.5 rounded-lg border border-slate-200">
-                            {val} / 10
-                          </span>
+                        {/* 4-Level Rubric Buttons */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                          {[
+                            { lvl: 1, label: '1: Lemah', score: 3, bgActive: 'bg-red-600 text-white', borderActive: 'border-red-600' },
+                            { lvl: 2, label: '2: Sederhana', score: 6, bgActive: 'bg-amber-600 text-white', borderActive: 'border-amber-600' },
+                            { lvl: 3, label: '3: Baik', score: 8, bgActive: 'bg-blue-600 text-white', borderActive: 'border-blue-600' },
+                            { lvl: 4, label: '4: Cemerlang', score: 10, bgActive: 'bg-emerald-600 text-white', borderActive: 'border-emerald-600' }
+                          ].map(btn => {
+                            const isThisLvl = activeLevel === btn.lvl;
+                            return (
+                              <button
+                                key={btn.lvl}
+                                type="button"
+                                onClick={() => updateScoreField(crit.key as any, btn.score)}
+                                className={`py-1 px-2 rounded-lg text-[11px] font-bold transition-all border flex items-center justify-center gap-1 ${
+                                  isThisLvl
+                                    ? `${btn.bgActive} shadow-xs font-black ring-1 ring-offset-1`
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {isThisLvl && <Check size={12} />}
+                                <span>{btn.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
+
+                        {/* Active Rubric Descriptor Feedback */}
+                        {levelDescriptor && (
+                          <div className={`p-2 rounded-lg text-[11px] border leading-relaxed flex items-start gap-1.5 ${
+                            activeLevel === 4 ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
+                            activeLevel === 3 ? 'bg-blue-50 border-blue-200 text-blue-900' :
+                            activeLevel === 2 ? 'bg-amber-50 border-amber-200 text-amber-900' :
+                            'bg-red-50 border-red-200 text-red-900'
+                          }`}>
+                            <Info size={13} className="shrink-0 mt-0.5" />
+                            <span><strong>Skor {activeLevel}:</strong> {levelDescriptor}</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

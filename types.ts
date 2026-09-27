@@ -240,6 +240,8 @@ export interface StudentEvaluationCriteriaScores {
   reflectionQuality: number;   // 0 - 10
 }
 
+export type EvaluationFormType = 'weekly' | 'comprehensive';
+
 export interface StudentEvaluation {
   id: string;
   studentId: string;
@@ -250,6 +252,20 @@ export interface StudentEvaluation {
   companyAddress?: string;
   courseCode: string;
   courseName: string;
+  // Type: Weekly Task (Week 1-5) or Full Portfolio / Course Evaluation
+  evaluationType?: EvaluationFormType;
+  weekNumber?: number; // 1, 2, 3, 4, 5
+  weeklyTaskTitle?: string;
+  weeklyScores?: {
+    area1: number; // 1 - 4
+    area2: number; // 1 - 4
+    area3: number; // 1 - 4
+    total: number; // / 12
+  };
+  // Detailed Rubric scores mapping (criterion ID -> score 1 to 4)
+  rubricScores?: Record<string, number>;
+  jiWeightedScore?: number;
+  tpfWeightedScore?: number;
   // Pensyarah Kursus
   lecturerId: string;
   lecturerName: string;

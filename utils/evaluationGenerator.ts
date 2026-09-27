@@ -1,4 +1,5 @@
 import { StudentEvaluation, User } from '../types';
+import { UTEM_PORTFOLIO_SCHEMES, UTEM_WEEKLY_ASSESSMENTS } from '../constants/utemWblRubrics';
 
 export const generateEvaluationPrint = (
   evaluation: StudentEvaluation,
@@ -827,6 +828,222 @@ export const generateCourseGradeSummaryPrint = (
           <div>Penyelaras WBL / Timbalan Dekan Akademik</div>
           <div>FPTT, Universiti Teknikal Malaysia Melaka</div>
         </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+};
+
+export const generateCourseRubricPrint = (
+  courseCode: string,
+  language: 'ms' | 'en' = 'ms'
+) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert(language === 'ms' 
+      ? "Tetingkap pop-up telah disekat. Sila benarkan pop-up pada pelayar web anda." 
+      : "Pop-up blocked. Please allow pop-ups for this site.");
+    return;
+  }
+
+  const scheme = UTEM_PORTFOLIO_SCHEMES[courseCode] || UTEM_PORTFOLIO_SCHEMES['BTMT 3273(i)'];
+  const weeklyAssessments = UTEM_WEEKLY_ASSESSMENTS[courseCode] || [];
+
+  const partsHtml = (scheme?.parts || []).map((part, pIdx) => {
+    const criteriaRows = part.criteria.map((c, cIdx) => `
+      <tr style="background: ${cIdx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+        <td style="padding: 6px 8px; border: 1px solid #d1d5db; font-weight: bold; vertical-align: top; width: 22%;">
+          ${c.title}
+          ${c.clo ? `<div style="font-size: 7.5pt; color: #1e40af; font-weight: normal; margin-top: 2px;">${c.clo}</div>` : ''}
+        </td>
+        <td style="padding: 6px 8px; border: 1px solid #d1d5db; font-size: 8pt; vertical-align: top; width: 19.5%; color: #991b1b; background: #fef2f2;">
+          <strong>Skor 1 (Lemah):</strong><br/>${c.levels[1]}
+        </td>
+        <td style="padding: 6px 8px; border: 1px solid #d1d5db; font-size: 8pt; vertical-align: top; width: 19.5%; color: #92400e; background: #fffbeb;">
+          <strong>Skor 2 (Sederhana):</strong><br/>${c.levels[2]}
+        </td>
+        <td style="padding: 6px 8px; border: 1px solid #d1d5db; font-size: 8pt; vertical-align: top; width: 19.5%; color: #1e40af; background: #eff6ff;">
+          <strong>Skor 3 (Baik):</strong><br/>${c.levels[3]}
+        </td>
+        <td style="padding: 6px 8px; border: 1px solid #d1d5db; font-size: 8pt; vertical-align: top; width: 19.5%; color: #065f46; background: #ecfdf5;">
+          <strong>Skor 4 (Cemerlang):</strong><br/>${c.levels[4]}
+        </td>
+      </tr>
+    `).join('');
+
+    return `
+      <div style="margin-top: 18px; page-break-inside: avoid;">
+        <div style="background: #1e3a8a; color: #ffffff; padding: 6px 12px; font-weight: bold; font-size: 9.5pt; display: flex; justify-content: space-between; border-radius: 4px 4px 0 0;">
+          <span>${part.partCode}: ${part.partTitle}</span>
+          <span>Penilai: ${part.evaluator} (${part.weightagePercent}%)</span>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-top: none; padding: 6px 10px; font-size: 8pt; color: #475569; font-style: italic;">
+          ${part.description}
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 8.5pt;">
+          <thead>
+            <tr style="background: #e2e8f0; text-align: left; font-size: 8pt; font-weight: bold;">
+              <th style="padding: 5px 8px; border: 1px solid #cbd5e1;">Kriteria Pentaksiran</th>
+              <th style="padding: 5px 8px; border: 1px solid #cbd5e1; color: #991b1b;">1 - Lemah (0-49%)</th>
+              <th style="padding: 5px 8px; border: 1px solid #cbd5e1; color: #92400e;">2 - Sederhana (50-64%)</th>
+              <th style="padding: 5px 8px; border: 1px solid #cbd5e1; color: #1e40af;">3 - Baik (65-79%)</th>
+              <th style="padding: 5px 8px; border: 1px solid #cbd5e1; color: #065f46;">4 - Cemerlang (80-100%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${criteriaRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }).join('');
+
+  const weeklyRows = weeklyAssessments.map(w => `
+    <tr style="border-bottom: 1px solid #e2e8f0;">
+      <td style="padding: 6px 8px; border: 1px solid #cbd5e1; font-weight: bold; text-align: center; width: 70px;">
+        Minggu ${w.week}
+      </td>
+      <td style="padding: 6px 8px; border: 1px solid #cbd5e1; width: 45%;">
+        <strong>${w.taskTitle}</strong>
+        <div style="font-size: 7.5pt; color: #1e40af; margin-top: 2px;">${w.cloStatement}</div>
+        <ul style="margin: 4px 0 0 16px; padding: 0; font-size: 7.5pt; color: #475569;">
+          ${w.taskHighlights.map(h => `<li>${h}</li>`).join('')}
+        </ul>
+      </td>
+      <td style="padding: 6px 8px; border: 1px solid #cbd5e1; width: 38%; font-size: 7.5pt;">
+        <ol style="margin: 0 0 0 16px; padding: 0;">
+          ${w.areas.map(a => `<li>${a.title}</li>`).join('')}
+        </ol>
+      </td>
+      <td style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; width: 65px;">
+        ${w.maxMarks}m
+      </td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="ms">
+    <head>
+      <meta charset="UTF-8">
+      <title>Rubrik & Skema Pemarkahan Rasmi WBL - ${scheme?.courseCode || courseCode}</title>
+      <style>
+        @page { size: A4 portrait; margin: 10mm 12mm; }
+        body { font-family: 'Times New Roman', Times, serif; font-size: 9pt; color: #0f172a; margin: 0; padding: 12px; }
+        .no-print { background: #1e3a8a; color: white; padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 11px; margin-bottom: 15px; border-radius: 6px; }
+        .btn-print { background: #f59e0b; color: #111827; border: none; padding: 6px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .title-box { text-align: center; flex: 1; }
+        .univ { font-size: 11pt; font-weight: bold; color: #1e3a8a; margin: 0; text-transform: uppercase; }
+        .faculty { font-size: 9.5pt; font-weight: bold; color: #334155; margin: 2px 0 0; }
+        .sub { font-size: 8pt; color: #64748b; margin: 2px 0 0; }
+        .course-banner { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        table.summary-tbl { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 8pt; }
+        table.summary-tbl th, table.summary-tbl td { border: 1px solid #cbd5e1; padding: 4px 6px; }
+        table.summary-tbl th { background: #f1f5f9; text-align: left; }
+        @media print { .no-print { display: none !important; } body { padding: 0; } }
+      </style>
+    </head>
+    <body>
+      <div class="no-print">
+        <span><strong>Rubrik & Panduan Pemarkahan Rasmi WBL FPTT UTeM</strong> • ${scheme?.courseCode} - ${scheme?.courseName}</span>
+        <button class="btn-print" onclick="window.print()">CETAK / SIMPAN SEBAGAI PDF</button>
+      </div>
+
+      <div class="header">
+        <div style="font-weight: bold; font-size: 9pt; color: #1e3a8a; width: 100px;">
+          UTeM / FPTT
+        </div>
+        <div class="title-box">
+          <div class="univ">UNIVERSITI TEKNIKAL MALAYSIA MELAKA</div>
+          <div class="faculty">FAKULTI PENGURUSAN TEKNOLOGI DAN TEKNOUSAHAWANAN (FPTT)</div>
+          <div class="sub">PANDUAN RUBRIK & SKEMA PEMARKAHAN INDUSTRI PROGRAM WORK-BASED LEARNING (2u2i)</div>
+        </div>
+        <div style="text-align: right; font-size: 7.5pt; color: #64748b; width: 100px;">
+          Lampiran Pentaksiran<br>Sesi 2026/2027
+        </div>
+      </div>
+
+      <div class="course-banner">
+        <div>
+          <span style="background: #1e3a8a; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-family: monospace; font-size: 9pt;">
+            ${scheme?.courseCode}
+          </span>
+          <strong style="font-size: 10pt; margin-left: 8px; color: #0f172a;">${scheme?.courseName}</strong>
+          <span style="font-size: 8pt; color: #64748b; margin-left: 8px;">(${scheme?.creditHours || 3} Jam Kredit)</span>
+        </div>
+        <div style="font-size: 8.5pt; font-weight: bold; color: #1e40af;">
+          Nisbah Penilai: ${scheme?.evaluatorRatio || 'JI: 60% | TPF: 40%'}
+        </div>
+      </div>
+
+      <!-- Component Summary Table -->
+      ${scheme?.componentsSummary && scheme.componentsSummary.length > 0 ? `
+        <div style="font-weight: bold; font-size: 8.5pt; margin-bottom: 4px; color: #1e3a8a;">
+          1. JADUAL PEMBERAT KOMPONEN & HASIL PEMBELAJARAN KURSUS (CLO / PLO):
+        </div>
+        <table class="summary-tbl">
+          <thead>
+            <tr>
+              <th style="width: 25px; text-align: center;">No.</th>
+              <th>Komponen Penilaian Prestasi Industri</th>
+              <th>Domain Pembelajaran</th>
+              <th>CLO / PLO</th>
+              <th>Penilai Bertanggungjawab</th>
+              <th style="width: 70px; text-align: center;">Pemberat (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${scheme.componentsSummary.map(c => `
+              <tr>
+                <td style="text-align: center;">${c.no}</td>
+                <td><strong>${c.componentName}</strong></td>
+                <td>${c.domain}</td>
+                <td style="font-family: monospace; font-size: 7.5pt;">${c.clo} / ${c.plo}</td>
+                <td>${c.evaluator}</td>
+                <td style="text-align: center; font-weight: bold; color: #1e40af;">${c.weightPercent}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : ''}
+
+      <!-- Detailed Rubrics Parts -->
+      <div style="font-weight: bold; font-size: 8.5pt; margin-top: 12px; margin-bottom: 4px; color: #1e3a8a;">
+        2. RUBRIK PRESTASI MENGIKUT SKALA TAHAP PENCAPAIAN (SKOR 1 HINGGA 4):
+      </div>
+      ${partsHtml}
+
+      <!-- Weekly Milestones if available -->
+      ${weeklyRows ? `
+        <div style="page-break-before: always; margin-top: 15px;">
+          <div style="font-weight: bold; font-size: 9pt; margin-bottom: 6px; color: #1e3a8a;">
+            3. PANDUAN PENTAKSIRAN TUGASAN MINGGUAN BUKU LOG (MINGGU 1 - 5):
+          </div>
+          <table class="summary-tbl">
+            <thead>
+              <tr style="background: #e2e8f0;">
+                <th style="text-align: center;">Minggu</th>
+                <th>Tugasan & Hasil Pembelajaran (CLO)</th>
+                <th>Bidang Penilaian (Assessment Areas)</th>
+                <th style="text-align: center;">Maks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${weeklyRows}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+
+      <!-- Grading Scale -->
+      <div style="margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 7.5pt; color: #475569; display: flex; justify-content: space-between;">
+        <div><strong>Skala Penggredan Rasmi UTeM:</strong> A+ (90-100) | A (80-89) | A- (75-79) | B+ (70-74) | B (65-69) | B- (60-64) | C+ (55-59) | C (50-54) | D (40-49) | E (0-39)</div>
+        <div>Dokumen Rasmi FPTT UTeM • Work-Based Learning (WBL)</div>
       </div>
     </body>
     </html>

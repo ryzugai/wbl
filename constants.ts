@@ -85,6 +85,13 @@ export const DEFAULT_WBL_COURSES: WBLCourse[] = [
     name_en: 'Industrial Training (WBL)',
     creditHours: 6,
     semester: 'Semester 8'
+  },
+  {
+    code: 'BTMU 4066(i)',
+    name_ms: 'Technopreneurship Portfolio',
+    name_en: 'Technopreneurship Portfolio',
+    creditHours: 6,
+    semester: 'Semester 8'
   }
 ];
 

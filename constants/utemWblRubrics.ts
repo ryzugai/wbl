@@ -1,0 +1,2137 @@
+export interface WeeklyAssessmentArea {
+  id: number;
+  title: string;
+  description?: string;
+}
+
+export interface WeeklyAssessmentConfig {
+  week: number;
+  courseCode: string;
+  courseName: string;
+  cloStatement: string;
+  taskTitle: string;
+  taskHighlights: string[];
+  areas: WeeklyAssessmentArea[];
+  maxMarks: number; // 12
+}
+
+export interface RubricCriterionLevel {
+  score: number; // 1, 2, 3, 4
+  label: string; // Lemah, Sederhana, Baik, Cemerlang
+  description: string;
+}
+
+export interface RubricCriterion {
+  id: string;
+  title: string;
+  maxScore: number; // usually 4
+  clo?: string;
+  levels: {
+    1: string; // Lemah / Tidak Memuaskan
+    2: string; // Sederhana / Kurang Memuaskan
+    3: string; // Baik / Memuaskan
+    4: string; // Cemerlang
+  };
+}
+
+export interface CourseAssessmentPart {
+  partCode: string; // Bahagian A, B, C, D, E
+  partTitle: string;
+  evaluator: 'JI' | 'TPF' | 'JI & TPF';
+  weightagePercent: number; // e.g. 40%, 30%, 20%, 10%
+  description: string;
+  criteria: RubricCriterion[];
+}
+
+export interface CoursePortfolioScheme {
+  courseCode: string;
+  courseName: string;
+  creditHours: number;
+  evaluatorRatio: string; // e.g. "JI: 60% | TPF: 40%"
+  jiTotalPercent: number;
+  tpfTotalPercent: number;
+  componentsSummary: {
+    no: number;
+    componentName: string;
+    domain: string;
+    clo: string;
+    plo: string;
+    evaluator: string;
+    weightPercent: number;
+  }[];
+  parts: CourseAssessmentPart[];
+}
+
+// =========================================================================
+// 1. OFFICIAL WEEKLY ASSESSMENTS (WEEKS 1 - 5) AS PER UTeM ATTACHMENT
+// =========================================================================
+
+export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> = {
+  'BTMT 3273(i)': [
+    {
+      week: 1,
+      courseCode: 'BTMT 3273',
+      courseName: 'DIGITAL ENTREPRENEURSHIP',
+      cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
+      taskTitle: 'WEEK 1 Task: Digital Business Ecosystem & Regulations',
+      taskHighlights: [
+        'Explore the digital business ecosystem, startup models, and economic landscape at the placement firm',
+        'Review legal and ethical frameworks in e-commerce',
+        'Conduct a digital audit of existing business operations'
+      ],
+      areas: [
+        { id: 1, title: 'Explore the digital business ecosystem, startup models, and economic landscape at the placement firm' },
+        { id: 2, title: 'Review legal and ethical frameworks in e-commerce' },
+        { id: 3, title: 'Conduct a digital audit of existing business operations' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 2,
+      courseCode: 'BTMT 3273',
+      courseName: 'DIGITAL ENTREPRENEURSHIP',
+      cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
+      taskTitle: 'WEEK 2 Task: Digital Business Model Canvas (BMC) & UVP',
+      taskHighlights: [
+        'Develop a Digital Business Model Canvas (Digital BMC) draft for the firm',
+        'Design value propositions for digital markets and customer segmentation',
+        'Establish monetization strategies and strategic partnerships in e-business'
+      ],
+      areas: [
+        { id: 1, title: 'Develop a Digital Business Model Canvas (Digital BMC) draft for the firm' },
+        { id: 2, title: 'Design value propositions for digital markets and customer segmentation' },
+        { id: 3, title: 'Establish monetization strategies and strategic partnerships in e-business' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 3,
+      courseCode: 'BTMT 3273',
+      courseName: 'DIGITAL ENTREPRENEURSHIP',
+      cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
+      taskTitle: 'WEEK 3 Task: Social Media Marketing & Creative Copywriting',
+      taskHighlights: [
+        'Implement social media marketing strategies (Facebook, Instagram, TikTok, YouTube)',
+        'Produce creative copywriting and visual content for digital advertising',
+        'Manage brand engagement and community building'
+      ],
+      areas: [
+        { id: 1, title: 'Implement social media marketing strategies (Facebook, Instagram, TikTok, YouTube)' },
+        { id: 2, title: 'Produce creative copywriting and visual content for digital advertising' },
+        { id: 3, title: 'Manage brand engagement and community building' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 4,
+      courseCode: 'BTMT 3273',
+      courseName: 'DIGITAL ENTREPRENEURSHIP',
+      cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
+      taskTitle: 'WEEK 4 Task: E-Marketplace Operations & Customer Fulfillment',
+      taskHighlights: [
+        'Manage e-marketplace stores and cross-border e-commerce operations',
+        'Integrate payment gateways and ensure transaction security',
+        'Handle customer engagement, order fulfillment, and omnichannel service (WhatsApp/Telegram)'
+      ],
+      areas: [
+        { id: 1, title: 'Manage e-marketplace stores and cross-border e-commerce operations' },
+        { id: 2, title: 'Integrate payment gateways and ensure transaction security' },
+        { id: 3, title: 'Handle customer engagement, order fulfillment, and omnichannel service (WhatsApp/Telegram)' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 5,
+      courseCode: 'BTMT 3273',
+      courseName: 'DIGITAL ENTREPRENEURSHIP',
+      cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
+      taskTitle: 'WEEK 5 Task: Final Assessment, Digital Project Report & Comprehensive Presentation',
+      taskHighlights: [
+        'Measure and analyze digital business performance metrics and ROI',
+        'Prepare final digital entrepreneurship project report and joint assessment presentation (Viva)',
+        'Final verification by Industry Coach (JI) and Faculty Supervisor (TPF)'
+      ],
+      areas: [
+        { id: 1, title: 'Comprehensive presentation and defense of digital entrepreneurship project and model' },
+        { id: 2, title: 'Quality, depth and accuracy of final digital project report documentation' },
+        { id: 3, title: 'Professionalism, ethics and overall industrial performance across 5 weeks' }
+      ],
+      maxMarks: 12
+    }
+  ],
+
+  'BTMU 2103(i)': [
+    {
+      week: 1,
+      courseCode: 'BTMU 2103',
+      courseName: 'OPERATIONS MANAGEMENT',
+      cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
+      taskTitle: 'WEEK 1 Task: Plant Layout & Process Flow Analysis',
+      taskHighlights: [
+        'Map out the production plant layout and facility design at the placement firm',
+        'Analyze raw material to finished goods workflow strategy (Value Stream Mapping)',
+        'Identify critical workstations and global transfer operational principles'
+      ],
+      areas: [
+        { id: 1, title: 'Map out the production plant layout and facility design at the placement firm' },
+        { id: 2, title: 'Analyze raw material to finished goods workflow strategy (Value Stream Mapping)' },
+        { id: 3, title: 'Identify critical workstations and global transfer operational principles' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 2,
+      courseCode: 'BTMU 2103',
+      courseName: 'OPERATIONS MANAGEMENT',
+      cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
+      taskTitle: 'WEEK 2 Task: Capacity Planning & Production Scheduling',
+      taskHighlights: [
+        'Analyze machine and labor capacity planning and resource allocation',
+        'Review production scheduling, work shifting, and demand forecasting methods',
+        'Assess operations time management in daily plant operations'
+      ],
+      areas: [
+        { id: 1, title: 'Analyze machine and labor capacity planning and resource allocation' },
+        { id: 2, title: 'Review production scheduling, work shifting, and demand forecasting methods' },
+        { id: 3, title: 'Assess operations time management in daily plant operations' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 3,
+      courseCode: 'BTMU 2103',
+      courseName: 'OPERATIONS MANAGEMENT',
+      cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
+      taskTitle: 'WEEK 3 Task: Lean Manufacturing & JIT (Waste Elimination)',
+      taskHighlights: [
+        'Implement 5S audits at selected plant workstations',
+        'Identify and eliminate the 7 wastes (Muda) in manufacturing processes',
+        'Apply Kanban and pull production systems (Just-In-Time / Kaizen principles)'
+      ],
+      areas: [
+        { id: 1, title: 'Implement 5S audits at selected plant workstations' },
+        { id: 2, title: 'Identify and eliminate the 7 wastes (Muda) in manufacturing processes' },
+        { id: 3, title: 'Apply Kanban and pull production systems (Just-In-Time / Kaizen principles)' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 4,
+      courseCode: 'BTMU 2103',
+      courseName: 'OPERATIONS MANAGEMENT',
+      cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
+      taskTitle: 'WEEK 4 Task: Quality Control & Operational System Improvement',
+      taskHighlights: [
+        'Participate in Total Quality Management (TQM) and Statistical Process Control (SPC)',
+        'Conduct defect inspections and inventory control (EOQ models)',
+        'Analyze queue systems and operational bottlenecks'
+      ],
+      areas: [
+        { id: 1, title: 'Participate in Total Quality Management (TQM) and Statistical Process Control (SPC)' },
+        { id: 2, title: 'Conduct defect inspections and inventory control (EOQ models)' },
+        { id: 3, title: 'Analyze queue systems and operational bottlenecks' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 5,
+      courseCode: 'BTMU 2103',
+      courseName: 'OPERATIONS MANAGEMENT',
+      cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
+      taskTitle: 'WEEK 5 Task: Final Assessment, Operations Report & Comprehensive Presentation',
+      taskHighlights: [
+        'Synthesize overall operations management project findings and system evaluation',
+        'Prepare final case study report and joint assessment presentation (Viva)',
+        'Final verification by Industry Coach (JI) and Faculty Supervisor (TPF)'
+      ],
+      areas: [
+        { id: 1, title: 'Comprehensive presentation and defense of operations management project' },
+        { id: 2, title: 'Quality, depth and accuracy of final operations case study report documentation' },
+        { id: 3, title: 'Professionalism, ethics and overall industrial performance across 5 weeks' }
+      ],
+      maxMarks: 12
+    }
+  ],
+
+  'BTMT 3283(i)': [
+    {
+      week: 1,
+      courseCode: 'BTMT 3283',
+      courseName: 'BUSINESS ANALYTICS',
+      cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
+      taskTitle: 'WEEK 1 Task: Data Extraction & Business Problem Framing',
+      taskHighlights: [
+        'Identify business problems and scope within the industrial placement firm',
+        'Extract raw data sources and execute data cleaning (data wrangling)',
+        'Ensure data governance and quality control standards'
+      ],
+      areas: [
+        { id: 1, title: 'Identify business problems and scope within the industrial placement firm' },
+        { id: 2, title: 'Extract raw data sources and execute data cleaning (data wrangling)' },
+        { id: 3, title: 'Ensure data governance and quality control standards' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 2,
+      courseCode: 'BTMT 3283',
+      courseName: 'BUSINESS ANALYTICS',
+      cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
+      taskTitle: 'WEEK 2 Task: Exploratory Data Analysis (EDA) & Descriptive Statistics',
+      taskHighlights: [
+        'Execute Exploratory Data Analysis (EDA) using analytics software (Excel/Python/SPSS)',
+        'Summarize descriptive statistics and operational patterns',
+        'Apply statistical tools for business decisions'
+      ],
+      areas: [
+        { id: 1, title: 'Execute Exploratory Data Analysis (EDA) using analytics software (Excel/Python/SPSS)' },
+        { id: 2, title: 'Summarize descriptive statistics and operational patterns' },
+        { id: 3, title: 'Apply statistical tools for business decisions' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 3,
+      courseCode: 'BTMT 3283',
+      courseName: 'BUSINESS ANALYTICS',
+      cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
+      taskTitle: 'WEEK 3 Task: Predictive Modeling & Decision-Making Tools',
+      taskHighlights: [
+        'Develop predictive models or optimization models to evaluate sales/inventory efficiency',
+        'Apply forecasting methods for business performance projections',
+        'Validate and test analytics models'
+      ],
+      areas: [
+        { id: 1, title: 'Develop predictive models or optimization models to evaluate sales/inventory efficiency' },
+        { id: 2, title: 'Apply forecasting methods for business performance projections' },
+        { id: 3, title: 'Validate and test analytics models' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 4,
+      courseCode: 'BTMT 3283',
+      courseName: 'BUSINESS ANALYTICS',
+      cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
+      taskTitle: 'WEEK 4 Task: Dashboard Visualization & Prescriptive Insights',
+      taskHighlights: [
+        'Build visual dashboards (e.g., Power BI) for management review',
+        'Translate data insights into strategic prescriptive recommendations',
+        'Communicate data stories effectively to stakeholders'
+      ],
+      areas: [
+        { id: 1, title: 'Build visual dashboards (e.g., Power BI) for management review' },
+        { id: 2, title: 'Translate data insights into strategic prescriptive recommendations' },
+        { id: 3, title: 'Communicate data stories effectively to stakeholders' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 5,
+      courseCode: 'BTMT 3283',
+      courseName: 'BUSINESS ANALYTICS',
+      cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
+      taskTitle: 'WEEK 5 Task: Final Assessment, Analytics Report & Comprehensive Presentation',
+      taskHighlights: [
+        'Synthesize overall business analytics project findings and model verification',
+        'Prepare final case study report and joint assessment presentation (Viva)',
+        'Final verification by Industry Coach (JI) and Faculty Supervisor (TPF)'
+      ],
+      areas: [
+        { id: 1, title: 'Comprehensive presentation and defense of business analytics project and model' },
+        { id: 2, title: 'Quality, depth and accuracy of final analytics case study report documentation' },
+        { id: 3, title: 'Professionalism, ethics and overall industrial performance across 5 weeks' }
+      ],
+      maxMarks: 12
+    }
+  ],
+
+  'BTMT 2113(i)': [
+    {
+      week: 1,
+      courseCode: 'BTMT 2113',
+      courseName: 'BRAND MANAGEMENT',
+      cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
+      taskTitle: 'WEEK 1 Task: Brand and Brand Management for a New Entrepreneurial Venture, Customer-Based Brand Equity & Brand Positioning',
+      taskHighlights: [
+        "Find the company's profile and brand",
+        "Explain the importance of the company's brand",
+        "Find the company's branding challenges & opportunities"
+      ],
+      areas: [
+        { id: 1, title: "Find the company's profile and brand" },
+        { id: 2, title: "Explain the importance of the company's brand" },
+        { id: 3, title: "Find the company's branding challenges & opportunities" }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 2,
+      courseCode: 'BTMT 2113',
+      courseName: 'BRAND MANAGEMENT',
+      cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
+      taskTitle: 'WEEK 2 Task: Choosing Brand Elements & Developing Brand Equity Measurement Systems',
+      taskHighlights: [
+        'Pick an example of criteria of brand elements used at your place (e.g., name, logo, and color schemes)',
+        'Identify a brand equity management system at your workplace',
+        'Implement brand tracking studies (brand building initiatives based on consumer and business impact)'
+      ],
+      areas: [
+        { id: 1, title: 'Pick an example of criteria of brand elements used at your workplace' },
+        { id: 2, title: 'Identify a brand equity management system at your workplace' },
+        { id: 3, title: 'Implement brand tracking studies and evaluate business/consumer impact' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 3,
+      courseCode: 'BTMT 2113',
+      courseName: 'BRAND MANAGEMENT',
+      cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
+      taskTitle: 'WEEK 3 Task: Branding in Digital Era: Application of Technology & Brand Management',
+      taskHighlights: [
+        'Define key issues and brand engagement',
+        'Identify digital communications',
+        'Analyze the Pros and Cons of paid channels'
+      ],
+      areas: [
+        { id: 1, title: 'Define key issues and brand engagement in digital channels' },
+        { id: 2, title: 'Identify digital communications and tools used by the firm' },
+        { id: 3, title: 'Analyze the Pros and Cons of paid channels utilized in marketing' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 4,
+      courseCode: 'BTMT 2113',
+      courseName: 'BRAND MANAGEMENT',
+      cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
+      taskTitle: 'WEEK 4 Task: Integrating Marketing Communications (IMC), Brand Extensions & Portfolio Strategies',
+      taskHighlights: [
+        'Suggest/develop New Product and Brand Extensions',
+        'Implement Brand Architecture Strategies',
+        'Measure the results of Integrating Marketing Communications (IMC) programs to build brand equity'
+      ],
+      areas: [
+        { id: 1, title: 'Suggest/develop New Product and Brand Extensions' },
+        { id: 2, title: 'Implement Brand Architecture Strategies' },
+        { id: 3, title: 'Measure the results of Integrating Marketing Communications (IMC) programs' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 5,
+      courseCode: 'BTMT 2113',
+      courseName: 'BRAND MANAGEMENT',
+      cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
+      taskTitle: 'WEEK 5 Task: Final Assessment, Presentation & Comprehensive Portfolio Submission',
+      taskHighlights: [
+        'Synthesize overall WBL brand management project findings',
+        'Prepare final case study report and joint assessment presentation (Viva)',
+        'Final verification by Industry Coach (JI) and Faculty Supervisor (TPF)'
+      ],
+      areas: [
+        { id: 1, title: 'Comprehensive presentation and defense of brand strategy project' },
+        { id: 2, title: 'Quality, depth and accuracy of final case study report documentation' },
+        { id: 3, title: 'Professionalism, ethics and overall industrial performance across 5 weeks' }
+      ],
+      maxMarks: 12
+    }
+  ]
+};
+
+// =========================================================================
+// 2. OFFICIAL COMPREHENSIVE COURSE PORTFOLIOS & RUBRICS (ATTACHMENT P. 39 - 87)
+// =========================================================================
+
+export const UTEM_PORTFOLIO_SCHEMES: Record<string, CoursePortfolioScheme> = {
+  // Course 1: BTMU 4056(i) Technopreneur Internship (6 Kredit)
+  'BTMU 4056(i)': {
+    courseCode: 'BTMU 4056(i)',
+    courseName: 'Technopreneur Internship',
+    creditHours: 6,
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiTotalPercent: 60,
+    tpfTotalPercent: 40,
+    componentsSummary: [
+      { no: 1, componentName: 'Logbook & Laporan Kemajuan Mingguan', domain: 'Kognitif (C2 & C4)', clo: 'CLO1, CLO2', plo: 'PLO2, PLO7', evaluator: 'JI (10%) & TPF (20%)', weightPercent: 30 },
+      { no: 2, componentName: 'Soft Skills & Competencies Assessment', domain: 'Afektif (A4) / C3F', clo: 'CLO4', plo: 'PLO9 (Kepimpinan)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 30 },
+      { no: 3, componentName: 'Presentation di Industri (Pembentangan Akhir)', domain: 'Afektif & Kognitif / C3C', clo: 'CLO4', plo: 'PLO9 (Komunikasi)', evaluator: 'JI (10%) & TPF (10%)', weightPercent: 20 },
+      { no: 4, componentName: 'Professionalism & Ethics (Etika Profesional)', domain: 'Psikomotor (P3) / C5', clo: 'CLO3', plo: 'PLO8 (Etika)', evaluator: 'JI (10%) & TPF (10%)', weightPercent: 20 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Borang Penilaian Buku Log & Laporan Aktiviti Mingguan (30%)',
+        evaluator: 'JI & TPF',
+        weightagePercent: 30,
+        description: 'Dinilai oleh Jurulatih Industri (JI - 10%) dan Tenaga Pengajar Fakulti (TPF - 20%) berdasarkan rekod aktiviti perantisan 24 minggu.',
+        criteria: [
+          {
+            id: 'logbook_1',
+            title: '1. Ketekalan & Kesempurnaan Catatan Harian/Mingguan',
+            maxScore: 4,
+            levels: {
+              1: 'Catatan tidak lengkap, banyak minggu tertinggal dan lewat dikemukakan untuk semakan.',
+              2: 'Catatan ada tetapi ringkas, tidak konsisten dan pengesahan JI tidak teratur.',
+              3: 'Catatan lengkap setiap minggu, disemak dan disahkan secara berkala oleh JI.',
+              4: 'Catatan sangat terperinci, kemas, konsisten 24 minggu, disertakan bukti bergambar/dokumen dan pengesahan JI lengkap.'
+            }
+          },
+          {
+            id: 'logbook_2',
+            title: '2. Pengecaman Masalah & Isu Operasi Firma (CLO1)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal mengenal pasti isu sebenar syarikat dan deskripsi tugasan kabur.',
+              2: 'Mengenal pasti tugas harian tetapi kurang jelas dari segi permasalahan operasi.',
+              3: 'Berjaya mengenal pasti masalah dan cabaran operasi/perniagaan firma dengan jelas.',
+              4: 'Sangat analitikal dalam mengenal pasti punca masalah utama firma serta menghuraikan implikasinya kepada organisasi.'
+            }
+          },
+          {
+            id: 'logbook_3',
+            title: '3. Aplikasi Kaedah & Alat Analisis Masalah (CLO2)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada penggunaan alat atau teknik saintifik dalam menganalisis tugas industri.',
+              2: 'Aplikasi alat analisis sangat asas dan terhad kepada kaedah konvensional.',
+              3: 'Menggunakan kaedah dan alat pengurusan/teknikal yang sesuai untuk menganalisis masalah.',
+              4: 'Sangat cekap mengaplikasikan kaedah saintifik/teknikal lanjutan bagi menganalisis data dan proses firma.'
+            }
+          },
+          {
+            id: 'logbook_4',
+            title: '4. Refleksi Pembelajaran Kendiri & Bimbingan JI',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada catatan refleksi atau refleksi sekadar menyalin semula huraian kerja.',
+              2: 'Refleksi pembelajaran terlalu umum dan tidak menunjukkan kematangan pemikiran.',
+              3: 'Refleksi menghubungkaitkan pengalaman kerja dengan teori akademik yang dipelajari.',
+              4: 'Refleksi sangat matang, kritikal, mendokumentasikan pembelajaran daripada bimbingan JI serta cadangan penambahbaikan diri.'
+            }
+          },
+          {
+            id: 'logbook_5',
+            title: '5. Kualiti Dokumentasi & Format Laporan',
+            maxScore: 4,
+            levels: {
+              1: 'Format tidak teratur, bahasa lemah dan mengabaikan panduan buku log fakulti.',
+              2: 'Format sederhana dan lampiran sokongan aktiviti sangat terhad.',
+              3: 'Format mematuhi Buku Panduan Latihan Industri WBL dan bahasa kemas.',
+              4: 'Dokumentasi bertaraf profesional industri, susun atur sangat rapi dan lampiran evidens lengkap.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Borang Penilaian Kemahiran Insaniah & Kompetensi Praktikal Industri (30%)',
+        evaluator: 'JI',
+        weightagePercent: 30,
+        description: 'Dinilai sepenuhnya oleh Jurulatih Industri (JI - 30%) sepanjang 6 bulan penempatan bagi mengukur kebolehan pelaksanaan kerja, daya kepimpinan, autonomi dan kompetensi amali.',
+        criteria: [
+          {
+            id: 'soft_1',
+            title: '1. Keupayaan Pelaksanaan Tugas Amali & Solusi Firma',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal melaksanakan tugasan operasi/amali yang diarahkan oleh penyelia industri.',
+              2: 'Melaksanakan tugasan asas tetapi memerlukan pemantauan dan bantuan berterusan.',
+              3: 'Melaksanakan tugasan industri dengan betul, cekap dan mematuhi standard firma.',
+              4: 'Penguasaan amali sangat cemerlang, berdikari dan berjaya melaksanakan projek solusi dengan berkesan.'
+            }
+          },
+          {
+            id: 'soft_2',
+            title: '2. Kepimpinan, Autonomi & Kebertanggungjawaban (CLO4 / PLO9)',
+            maxScore: 4,
+            levels: {
+              1: 'Mengelak daripada memikul tanggungjawab dan tidak boleh bekerja secara berdikari.',
+              2: 'Kurang yakin membuat keputusan operasi dan bergantung sepenuhnya kepada rakan sekerja.',
+              3: 'Mampu memimpin tugasan kecil, berautonomi dan bertanggungjawab atas hasil kerja.',
+              4: 'Ciri kepimpinan cemerlang, berautonomi tinggi, matang dalam membuat keputusan dan menjadi contoh teladan.'
+            }
+          },
+          {
+            id: 'soft_3',
+            title: '3. Kerja Berpasukan & Hubungan Interpersonal Silang Budaya',
+            maxScore: 4,
+            levels: {
+              1: 'Sukar bekerjasama, pasif dan kerap menimbulkan perselisihan faham.',
+              2: 'Kurang berkomunikasi dan berinteraksi secara terhad dengan warga syarikat.',
+              3: 'Bekerjasama dengan baik, mesra dan menghormati semua peringkat warga kerja.',
+              4: 'Sangat proaktif membina hubungan kerja yang harmoni, memotivasi rakan sepasukan dan menyokong matlamat firma.'
+            }
+          },
+          {
+            id: 'soft_4',
+            title: '4. Inisiatif, Kreativiti & Daya Usaha Inovasi',
+            maxScore: 4,
+            levels: {
+              1: 'Pasif, menunggu arahan dan tidak menunjukkan minat terhadap penambahbaikan.',
+              2: 'Melakukan tugasan rutin tanpa sebarang inisiatif nilai tambah.',
+              3: 'Menunjukkan minat belajar, rajin dan bersedia mencuba kaedah kerja baharu.',
+              4: 'Sangat berinisiatif tinggi, kreatif mencadangkan idea inovatif bagi meningkatkan produktiviti organisasi.'
+            }
+          },
+          {
+            id: 'soft_5',
+            title: '5. Daya Tahan Kerja & Kebolehsuaian Persekitaran Industri',
+            maxScore: 4,
+            levels: {
+              1: 'Mudah putus asa, tidak tahan tekanan kerja dan sukar menyesuaikan diri.',
+              2: 'Mengambil masa terlalu lama untuk menyesuaikan diri dengan persekitaran syarikat.',
+              3: 'Mudah menyesuaikan diri dengan budaya kerja dan mampu menangani beban tugas.',
+              4: 'Daya tahan sangat tinggi (resilient), tangkas (agile) menangani tekanan dan pantas mengatasi cabaran operasi.'
+            }
+          },
+          {
+            id: 'soft_6',
+            title: '6. Ketelitian, Kualiti Kerja & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Hasil kerja cuai, banyak kesilapan dan sering gagal menepati tarikh akhir tugasan.',
+              2: 'Hasil kerja memerlukan semakan berulang kali daripada Jurulatih Industri.',
+              3: 'Hasil kerja berkualiti, kemas, teliti dan menepati jadual waktu yang ditetapkan.',
+              4: 'Kualiti kerja bertaraf profesional industri, sangat teliti, sifar ralat dan pengurusan masa cemerlang.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian C',
+        partTitle: 'Borang Penilaian Pembentangan Akhir di Premis Industri (20%)',
+        evaluator: 'JI & TPF',
+        weightagePercent: 20,
+        description: 'Dinilai bersama oleh Jurulatih Industri (JI - 10%) dan Tenaga Pengajar Fakulti (TPF - 10%) semasa sesi lawatan pemantauan kedua di industri (CLO4, PLO9).',
+        criteria: [
+          {
+            id: 'pres_1',
+            title: '1. Penguasaan Kandungan Latihan & Projek Firma',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan aktiviti perantisan dan peranan dalam projek syarikat.',
+              2: 'Penerangan aktiviti latihan terlalu umum dan kurang menghuraikan impak kepada firma.',
+              3: 'Menerangkan skop latihan, masalah yang diselesaikan dan impak projek dengan jelas.',
+              4: 'Penguasaan teknikal sangat mantap, menghuraikan sumbangan projek kepada operasi firma secara menyeluruh.'
+            }
+          },
+          {
+            id: 'pres_2',
+            title: '2. Struktur Pembentangan & Kelancaran Bahasa',
+            maxScore: 4,
+            levels: {
+              1: 'Penyampaian tidak teratur, gugup dan bahasa sukar difahami.',
+              2: 'Penyampaian mendatar, urutan slaid kurang logik dan kurang berkeyakinan.',
+              3: 'Penyampaian tersusun mengikut urutan fasa latihan, lancar dan berkeyakinan baik.',
+              4: 'Penyampaian sangat lancar, gaya korporat profesional, bahasa fasih dan memukau hadirin.'
+            }
+          },
+          {
+            id: 'pres_3',
+            title: '3. Kualiti Slaid & Pembuktian Visual Projek',
+            maxScore: 4,
+            levels: {
+              1: 'Slaid teks padat, tidak kemas dan tiada gambar rajah/bukti aktiviti di industri.',
+              2: 'Visual minima dan slaid persembahan kurang menarik perhatian panel penilai.',
+              3: 'Slaid kemas, berstruktur dan menyertakan foto aktiviti serta carta pelaksanaan projek.',
+              4: 'Reka bentuk persembahan bertaraf eksekutif, infografik data kemas dan bukti evidens projek sangat lengkap.'
+            }
+          },
+          {
+            id: 'pres_4',
+            title: '4. Sesi Soal Jawab & Maklum Balas Panel (Q&A)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menjawab soalan panel penilai JI dan TPF.',
+              2: 'Jawapan teragak-agak, kurang tepat dan tidak disokong fakta pengalaman kerja.',
+              3: 'Menjawab soalan panel penilai dengan tenang, tepat dan berkeyakinan.',
+              4: 'Menjawab soalan secara kritis, matang, mempertahankan cadangan solusi dengan data konkrit industri.'
+            }
+          },
+          {
+            id: 'pres_5',
+            title: '5. Profesionalisme, Penampilan & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Pakaian tidak mematuhi etika korporat dan pembentangan melebihi had masa.',
+              2: 'Pengurusan masa kurang seimbang antara bahagian pengenalan dan dapatan.',
+              3: 'Menepati had masa yang ditetapkan dan berpakaian kemas mematuhi etika korporat.',
+              4: 'Pengurusan masa tepat, interaksi dua hala berkarisma tinggi dan mempamerkan etika eksekutif cemerlang.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian D',
+        partTitle: 'Borang Penilaian Etika Profesional & Pematuhan Keselamatan (20%)',
+        evaluator: 'JI & TPF',
+        weightagePercent: 20,
+        description: 'Dinilai bersama oleh Jurulatih Industri (JI - 10%) dan Tenaga Pengajar Fakulti (TPF - 10%) sepanjang 6 bulan (CLO3, PLO8).',
+        criteria: [
+          {
+            id: 'eth_1',
+            title: '1. Kehadiran & Ketetapan Waktu Kerja Industri',
+            maxScore: 4,
+            levels: {
+              1: 'Kerap ponteng, datang lewat dan pulang awal tanpa kebenaran pihak pengurusan firma.',
+              2: 'Pernah lewat dan tidak memaklumkan ketidakhadiran mengikut prosedur syarikat.',
+              3: 'Sentiasa hadir bertugas tepat pada masanya dan mematuhi jadual kerja firma.',
+              4: 'Rekod kehadiran 100% sempurna, sangat komited, berintegriti terhadap masa dan teladan terbaik.'
+            }
+          },
+          {
+            id: 'eth_2',
+            title: '2. Pematuhan Dasar Keselamatan, Kesihatan Pekerjaan & 5S (OSHA)',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan SOP keselamatan, enggan memakai PPE dan mengancam keselamatan tempat kerja.',
+              2: 'Mematuhi peraturan keselamatan hanya apabila dipantau secara ketat oleh penyelia.',
+              3: 'Sentiasa memakai PPE, mematuhi SOP keselamatan dan menjaga kebersihan ruang kerja (5S).',
+              4: 'Sangat komited terhadap budaya keselamatan sifar kemalangan, proaktif mengenal pasti hazad dan mengamalkan 5S cemerlang.'
+            }
+          },
+          {
+            id: 'eth_3',
+            title: '3. Integriti, Amanah & Kerahsiaan Perniagaan Firma',
+            maxScore: 4,
+            levels: {
+              1: 'Membocorkan maklumat sulit syarikat atau tidak jujur dalam urusan kerja.',
+              2: 'Kurang peka terhadap batas kerahsiaan maklumat perniagaan dan harta intelek firma.',
+              3: 'Menjaga kerahsiaan data perniagaan dan amanah dalam melaksanakan tugas.',
+              4: 'Integriti sangat tinggi, jujur, telus dan mempertahankan nama baik serta kerahsiaan syarikat sepenuhnya.'
+            }
+          },
+          {
+            id: 'eth_4',
+            title: '4. Kepatuhan Terhadap Arahan & Kod Etika Majikan',
+            maxScore: 4,
+            levels: {
+              1: 'Ingkar arahan Jurulatih Industri dan melanggar peraturan tatatertib syarikat.',
+              2: 'Melaksanakan arahan dengan rungutan dan kurang menghormati hierarki organisasi.',
+              3: 'Sentiasa akur kepada arahan pihak majikan dan menghormati carta organisasi syarikat.',
+              4: 'Sangat patuh, menghormati budaya korporat syarikat dan menunjukkan kesetiaan profesional yang tinggi.'
+            }
+          },
+          {
+            id: 'eth_5',
+            title: '5. Tingkah Laku Moral & Tatatertib Pelajar UTeM',
+            maxScore: 4,
+            levels: {
+              1: 'Melakukan salah laku moral atau mencemarkan imej universiti dan syarikat.',
+              2: 'Tingkah laku kurang memuaskan dan memerlukan teguran daripada pihak pengurusan.',
+              3: 'Mempamerkan sahsiah terpuji, bersopan santun dan memelihara nama baik universiti.',
+              4: 'Menjadi duta pelajar UTeM yang cemerlang, berakhlak mulia dan dipuji oleh pihak pengurusan industri.'
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // Course 2: BTMT 3283(i) Business Analytics (3 Kredit)
+  'BTMT 3283(i)': {
+    courseCode: 'BTMT 3283(i)',
+    courseName: 'Business Analytics',
+    creditHours: 3,
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiTotalPercent: 60,
+    tpfTotalPercent: 40,
+    componentsSummary: [
+      { no: 1, componentName: 'Student Performance Evaluation (Weekly Report)', domain: 'Kognitif (C2/C4)', clo: 'CLO3', plo: 'PLO8 (C5)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 40 },
+      { no: 2, componentName: 'Student Performance Evaluation (Soft Skills & Digital)', domain: 'Afektif (A2/A3)', clo: 'CLO2', plo: 'PLO6 (C3D)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 20 },
+      { no: 3, componentName: 'Presentation (Pembentangan Analitik)', domain: 'Kognitif (C4)', clo: 'CLO1', plo: 'PLO3 (C3A)', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 10 },
+      { no: 4, componentName: 'Case Study Report (Laporan Kajian Kes Analitik)', domain: 'Psikomotor (P1/P4)', clo: 'CLO1, 2, 3', plo: 'PLO3, 6, 8', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 30 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Borang Penilaian Prestasi Mingguan & Laporan Analitik (JI - 40%)',
+        evaluator: 'JI',
+        weightagePercent: 40,
+        description: 'Dinilai oleh Jurulatih Industri (JI) di tempat kerja bagi mengukur kebolehan pelajar mengekstrak data, meneroka isu analitik dan mencadangkan tindakan keputusan (CLO3, PLO8).',
+        criteria: [
+          {
+            id: 'ba_w_1',
+            title: '1. Pemahaman Konsep & Ekstraksi Data Industri',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal memahami struktur data industri dan tidak tahu mengekstrak data yang relevan.',
+              2: 'Memahami konsep asas tetapi memerlukan bimbingan kerap dalam mengumpul data.',
+              3: 'Mampu mengekstrak data industri yang berkaitan dengan operasi syarikat secara teratur.',
+              4: 'Sangat mahir mengekstrak, membersihkan (data cleaning) dan menstruktur data kompleks industri.'
+            }
+          },
+          {
+            id: 'ba_w_2',
+            title: '2. Aplikasi Alat Analitik & Pemodelan Data',
+            maxScore: 4,
+            levels: {
+              1: 'Tidak tahu menggunakan perisian analitik (Excel Solver, SPSS, Python, PowerBI).',
+              2: 'Menggunakan alat analitik secara terhad dan bergantung kepada templat asas.',
+              3: 'Mengaplikasikan alat statistik dan model pembuatan keputusan dengan betul.',
+              4: 'Penguasaan tinggi dalam membangunkan model deskriptif/prediktif untuk menyelesaikan isu perniagaan.'
+            }
+          },
+          {
+            id: 'ba_w_3',
+            title: '3. Kualiti & Analisis Laporan Mingguan',
+            maxScore: 4,
+            levels: {
+              1: 'Laporan tidak lengkap, lewat dihantar dan tiada analisis data perniagaan.',
+              2: 'Laporan sekadar mencatat tugasan rutin tanpa sokongan visualisasi atau graf.',
+              3: 'Laporan lengkap, menyertakan visualisasi data dan dihantar tepat pada masanya.',
+              4: 'Laporan sangat analitikal, menyertakan papan pemuka (dashboard), cerapan data (insights) dan disokong fakta.'
+            }
+          },
+          {
+            id: 'ba_w_4',
+            title: '4. Cadangan Tindakan Berasaskan Data (Decision Making)',
+            maxScore: 4,
+            levels: {
+              1: 'Pasif, tiada cadangan alternatif untuk menyelesaikan masalah industri.',
+              2: 'Cadangan tidak disokong oleh bukti analitik yang kukuh.',
+              3: 'Mencadangkan alternatif tindakan yang logik dan disokong oleh interpretasi data.',
+              4: 'Sangat proaktif mencadangkan tindakan preskriptif yang inovatif, berdaya maju dan berimpak tinggi.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Borang Penilaian Kemahiran Insaniah, Etika & Kemahiran Digital (JI - 20%)',
+        evaluator: 'JI',
+        weightagePercent: 20,
+        description: 'Dinilai oleh Jurulatih Industri (JI) bagi mengukur etika pengendalian data, integriti, disiplin dan kemahiran digital pelajar (CLO2, PLO6).',
+        criteria: [
+          {
+            id: 'ba_s_1',
+            title: '1. Integriti & Etika Kerahsiaan Data (Data Governance)',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan kerahsiaan data sulit industri dan tidak beretika.',
+              2: 'Kurang peka terhadap privasi data syarikat.',
+              3: 'Sentiasa menjaga kerahsiaan data mengikut polisi syarikat.',
+              4: 'Sangat beretika, mematuhi akta perlindungan data dan garis panduan industri.'
+            }
+          },
+          {
+            id: 'ba_s_2',
+            title: '2. Kehadiran & Ketepatan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Kerap lewat atau tidak hadir tanpa makluman rasmi.',
+              2: 'Pernah lewat dan kurang berdisiplin terhadap masa kerja.',
+              3: 'Kehadiran sangat baik dan sentiasa menepati masa.',
+              4: 'Kehadiran 100%, sangat komited dan menepati tarikh akhir projek.'
+            }
+          },
+          {
+            id: 'ba_s_3',
+            title: '3. Literasi Digital & Kebolehan Mempelajari Alat Baharu',
+            maxScore: 4,
+            levels: {
+              1: 'Sukar menguasai sistem perisian digital syarikat.',
+              2: 'Mengambil masa lama untuk menyesuaikan diri dengan sistem perisian.',
+              3: 'Cepat mempelajari perisian dan platform analitik yang digunakan.',
+              4: 'Sangat tangkas (agile) dalam meneroka dan memanfaatkan teknologi digital terkini.'
+            }
+          },
+          {
+            id: 'ba_s_4',
+            title: '4. Komunikasi Data & Hubungan Interpersonal',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan dapatan analitik kepada rakan sekerja.',
+              2: 'Komunikasi data terhad dan sukar difahami oleh bukan pakar teknikal.',
+              3: 'Mampu berkomunikasi dan menerangkan hasil analitik dengan sopan.',
+              4: 'Sangat mahir menceritakan data (data storytelling) secara meyakinkan dan profesional.'
+            }
+          },
+          {
+            id: 'ba_s_5',
+            title: '5. Kerja Berpasukan & Kolaborasi Silang Fungsi',
+            maxScore: 4,
+            levels: {
+              1: 'Sukar bekerjasama dan kerap menimbulkan salah faham.',
+              2: 'Kurang berinteraksi dengan jabatan/unit lain dalam syarikat.',
+              3: 'Bekerjasama dengan baik bersama pasukan pelbagai fungsi.',
+              4: 'Pemimpin pasukan yang cemerlang dan memupuk kolaborasi analitik yang harmoni.'
+            }
+          },
+          {
+            id: 'ba_s_6',
+            title: '6. Tanggungjawab & Ketelitian Kerja (Attention to Detail)',
+            maxScore: 4,
+            levels: {
+              1: 'Kerja cuai, banyak kesilapan data dan mengabaikan arahan.',
+              2: 'Memerlukan semakan berulang kali daripada penyelia.',
+              3: 'Hasil kerja teliti, tepat dan bertanggungjawab.',
+              4: 'Sangat teliti, sifar ralat analisis data dan bertanggungjawab penuh atas tugasan.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian C',
+        partTitle: 'Borang Penilaian Pembentangan Projek Analitik (TPF - 10%)',
+        evaluator: 'TPF',
+        weightagePercent: 10,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) semasa lawatan pemantauan atau pembentangan viva analitik perniagaan (CLO1, PLO3).',
+        criteria: [
+          {
+            id: 'ba_p_1',
+            title: '1. Penguasaan Metodologi & Model Analitik',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan metodologi dan model analitik yang diguna pakai.',
+              2: 'Penerangan model analitik terlalu umum dan kurang tepat.',
+              3: 'Menerangkan kaedah analisis dan algoritma pemodelan dengan jelas.',
+              4: 'Penguasaan teori dan teknikal analitik sangat mendalam dan mantap.'
+            }
+          },
+          {
+            id: 'ba_p_2',
+            title: '2. Visualisasi Data & Reka Bentuk Papan Pemuka',
+            maxScore: 4,
+            levels: {
+              1: 'Visualisasi data mengelirukan, tidak tersusun dan tiada carta.',
+              2: 'Visualisasi minima dan reka bentuk papan pemuka kurang kemas.',
+              3: 'Papan pemuka (dashboard) tersusun dengan graf analitik yang sesuai.',
+              4: 'Visualisasi interaktif, reka bentuk dashboard bertaraf profesional dan estetik.'
+            }
+          },
+          {
+            id: 'ba_p_3',
+            title: '3. Struktur & Gaya Penyampaian (Data Storytelling)',
+            maxScore: 4,
+            levels: {
+              1: 'Penyampaian tidak teratur dan gagal menyampaikan mesej analitik.',
+              2: 'Penyampaian mendatar dan urutan slaid kurang logik.',
+              3: 'Penyampaian tersusun, yakin dan menghubungkan data dengan konteks perniagaan.',
+              4: 'Penceritaan data (storytelling) sangat menarik, lancar, memukau dan berfokus.'
+            }
+          },
+          {
+            id: 'ba_p_4',
+            title: '4. Sesi Soal Jawab & Justifikasi Model',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menjawab soalan teknikal daripada panel penilai.',
+              2: 'Jawapan kurang meyakinkan dan tidak disokong fakta data.',
+              3: 'Menjawab soalan teknikal dan praktikal industri dengan yakin.',
+              4: 'Hujah sangat matang, mempertahankan ketepatan model dengan bukti empirikal.'
+            }
+          },
+          {
+            id: 'ba_p_5',
+            title: '5. Profesionalisme & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Pakaian tidak profesional dan masa pembentangan melebihi had.',
+              2: 'Pengurusan masa kurang seimbang antara analisis dan dapatan.',
+              3: 'Menepati masa dan berpakaian kemas mematuhi etika akademik/industri.',
+              4: 'Sangat menepati had masa, berkarisma dan beretika tinggi.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian D',
+        partTitle: 'Borang Penilaian Laporan Kajian Kes Analitik Perniagaan (TPF - 30%)',
+        evaluator: 'TPF',
+        weightagePercent: 30,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) berdasarkan laporan penuh projek analitik data di industri (CLO1, CLO2, CLO3).',
+        criteria: [
+          {
+            id: 'ba_r_1',
+            title: '1. Pengenalan Masalah Perniagaan & Skop Data (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Latar belakang masalah perniagaan dan definisi data sangat kabur.',
+              2: 'Penerangan masalah ada tetapi skop pemboleh ubah data tidak jelas.',
+              3: 'Penerangan masalah perniagaan jelas dan set data dikenal pasti dengan tepat.',
+              4: 'Pernyataan masalah sangat berfokus, objektif analitik jelas dan profil data komprehensif.'
+            }
+          },
+          {
+            id: 'ba_r_2',
+            title: '2. Pra-pemprosesan Data & Eksplorasi (EDA) (20%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada pra-pemprosesan dan analisis data eksploratori (EDA) tidak dijalankan.',
+              2: 'EDA sangat asas tanpa menangani nilai hilang (missing values) atau pencilan (outliers).',
+              3: 'Pembersihan data dilaksanakan dengan baik dan disertakan analisis statistik deskriptif.',
+              4: 'Eksplorasi data (EDA) sangat mendalam, normalisasi rapi dan korelasi dianalisis secara saintifik.'
+            }
+          },
+          {
+            id: 'ba_r_3',
+            title: '3. Pembangunan & Penilaian Model Analitik (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal membina model analitik dan tiada pengesahan model.',
+              2: 'Model dibina tetapi kriteria penilaian ketepatan model tidak mencukupi.',
+              3: 'Model analitik dibina dengan teknik yang betul dan dinilai prestasinya.',
+              4: 'Model analitik cemerlang, pengesahan silang (cross-validation) mantap dan metrik prestasi terperinci.'
+            }
+          },
+          {
+            id: 'ba_r_4',
+            title: '4. Cadangan Strategik & Preskriptif Perniagaan (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Cadangan tidak praktikal dan tiada kaitan dengan hasil analitik.',
+              2: 'Cadangan perniagaan umum tanpa disokong oleh cerapan data yang jelas.',
+              3: 'Cadangan tindakan perniagaan praktikal dan berpandukan dapatan model.',
+              4: 'Solusi preskriptif inovatif, disertakan analisis kos-faedah (ROI) dan pelan pelaksanaan industri.'
+            }
+          },
+          {
+            id: 'ba_r_5',
+            title: '5. Format, Gaya Penulisan & Rujukan Saintifik (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Format tidak kemas, plagiarisme tinggi dan tiada rujukan.',
+              2: 'Format laporan sederhana dan senarai rujukan sangat terhad.',
+              3: 'Format mengikut panduan fakulti, rujukan relevan dan bahasa akademik kemas.',
+              4: 'Laporan bertaraf profesional, struktur teknikal mantap, visualisasi kemas dan rujukan terkini.'
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // Course 3: BTMU 2103(i) Operations Management (3 Kredit)
+  'BTMU 2103(i)': {
+    courseCode: 'BTMU 2103(i)',
+    courseName: 'Operations Management',
+    creditHours: 3,
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiTotalPercent: 60,
+    tpfTotalPercent: 40,
+    componentsSummary: [
+      { no: 1, componentName: 'Student Performance Evaluation (Weekly Report)', domain: 'Kognitif (C6)', clo: 'CLO3', plo: 'PLO9 (C3F)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 40 },
+      { no: 2, componentName: 'Student Performance Evaluation (Soft Skills Rubric)', domain: 'Afektif (A5)', clo: 'CLO2', plo: 'PLO8 (C5)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 20 },
+      { no: 3, componentName: 'Presentation (Pembentangan Projek)', domain: 'Kognitif (C6)', clo: 'CLO1', plo: 'PLO3 (C3A)', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 10 },
+      { no: 4, componentName: 'Case Study Report (Laporan Kajian Kes WBL)', domain: 'Psikomotor (P6)', clo: 'CLO1, 2, 3', plo: 'PLO3, 8, 9', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 30 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Borang Penilaian Prestasi Mingguan & Laporan Operasi (JI - 40%)',
+        evaluator: 'JI',
+        weightagePercent: 40,
+        description: 'Dinilai oleh Jurulatih Industri (JI) di tempat kerja bagi mengukur penguasaan teknikal dan pematuhan jadual operasi pelajar (CLO3, PLO9).',
+        criteria: [
+          {
+            id: 'om_w_1',
+            title: '1. Kefahaman Aliran Operasi & Susun Atur (W1-W4)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal memahami susun atur lantai pengeluaran dan aliran bahan mentah ke produk siap.',
+              2: 'Memahami prinsip asas aliran operasi tetapi memerlukan pemantauan kerap.',
+              3: 'Memahami aliran operasi, stesen kerja dan pengurusan masa operasi dengan tepat.',
+              4: 'Penguasaan mendalam aliran operasi, kapasiti mesin, dan mengenal pasti kekangan (bottleneck) secara proaktif.'
+            }
+          },
+          {
+            id: 'om_w_2',
+            title: '2. Aplikasi Alat & Teknik Pengurusan Operasi',
+            maxScore: 4,
+            levels: {
+              1: 'Tidak menggunakan alat kualiti/lean (5S, Kaizen, Kanban, JIT) dalam tugasan operasi.',
+              2: 'Mengaplikasikan alat operasi secara minimum dan terhad kepada arahan langsung.',
+              3: 'Menggunakan alat pengurusan operasi dengan betul dan konsisten dalam tugasan.',
+              4: 'Sangat mahir mengaplikasi kaedah Lean/JIT, mengenal pasti pembaziran (Muda) dan meningkatkan produktiviti.'
+            }
+          },
+          {
+            id: 'om_w_3',
+            title: '3. Ketepatan & Analisis Laporan Mingguan',
+            maxScore: 4,
+            levels: {
+              1: 'Laporan mingguan tidak lengkap, lewat dihantar, dan tidak mengandungi data operasi.',
+              2: 'Laporan sekadar ringkasan aktiviti harian tanpa analisis teknikal operasi.',
+              3: 'Laporan berstruktur, mengandungi data operasi dan dihantar tepat pada masanya.',
+              4: 'Laporan sangat komprehensif, mengandungi analisis log operasi yang analitikal, reflektif dan disokong data.'
+            }
+          },
+          {
+            id: 'om_w_4',
+            title: '4. Penyelesaian Masalah Operasi & Inisiatif Solusi',
+            maxScore: 4,
+            levels: {
+              1: 'Pasif terhadap masalah operasi dan tiada inisiatif menyelesaikan isu kerja.',
+              2: 'Cuba menyelesaikan masalah rutin tetapi bergantung sepenuhnya kepada bimbingan.',
+              3: 'Berjaya menyelesaikan masalah operasi rutin di lantai industri secara berdikari.',
+              4: 'Proaktif, mencadangkan penyelesaian inovatif untuk mengatasi isu kapasiti dan kawalan kualiti.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Borang Penilaian Kemahiran Insaniah & Etika Profesional (JI - 20%)',
+        evaluator: 'JI',
+        weightagePercent: 20,
+        description: 'Dinilai oleh Jurulatih Industri (JI) berasaskan pemerhatian sikap, etika, dan disiplin pelajar di industri (CLO2, PLO8).',
+        criteria: [
+          {
+            id: 'om_s_1',
+            title: '1. Kehadiran, Ketepatan Masa & Kebergantungan',
+            maxScore: 4,
+            levels: {
+              1: 'Kerap lewat/tidak hadir tanpa sebab munasabah.',
+              2: 'Pernah lewat dan kurang proaktif terhadap masa.',
+              3: 'Hadir tepat pada masanya dan boleh diharap.',
+              4: 'Kehadiran 100%, sangat menepati masa dan berdisiplin tinggi.'
+            }
+          },
+          {
+            id: 'om_s_2',
+            title: '2. Etika Kerja & Pematuhan Keselamatan (OSHA)',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan SOP keselamatan dan etika kerja.',
+              2: 'Mematuhi SOP hanya apabila dipantau rapi.',
+              3: 'Sentiasa mematuhi peraturan dan memakai PPE.',
+              4: 'Teladan dalam amalan 5S, keselamatan dan etika profesional.'
+            }
+          },
+          {
+            id: 'om_s_3',
+            title: '3. Inisiatif & Pembelajaran Kendiri',
+            maxScore: 4,
+            levels: {
+              1: 'Pasif, menunggu arahan dan kurang berminat.',
+              2: 'Melakukan tugasan asas tanpa inisiatif tambahan.',
+              3: 'Menunjukkan minat belajar dan inisiatif menyelesaikan tugas.',
+              4: 'Sangat proaktif, berinisiatif tinggi mencari ilmu dan tugasan baharu.'
+            }
+          },
+          {
+            id: 'om_s_4',
+            title: '4. Kerja Berpasukan & Hubungan Interpersonal',
+            maxScore: 4,
+            levels: {
+              1: 'Sukar bekerjasama dan kerap menimbulkan konflik.',
+              2: 'Kurang berinteraksi dengan rakan sepasukan industri.',
+              3: 'Bekerjasama dengan baik dan menghormati rakan sekerja.',
+              4: 'Pemimpin pasukan yang cemerlang, memotivasi rakan sekerja.'
+            }
+          },
+          {
+            id: 'om_s_5',
+            title: '5. Komunikasi Profesional',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal berkomunikasi dengan jelas dan sopan.',
+              2: 'Komunikasi terhad dan kurang yakin.',
+              3: 'Berkomunikasi secara berkesan dan bertatasusila.',
+              4: 'Komunikasi lisan/bertulis sangat fasih, tepat dan meyakinkan.'
+            }
+          },
+          {
+            id: 'om_s_6',
+            title: '6. Kebolehsuaian & Tanggungjawab (Accountability)',
+            maxScore: 4,
+            levels: {
+              1: 'Mengelak daripada memikul tanggungjawab.',
+              2: 'Mengambil masa lama untuk menyesuaikan diri.',
+              3: 'Mudah menyesuaikan diri dengan budaya kerja syarikat.',
+              4: 'Sangat tangkas (agile), bertanggungjawab penuh atas hasil kerja.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian C',
+        partTitle: 'Borang Penilaian Pembentangan Projek Operasi (TPF - 10%)',
+        evaluator: 'TPF',
+        weightagePercent: 10,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) semasa sesi lawatan industri / pembentangan viva projek operasi (CLO1, PLO3).',
+        criteria: [
+          {
+            id: 'om_p_1',
+            title: '1. Penguasaan Kandungan Teknikal Operasi',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan sistem dan konsep operasi syarikat.',
+              2: 'Penerangan konsep asas operasi kurang mendalam.',
+              3: 'Menerangkan sistem operasi industri dengan jelas dan tepat.',
+              4: 'Penguasaan teknikal cemerlang, sintesis data operasi mantap.'
+            }
+          },
+          {
+            id: 'om_p_2',
+            title: '2. Struktur & Kejelasan Penyampaian',
+            maxScore: 4,
+            levels: {
+              1: 'Penyampaian tidak teratur dan sukar difahami.',
+              2: 'Penyampaian mendatar dan urutan slaid kurang logik.',
+              3: 'Penyampaian tersusun mengikut struktur projek yang baik.',
+              4: 'Penyampaian sangat profesional, menarik dan lancar.'
+            }
+          },
+          {
+            id: 'om_p_3',
+            title: '3. Kualiti Bahan Bantuan Visual (Slaid)',
+            maxScore: 4,
+            levels: {
+              1: 'Slaid teks padat, tidak menarik dan tiada visual operasi.',
+              2: 'Visual minima, format kurang kemas.',
+              3: 'Slaid tersusun, menggunakan carta aliran dan gambar rajah.',
+              4: 'Reka bentuk visual profesional, infografik operasi sangat jelas.'
+            }
+          },
+          {
+            id: 'om_p_4',
+            title: '4. Sesi Soal Jawab (Q&A)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menjawab soalan teknikal panel penilai.',
+              2: 'Jawapan kurang tepat dan teragak-agak.',
+              3: 'Menjawab soalan teknikal dengan tepat dan yakin.',
+              4: 'Jawapan sangat matang, disokong bukti data operasi industri.'
+            }
+          },
+          {
+            id: 'om_p_5',
+            title: '5. Profesionalisme & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Pakaian tidak kemas dan masa pembentangan melebihi had.',
+              2: 'Pengurusan masa kurang memuaskan.',
+              3: 'Menepati masa dan berpakaian profesional.',
+              4: 'Sangat menepati masa, karisma dan etika profesional tinggi.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian D',
+        partTitle: 'Borang Penilaian Laporan Kajian Kes Operasi Industri (TPF - 30%)',
+        evaluator: 'TPF',
+        weightagePercent: 30,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) bagi mengukur kemahiran analitikal dan cadangan penambahbaikan sistem operasi sebenar (CLO1, CLO2, CLO3).',
+        criteria: [
+          {
+            id: 'om_r_1',
+            title: '1. Pengenalan & Pemetaan Aliran Operasi Firma (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Penerangan latar belakang syarikat dan aliran operasi sangat kabur.',
+              2: 'Penerangan asas operasi syarikat tetapi tiada pemetaan proses terperinci.',
+              3: 'Penerangan operasi jelas dengan rajah susun atur dan aliran proses lengkap.',
+              4: 'Gambaran holistik sistem operasi, carta alir nilai (VSM) dan susun atur sangat cemerlang.'
+            }
+          },
+          {
+            id: 'om_r_2',
+            title: '2. Analisis Kekangan & Isu Operasi (Bottleneck) (30%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada data operasi dan gagal mengenal pasti isu kekangan operasi.',
+              2: 'Mengenal pasti isu operasi tetapi analisis data adalah minima.',
+              3: 'Analisis isu operasi (kapasiti, masa kitaran, inventori) disokong data.',
+              4: 'Analisis diagnostik mendalam terhadap bottleneck, pembaziran (Muda) disokong data empirikal.'
+            }
+          },
+          {
+            id: 'om_r_3',
+            title: '3. Penandaarasan Industri (Benchmarking) (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada perbandingan dengan amalan terbaik industri.',
+              2: 'Perbandingan industri terhad dan kurang relevan.',
+              3: 'Membuat penandaarasan amalan operasi terbaik industri (Lean/JIT).',
+              4: 'Penandaarasan komprehensif mengikut piawaian industri global (ISO/Six Sigma/Lean).'
+            }
+          },
+          {
+            id: 'om_r_4',
+            title: '4. Cadangan Penambahbaikan & Pelan Pelaksanaan (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Cadangan tidak praktikal dan tidak menyelesaikan punca masalah.',
+              2: 'Cadangan penyelesaian asas tanpa pelan tindakan yang jelas.',
+              3: 'Cadangan praktikal, menyelesaikan isu operasi dan disertakan jadual.',
+              4: 'Solusi inovatif, analisis kos-faedah (ROI) yang mantap serta pelan pelaksanaan realistik.'
+            }
+          },
+          {
+            id: 'om_r_5',
+            title: '5. Format, Etika & Rujukan Akademik (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Format laporan tidak teratur, tiada rujukan dan plagiarisme tinggi.',
+              2: 'Format laporan sederhana dan senarai rujukan terhad.',
+              3: 'Format mengikut garis panduan fakulti, rujukan relevan dan etika dipatuhi.',
+              4: 'Format laporan sangat profesional, gaya penulisan teknikal tinggi, rujukan piawai terkini.'
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // Course 4: BTMT 2113(i) Brand Management (3 Kredit)
+  'BTMT 2113(i)': {
+    courseCode: 'BTMT 2113(i)',
+    courseName: 'Brand Management',
+    creditHours: 3,
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiTotalPercent: 60,
+    tpfTotalPercent: 40,
+    componentsSummary: [
+      { no: 1, componentName: 'Student Performance Evaluation (Weekly Report)', domain: 'Afektif (A1)', clo: 'CLO3', plo: 'PLO8 (C5)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 40 },
+      { no: 2, componentName: 'Student Performance Evaluation (Soft Skills Rubric)', domain: 'Psikomotor (P2)', clo: 'CLO2', plo: 'PLO3 (C3A)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 20 },
+      { no: 3, componentName: 'Presentation (Pembentangan Projek Penjenamaan)', domain: 'Kognitif (C2)', clo: 'CLO1', plo: 'PLO2 (C2)', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 10 },
+      { no: 4, componentName: 'Case Study Report (Laporan Kajian Kes Penjenamaan)', domain: 'Kognitif & Psikomotor', clo: 'CLO1, 2, 3', plo: 'PLO2, 3, 8', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 30 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Borang Penilaian Prestasi Mingguan & Laporan Penjenamaan (JI - 40%)',
+        evaluator: 'JI',
+        weightagePercent: 40,
+        description: 'Dinilai oleh Jurulatih Industri (JI) di tempat kerja bagi mengukur kebolehan pelajar melaksanakan strategi penjenamaan korporat/produk (CLO3, PLO8).',
+        criteria: [
+          {
+            id: 'bm_w_1',
+            title: '1. Pemahaman Identiti Jenama & Posisi Pasaran (Brand Positioning)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal memahami identiti jenama organisasi dan sasaran posisi pasaran syarikat.',
+              2: 'Memahami identiti asas tetapi memerlukan panduan kerap dalam aktiviti penjenamaan.',
+              3: 'Memahami kedudukan jenama (brand positioning) dan identiti jenama dengan jelas.',
+              4: 'Penguasaan sangat mendalam terhadap ekuiti jenama berasaskan pelanggan (CBBE) dan posisi pasaran unik firma.'
+            }
+          },
+          {
+            id: 'bm_w_2',
+            title: '2. Aplikasi Teknologi & Alat Komunikasi Pemasaran Bersepadu (IMC)',
+            maxScore: 4,
+            levels: {
+              1: 'Tidak mengaplikasikan alat digital/teknologi dalam kempen komunikasi jenama.',
+              2: 'Penggunaan alat teknologi jenama sangat minimum dan terhad kepada arahan langsung.',
+              3: 'Menggunakan alat teknologi dan saluran IMC dengan betul serta konsisten.',
+              4: 'Sangat kreatif mengintegrasikan teknologi digital, media sosial dan kempen IMC bagi membina ekuiti jenama.'
+            }
+          },
+          {
+            id: 'bm_w_3',
+            title: '3. Ketepatan, Struktur & Analisis Laporan Mingguan',
+            maxScore: 4,
+            levels: {
+              1: 'Laporan tidak lengkap, lewat dihantar dan tiada analisis aktiviti jenama.',
+              2: 'Laporan sekadar mencatat log tugas harian tanpa analisis prestasi jenama.',
+              3: 'Laporan lengkap, tersusun rapi, disertakan bukti visual dan dihantar tepat pada masanya.',
+              4: 'Laporan sangat komprehensif, analitikal, mengandungi analisis sentimen jenama dan refleksi strategik.'
+            }
+          },
+          {
+            id: 'bm_w_4',
+            title: '4. Cadangan Strategi Portfolio Jenama & Inisiatif Nilai Tambah',
+            maxScore: 4,
+            levels: {
+              1: 'Bersikap pasif dan tiada cadangan penambahbaikan nilai jenama firma.',
+              2: 'Cadangan penjenamaan asas tanpa pelan peluasan jenama (brand extension) yang jelas.',
+              3: 'Mencadangkan strategi portfolio jenama yang logik dan sesuai dengan pasaran firma.',
+              4: 'Sangat proaktif mencadangkan strategi portfolio dan peluasan jenama yang inovatif, berdaya saing dan bernilai tinggi.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Borang Penilaian Kemahiran Insaniah & Praktikal Teknologi Jenama (JI - 20%)',
+        evaluator: 'JI',
+        weightagePercent: 20,
+        description: 'Dinilai oleh Jurulatih Industri (JI) bagi mengukur kebolehan praktikal pembangunan mekanisme teknologi jenama, disiplin, etika dan kerjasama pasukan (CLO2, PLO3).',
+        criteria: [
+          {
+            id: 'bm_s_1',
+            title: '1. Kehadiran, Disiplin & Ketepatan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Kerap lewat atau tidak hadir tanpa sebab munasabah.',
+              2: 'Pernah lewat dan kurang komited terhadap waktu kerja.',
+              3: 'Sentiasa hadir tepat pada masanya dan berdisiplin.',
+              4: 'Kehadiran 100%, sangat menepati masa dan komitmen kerja cemerlang.'
+            }
+          },
+          {
+            id: 'bm_s_2',
+            title: '2. Etika Kerja & Perlindungan Integriti Jenama Korporat',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan etika dan garis panduan integriti jenama syarikat.',
+              2: 'Mematuhi garis panduan jenama hanya apabila ditegur.',
+              3: 'Sentiasa mematuhi etika profesional dan garis panduan jenama korporat.',
+              4: 'Sangat berintegriti dalam memelihara reputasi jenama dan kerahsiaan strategi organisasi.'
+            }
+          },
+          {
+            id: 'bm_s_3',
+            title: '3. Inisiatif & Kreativiti Pembangunan Aset Jenama',
+            maxScore: 4,
+            levels: {
+              1: 'Pasif, menunggu arahan dan tiada idea kreatif.',
+              2: 'Melaksanakan kerja penjenamaan asas tanpa sebarang inovasi.',
+              3: 'Menunjukkan kreativiti dan inisiatif menghasilkan bahan jenama.',
+              4: 'Sangat inovatif, mencetuskan idea reka bentuk jenama dan kempen kreatif yang berimpak.'
+            }
+          },
+          {
+            id: 'bm_s_4',
+            title: '4. Kerjasama Pasukan & Hubungan Interpersonal',
+            maxScore: 4,
+            levels: {
+              1: 'Sukar bekerjasama dan kerap menimbulkan perselisihan faham.',
+              2: 'Kurang berinteraksi dengan rakan sepasukan pemasaran/operasi.',
+              3: 'Bekerjasama dengan baik dan menghormati rakan sekerja.',
+              4: 'Semangat kerja sepasukan cemerlang, memupuk sinergi kreatif dalam pasukan.'
+            }
+          },
+          {
+            id: 'bm_s_5',
+            title: '5. Komunikasi Profesional & Pembentangan Mesej Jenama',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menyampaikan mesej jenama secara berkesan.',
+              2: 'Komunikasi terhad dan kurang yakin menyampaikan konsep jenama.',
+              3: 'Berkomunikasi secara jelas, sopan dan meyakinkan.',
+              4: 'Sangat fasih, penyampaian mesej jenama menarik dan bertaraf profesional.'
+            }
+          },
+          {
+            id: 'bm_s_6',
+            title: '6. Kebolehsuaian & Akauntabiliti (Accountability)',
+            maxScore: 4,
+            levels: {
+              1: 'Mengelak daripada memikul tanggungjawab penjenamaan.',
+              2: 'Mengambil masa lama untuk menyesuaikan diri dengan budaya firma.',
+              3: 'Mudah menyesuaikan diri dengan persekitaran kerja industri.',
+              4: 'Sangat tangkas (agile), bertanggungjawab penuh ke atas setiap kempen yang diamanahkan.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian C',
+        partTitle: 'Borang Penilaian Pembentangan Projek Pengurusan Jenama (TPF - 10%)',
+        evaluator: 'TPF',
+        weightagePercent: 10,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) semasa sesi lawatan pemantauan industri atau viva pembentangan strategi jenama (CLO1, PLO2).',
+        criteria: [
+          {
+            id: 'bm_p_1',
+            title: '1. Penguasaan Teori & Konsep Pengurusan Jenama',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan konsep ekuiti, resonans dan nilai jenama firma.',
+              2: 'Penerangan konsep jenama terlalu umum dan kurang mendalam.',
+              3: 'Menerangkan strategi penjenamaan dan model resonans jenama dengan tepat.',
+              4: 'Penguasaan konsep jenama sangat mantap, mengaitkan teori akademik dengan konteks industri sebenar.'
+            }
+          },
+          {
+            id: 'bm_p_2',
+            title: '2. Analisis Isu & Prosedur Pelaksanaan Jenama',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menganalisis isu reputasi atau cabaran jenama firma.',
+              2: 'Analisis cabaran jenama kurang menyeluruh dan terhad.',
+              3: 'Menganalisis isu pasaran jenama dan prosedur pelaksanaan secara teratur.',
+              4: 'Analisis diagnostik isu penjenamaan sangat tajam, analitikal dan disokong fakta industri.'
+            }
+          },
+          {
+            id: 'bm_p_3',
+            title: '3. Reka Bentuk Visual & Kualiti Bahan Pembentangan',
+            maxScore: 4,
+            levels: {
+              1: 'Slaid teks padat, reka bentuk tidak kemas dan tiada aset visual jenama.',
+              2: 'Visual jenama minima dan susun atur persembahan kurang menarik.',
+              3: 'Slaid tersusun kemas, menyertakan visual identiti jenama dan carta aliran.',
+              4: 'Reka bentuk persembahan bertaraf agensi kreatif, infografik visual jenama sangat menarik dan profesional.'
+            }
+          },
+          {
+            id: 'bm_p_4',
+            title: '4. Sesi Soal Jawab & Keyakinan Hujah (Q&A)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menjawab soalan penilaian panel TPF.',
+              2: 'Jawapan kurang meyakinkan dan tidak disokong bukti pasaran.',
+              3: 'Menjawab soalan teknikal penjenamaan dengan tepat dan berkeyakinan.',
+              4: 'Menjawab soalan dengan hujah matang, mempertahankan strategi jenama dengan fakta empirikal industri.'
+            }
+          },
+          {
+            id: 'bm_p_5',
+            title: '5. Profesionalisme & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Pakaian tidak mematuhi etika profesional dan melebihi masa.',
+              2: 'Pengurusan masa pembentangan kurang seimbang antara topik.',
+              3: 'Menepati masa dan berpakaian kemas mematuhi etika korporat.',
+              4: 'Sangat menepati had masa, gaya karismatik, berkeyakinan tinggi dan beretika cemerlang.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian D',
+        partTitle: 'Borang Penilaian Laporan Kajian Kes Pengurusan Jenama Industri (TPF - 30%)',
+        evaluator: 'TPF',
+        weightagePercent: 30,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) berdasarkan laporan penuh projek kajian kes penjenamaan korporat dan produk (CLO1, CLO2, CLO3).',
+        criteria: [
+          {
+            id: 'bm_r_1',
+            title: '1. Latar Belakang Organisasi & Audit Ekuiti Jenama (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Latar belakang firma dan audit ekuiti jenama sangat kabur.',
+              2: 'Audit jenama dilaksanakan secara asas tanpa instrumen penilaian jelas.',
+              3: 'Penerangan profil jenama jelas disertakan analisis audit ekuiti jenama yang teratur.',
+              4: 'Audit ekuiti jenama komprehensif, merangkumi rantaian nilai jenama (Brand Value Chain) yang terperinci.'
+            }
+          },
+          {
+            id: 'bm_r_2',
+            title: '2. Analisis Pasaran, Pesaing & Isu Penjenamaan (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada analisis pesaing dan gagal mengenal pasti isu jenama firma.',
+              2: 'Analisis pesaing sangat terhad dan kurang mendalam.',
+              3: 'Analisis kedudukan jenama berbanding pesaing jelas disokong data pasaran.',
+              4: 'Analisis perbandingan pesaing (competitive benchmarking) sangat mendalam, SWOT/TOWS jenama mantap.'
+            }
+          },
+          {
+            id: 'bm_r_3',
+            title: '3. Pembangunan Mekanisme Teknologi Penjenamaan (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada aplikasi teknologi dalam penyelesaian pengurusan jenama.',
+              2: 'Aplikasi teknologi jenama sangat asas tanpa mekanisme pelaksanaan.',
+              3: 'Membangunkan mekanisme teknologi digital penjenamaan yang relevan.',
+              4: 'Mekanisme teknologi penjenamaan sangat inovatif, mengintegrasikan platform digital, sistem CRM dan IMC.'
+            }
+          },
+          {
+            id: 'bm_r_4',
+            title: '4. Cadangan Strategi Portfolio & Peluasan Jenama (20%)',
+            maxScore: 4,
+            levels: {
+              1: 'Cadangan strategi jenama tidak praktikal dan tiada hala tuju.',
+              2: 'Cadangan strategi umum tanpa pelan tindakan portfolio yang jelas.',
+              3: 'Cadangan peluasan jenama (brand extension) dan portfolio praktikal.',
+              4: 'Cadangan portfolio jenama holistik, pelan pengurusan risiko reputasi mantap dan pelan pelaksanaan realistik.'
+            }
+          },
+          {
+            id: 'bm_r_5',
+            title: '5. Format, Etika Penulisan & Rujukan Akademik (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Format tidak teratur, tiada rujukan dan plagiarisme tinggi.',
+              2: 'Format laporan sederhana dan senarai rujukan sangat terhad.',
+              3: 'Format mengikut panduan fakulti, rujukan relevan dan etika dipatuhi.',
+              4: 'Format laporan sangat profesional, gaya penulisan teknikal tinggi, rujukan berwasit edisi terkini.'
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // Course 5: BTMU 4084(i) Final Year Project II (PSM II) (4 Kredit)
+  'BTMU 4084(i)': {
+    courseCode: 'BTMU 4084(i)',
+    courseName: 'Final Year Project II (PSM II)',
+    creditHours: 4,
+    evaluatorRatio: 'JI: 40% | TPF: 60%',
+    jiTotalPercent: 40,
+    tpfTotalPercent: 60,
+    componentsSummary: [
+      { no: 1, componentName: 'General Conduct (Sahsiah, Disiplin & Etika)', domain: 'Afektif (A2) / C5', clo: 'CLO3', plo: 'PLO8 (Etika & Profesionalisme)', evaluator: 'JI (5%) & TPF (5%)', weightPercent: 10 },
+      { no: 2, componentName: 'PSM Seminar & Presentation (Pembentangan & Viva)', domain: 'Afektif & Kognitif / C3C', clo: 'CLO4', plo: 'PLO9 (Komunikasi & Kepimpinan)', evaluator: 'JI (15%) & TPF (15%)', weightPercent: 30 },
+      { no: 3, componentName: 'Research Report (Laporan Akhir Penyelidikan)', domain: 'Kognitif & Psikomotor / C3C, C4B', clo: 'CLO1, 2, 3, 4', plo: 'PLO4, PLO7, PLO8, PLO9', evaluator: 'JI (20%) & TPF (40%)', weightPercent: 60 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Borang Penilaian Sahsiah, Etika & Kebertanggungjawaban (General Conduct - 10%)',
+        evaluator: 'JI & TPF',
+        weightagePercent: 10,
+        description: 'Dinilai secara bersama oleh Jurulatih Industri (JI - 5%) dan Tenaga Pengajar Fakulti / Penyelia (TPF - 5%) (CLO3, PLO8).',
+        criteria: [
+          {
+            id: 'psm_g_1',
+            title: '1. Disiplin Kehadiran, Komitmen & Pertemuan Penyeliaan',
+            maxScore: 4,
+            levels: {
+              1: 'Kerap gagal menghadiri sesi penyeliaan (bersama TPF/JI) tanpa sebab dan sukar dihubungi.',
+              2: 'Menghadiri sesi perbincangan tetapi kurang bersedia dan tidak mematuhi jadual penyelidikan.',
+              3: 'Menghadiri sesi penyeliaan secara konsisten, menepati masa dan membawa kemajuan draf kajian.',
+              4: 'Komitmen luar biasa, 100% menepati masa, proaktif mengatur perbincangan teknikal dan sangat berdisiplin tinggi.'
+            }
+          },
+          {
+            id: 'psm_g_2',
+            title: '2. Etika Penyelidikan & Kerahsiaan Data Industri',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan etika penyelidikan, manipulasi data atau tidak mematuhi kerahsiaan firma.',
+              2: 'Kurang peka terhadap sensitiviti maklumat sulit industri dan prosedur data.',
+              3: 'Mematuhi etika akademik dan menjaga kerahsiaan data organisasi dengan baik.',
+              4: 'Integriti penyelidikan cemerlang, sifar isu etika/plagiarisme dan mematuhi polisi keselamatan data firma sepenuhnya.'
+            }
+          },
+          {
+            id: 'psm_g_3',
+            title: '3. Inisiatif, Sikap Berdikari & Minat Meneroka',
+            maxScore: 4,
+            levels: {
+              1: 'Sangat pasif, menunggu arahan sepenuhnya dan tidak menunjukkan usaha berdikari.',
+              2: 'Menjalankan tugas penyelidikan secara minima dan kurang inisiatif menyelesaikan halangan.',
+              3: 'Menunjukkan usaha berdikari yang baik dalam mencari sumber literatur dan data lapangan.',
+              4: 'Sangat berdikari, proaktif mengatasi kekangan lapangan dan bersemangat tinggi menjayakan projek industri.'
+            }
+          },
+          {
+            id: 'psm_g_4',
+            title: '4. Responsiviti Terhadap Maklum Balas Penyelia',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan teguran dan tidak membetulkan kesilapan yang diarahkan oleh penyelia.',
+              2: 'Mengambil masa terlalu lama untuk membuat pembetulan dan kerap mengulangi ralat.',
+              3: 'Menerima teguran dengan positif dan membetulkan kesilapan mengikut tempoh masa yang dipersetujui.',
+              4: 'Sangat responsif, memproses maklum balas secara matang, kritis dan menyempurnakan penambahbaikan dengan segera.'
+            }
+          },
+          {
+            id: 'psm_g_5',
+            title: '5. Akauntabiliti & Profesionalisme Penyelidikan',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan tanggungjawab projek dan menyalahkan pihak lain atas kelewatan kajian.',
+              2: 'Kurang bertanggungjawab dalam memastikan kualiti draf projek sarjana muda.',
+              3: 'Bertanggungjawab penuh terhadap kualiti data dan ketepatan masa fasa penyelidikan.',
+              4: 'Mempamerkan profesionalisme bertaraf graduan cemerlang, berakauntabiliti tinggi dan beretika murni.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Borang Penilaian Seminar & Pembentangan Projek PSM II (30%)',
+        evaluator: 'JI & TPF',
+        weightagePercent: 30,
+        description: 'Dinilai oleh Jurulatih Industri (JI - 15%) dan Tenaga Pengajar Fakulti (TPF - 15%) semasa sesi Kolokium / Seminar Pembentangan PSM II (CLO4, PLO9).',
+        criteria: [
+          {
+            id: 'psm_p_1',
+            title: '1. Penguasaan Masalah, Objektif & Konteks Industri',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan objektif penyelidikan dan perkaitan isu sebenar di industri.',
+              2: 'Penerangan isu terlalu umum, kurang jelas hala tuju dan konteks firma kabur.',
+              3: 'Menerangkan pernyataan masalah, objektif dan skop kajian dengan jelas dan teratur.',
+              4: 'Penguasaan menyeluruh, menghubungkaitkan jurang praktikal industri dengan objektif penyelidikan secara sangat tuntas.'
+            }
+          },
+          {
+            id: 'psm_p_2',
+            title: '2. Penerangan Metodologi & Kebolehpercayaan Data',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal memperincikan kaedah kutipan data, sampel dan instrumen penyelidikan.',
+              2: 'Penerangan metodologi ada tetapi kabur dari aspek kebolehpercayaan instrumen.',
+              3: 'Menerangkan kaedah pensampelan, pengumpulan data dan teknik analisis data dengan tepat.',
+              4: 'Justifikasi pemilihan metodologi sangat kukuh, saintifik, teliti dan mematuhi piawaian penyelidikan berwasit.'
+            }
+          },
+          {
+            id: 'psm_p_3',
+            title: '3. Pembentangan Analisis Dapatan & Solusi Cadangan',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal membentangkan hasil analisis data dan tiada cadangan penyelesaian masalah firma.',
+              2: 'Pembentangan dapatan terlalu ringkas dan cadangan penyelesaian tidak praktikal.',
+              3: 'Membentangkan hasil analisis data kualitatif/kuantitatif dengan baik dan menyertakan cadangan relevan.',
+              4: 'Pembentangan analisis dapatan sangat mendalam, disokong bukti visual/statistik mantap dan cadangan solusi berimpak tinggi.'
+            }
+          },
+          {
+            id: 'psm_p_4',
+            title: '4. Reka Bentuk Visual Slaid & Kejelasan Penyampaian',
+            maxScore: 4,
+            levels: {
+              1: 'Slaid tidak teratur, teks padat, pembentangan mengelirukan dan suara tidak jelas.',
+              2: 'Slaid ringkas tetapi susun atur hambar, penyampaian mendatar dan kurang meyakinkan.',
+              3: 'Slaid kemas, susunan logik mengikut bab projek, penyampaian jelas dan teratur.',
+              4: 'Reka bentuk visual bertaraf persidangan profesional, infografik data menarik, artikulasi fasih dan sangat berkarisma.'
+            }
+          },
+          {
+            id: 'psm_p_5',
+            title: '5. Sesi Soal Jawab & Pertahanan Hujah (Viva Q&A)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menjawab soalan panel penilai atau memberikan jawapan yang bertentangan dengan data.',
+              2: 'Jawapan teragak-agak, kurang tepat dan tidak disokong bukti analisis projek.',
+              3: 'Menjawab soalan panel penilai dengan tenang, tepat, yakin dan berasaskan fakta kajian.',
+              4: 'Mempertahankan hujah secara intelektual, kritis, matang dan menguasai setiap aspek penyelidikan secara cemerlang.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian C',
+        partTitle: 'Borang Penilaian Laporan Akhir Penyelidikan PSM II (60%)',
+        evaluator: 'JI & TPF',
+        weightagePercent: 60,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF - 40%) dan Jurulatih Industri (JI - 20%) berdasarkan manuskrip laporan akhir PSM II.',
+        criteria: [
+          {
+            id: 'psm_r_1',
+            title: 'Bab 1: Pengenalan & Pernyataan Masalah (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Latar belakang kabur, isu industri tidak berasas dan tiada objektif jelas.',
+              2: 'Pernyataan masalah ada tetapi kurang mengaitkan dengan isu sebenar firma industri.',
+              3: 'Latar belakang jelas, isu operasi firma dihuraikan dengan baik dan objektif berfokus.',
+              4: 'Justifikasi masalah industri sangat tajam, disokong data awal firma dan objektif SMART yang cemerlang.'
+            }
+          },
+          {
+            id: 'psm_r_2',
+            title: 'Bab 2: Sorotan Literatur & Kerangka Konseptual (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada sorotan literatur berkaitan dan tiada kerangka teori/konseptual kajian.',
+              2: 'Rujukan literatur terhad, sumber lapuk dan kerangka konseptual kurang mantap.',
+              3: 'Sorotan literatur relevan daripada jurnal berwasit terkini dan kerangka konseptual jelas.',
+              4: 'Sintesis literatur sangat kritikal, menghubungkan teori akademik dengan praktikal industri dan kerangka kajian kukuh.'
+            }
+          },
+          {
+            id: 'psm_r_3',
+            title: 'Bab 3: Metodologi & Instrumen Kutipan Data (20%)',
+            maxScore: 4,
+            levels: {
+              1: 'Reka bentuk penyelidikan tidak tepat, instrumen tiada dan kaedah kutipan data kabur.',
+              2: 'Metodologi diterangkan secara asas tanpa bukti pengujian kesahan dan kebolehpercayaan.',
+              3: 'Kaedah pensampelan, prosedur kutipan data dan instrumen kajian dihuraikan dengan tepat.',
+              4: 'Reka bentuk kajian saintifik mantap, protokol kutipan data industri teliti dan instrumen disahkan secara ketat.'
+            }
+          },
+          {
+            id: 'psm_r_4',
+            title: 'Bab 4: Analisis Data Kualitatif / Kuantitatif (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada analisis data atau analisis yang dibuat sepenuhnya salah dan mengelirukan.',
+              2: 'Analisis data sangat asas, banyak kesilapan statistik/tematik dan tafsiran cetek.',
+              3: 'Analisis data dijalankan dengan kaedah yang betul dan dapatan dihuraikan secara tersusun.',
+              4: 'Analisis data sangat mendalam (analisis statistik mantap / analisis tematik rapi), visualisasi data profesional dan tafsiran ilmiah.'
+            }
+          },
+          {
+            id: 'psm_r_5',
+            title: 'Bab 5: Cadangan Penyelesaian & Implikasi Industri (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada cadangan penyelesaian atau cadangan tidak menyelesaikan objektif kajian.',
+              2: 'Cadangan terlalu umum dan sukar diaplikasikan dalam konteks firma penempatan.',
+              3: 'Cadangan penyelesaian masalah praktikal, realistik dan menjawab objektif penyelidikan.',
+              4: 'Solusi yang dicadangkan sangat inovatif, mempunyai nilai komersial/penjimatan kos, disertakan pelan pelaksanaan industri.'
+            }
+          },
+          {
+            id: 'psm_r_6',
+            title: 'Format, Gaya Penulisan, Rujukan & Integriti (10%)',
+            maxScore: 4,
+            levels: {
+              1: 'Format tidak mengikut Buku Panduan PSM UTeM, rujukan tidak lengkap dan plagiarisme tinggi.',
+              2: 'Format penulisan sederhana, senarai rujukan terhad dan gaya penulisan kurang kemas.',
+              3: 'Format mematuhi Buku Panduan PSM FPTT, rujukan mengikut gaya APA dan etika dipatuhi.',
+              4: 'Gaya penulisan teknikal cemerlang, tatabahasa rapi, rujukan jurnal autoritatif terkini dan sifar isu integriti akademik.'
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // Course 6: BTMT 3273(i) Digital Entrepreneurship (3 Kredit)
+  'BTMT 3273(i)': {
+    courseCode: 'BTMT 3273(i)',
+    courseName: 'Digital Entrepreneurship',
+    creditHours: 3,
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiTotalPercent: 60,
+    tpfTotalPercent: 40,
+    componentsSummary: [
+      { no: 1, componentName: 'Student Performance Evaluation (Weekly Report / Tasks)', domain: 'Kognitif', clo: 'CLO3', plo: 'PLO8 (C5)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 40 },
+      { no: 2, componentName: 'Student Performance Evaluation (Soft Skill Rubric)', domain: 'Afektif (A5)', clo: 'CLO2', plo: 'PLO7 (C4B)', evaluator: 'Jurulatih Industri (JI)', weightPercent: 20 },
+      { no: 3, componentName: 'Presentation (Pembentangan Keusahawanan Digital)', domain: 'Kognitif (C6)', clo: 'CLO1', plo: 'PLO2 (C2)', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 10 },
+      { no: 4, componentName: 'Case Study Report (Laporan Kajian Kes Keusahawanan)', domain: 'Psikomotor (P7)', clo: 'CLO1, 2, 3', plo: 'PLO2, 7, 8', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 30 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Borang Penilaian Prestasi Mingguan & Projek Keusahawanan Digital (JI - 40%)',
+        evaluator: 'JI',
+        weightagePercent: 40,
+        description: 'Dinilai oleh Jurulatih Industri (JI) berdasarkan pelaksanaan tugasan mingguan Minggu 1 hingga Minggu 5 di organisasi (CLO3, PLO8).',
+        criteria: [
+          {
+            id: 'de_w_1',
+            title: '1. Pemahaman Ekosistem Perniagaan Digital & Model Permulaan',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal memahami ekosistem digital syarikat dan keperluan undang-undang e-dagang.',
+              2: 'Memahami asas perniagaan digital tetapi memerlukan bimbingan kerap dalam audit operasi.',
+              3: 'Berjaya memetakan ekosistem perniagaan digital dan audit operasi syarikat dengan jelas.',
+              4: 'Penguasaan menyeluruh model perniagaan digital inovatif serta analisis landskap ekonomi firma yang tajam.'
+            }
+          },
+          {
+            id: 'de_w_2',
+            title: '2. Pembangunan Digital Business Model Canvas (BMC) & UVP',
+            maxScore: 4,
+            levels: {
+              1: 'Draf BMC digital tidak teratur dan cadangan nilai kabur.',
+              2: 'Draf BMC asas tetapi strategi pengewangan kurang realistik.',
+              3: 'Membangunkan Digital BMC yang lengkap dengan cadangan nilai dan perkongsian strategik jelas.',
+              4: 'Digital BMC bertaraf industri termaju, strategi pengewangan bernas dan segmentasi pasaran tepat.'
+            }
+          },
+          {
+            id: 'de_w_3',
+            title: '3. Pemasaran Media Sosial, Copywriting Kreatif & E-Pasaran',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada kemahiran copywriting dan gagal menguruskan saluran e-pasaran syarikat.',
+              2: 'Copywriting asas dan kandungan media sosial kurang menarik perhatian sasaran.',
+              3: 'Menghasilkan bahan pengiklanan digital yang kreatif serta menguruskan kedai e-pasaran dengan baik.',
+              4: 'Kandungan visual dan copywriting sangat berimpak tinggi, pengurusan pesanan pantas dan kadar penglibatan cemerlang.'
+            }
+          },
+          {
+            id: 'de_w_4',
+            title: '4. Prestasi Perniagaan Digital, ROI & Laporan Projek',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada analisis prestasi jualan/ROI dan laporan projek tidak lengkap.',
+              2: 'Laporan sekadar mencatat data jualan asas tanpa cadangan penambahbaikan.',
+              3: 'Analisis metrik prestasi perniagaan digital jelas disokong data analitik yang tepat.',
+              4: 'Analisis pulangan pelaburan (ROI) dan cadangan masa hadapan perniagaan sangat mantap dan berdaya saing.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Borang Penilaian Kemahiran Insaniah & Sikap Keusahawanan (JI - 20%)',
+        evaluator: 'JI',
+        weightagePercent: 20,
+        description: 'Dinilai oleh Jurulatih Industri (JI) bagi mengukur kebolehan kepimpinan, komunikasi, daya tahan dan minda keusahawanan pelajar (CLO2, PLO7).',
+        criteria: [
+          {
+            id: 'de_s_1',
+            title: '1. Kehadiran, Disiplin & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Kerap lewat atau mengabaikan jadual kerja firma.',
+              2: 'Menepati waktu kerja tetapi kurang proaktif dalam pengurusan tugasan.',
+              3: 'Sentiasa hadir tepat pada masanya, berdisiplin dan menepati tarikh akhir.',
+              4: 'Kehadiran 100%, komitmen luar biasa dan menjadi contoh disiplin kepada rakan sekerja.'
+            }
+          },
+          {
+            id: 'de_s_2',
+            title: '2. Minda Keusahawanan (Entrepreneurial Mindset) & Inisiatif',
+            maxScore: 4,
+            levels: {
+              1: 'Pasif, hanya menunggu arahan tanpa minat mencipta peluang.',
+              2: 'Melakukan tugasan rutin tanpa sebarang inisiatif nilai tambah.',
+              3: 'Menunjukkan inisiatif proaktif dalam meneroka peluang perniagaan baharu.',
+              4: 'Daya keusahawanan sangat tinggi, sentiasa berfikir di luar kotak dan mencadangkan solusi perniagaan berimpak.'
+            }
+          },
+          {
+            id: 'de_s_3',
+            title: '3. Kemahiran Komunikasi Pelanggan & Rakan Niaga',
+            maxScore: 4,
+            levels: {
+              1: 'Komunikasi lemah dan kerap menimbulkan salah faham dengan pelanggan.',
+              2: 'Komunikasi asas tetapi kurang meyakinkan dalam rundingan perniagaan.',
+              3: 'Berkomunikasi secara profesional, sopan dan meyakinkan pelanggan.',
+              4: 'Sangat petah, kemahiran perundingan cemerlang dan berjaya membina hubungan pelanggan jangka panjang.'
+            }
+          },
+          {
+            id: 'de_s_4',
+            title: '4. Kerja Berpasukan & Kepimpinan Projek',
+            maxScore: 4,
+            levels: {
+              1: 'Sukar bekerjasama dalam pasukan dan mengabaikan matlamat bersama.',
+              2: 'Bekerjasama hanya apabila diarahkan secara terhad.',
+              3: 'Bekerjasama dengan baik, menyokong rakan sepasukan dan berkongsi idea.',
+              4: 'Ciri kepimpinan cemerlang, memupuk semangat sinergi dan memimpin projek ke arah kejayaan.'
+            }
+          },
+          {
+            id: 'de_s_5',
+            title: '5. Kebolehsuaian (Agility) & Daya Tahan Pasaran',
+            maxScore: 4,
+            levels: {
+              1: 'Mudah putus asa apabila kempen digital tidak mencapai sasaran.',
+              2: 'Mengambil masa lama untuk menyesuaikan diri dengan perubahan pasaran.',
+              3: 'Mampu menangani cabaran pasaran dan mengubah suai taktik dengan pantas.',
+              4: 'Sangat tangkas (resilient & agile), positif menghadapi kegagalan dan pantas mencari penyelesaian alternatif.'
+            }
+          },
+          {
+            id: 'de_s_6',
+            title: '6. Etika Perniagaan Digital & Integriti Transaksi',
+            maxScore: 4,
+            levels: {
+              1: 'Mengabaikan etika perniagaan dan privasi transaksi pelanggan.',
+              2: 'Mematuhi etika hanya apabila diawasi ketat.',
+              3: 'Sentiasa mengutamakan kejujuran dan pematuhan transaksi selamat.',
+              4: 'Integriti perniagaan bertaraf tinggi, telus dan mempertahankan amanah pelanggan serta syarikat sepenuhnya.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian C',
+        partTitle: 'Borang Penilaian Pembentangan Keusahawanan Digital (TPF - 10%)',
+        evaluator: 'TPF',
+        weightagePercent: 10,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) semasa lawatan industri atau sesi pembentangan viva (CLO1, PLO2).',
+        criteria: [
+          {
+            id: 'de_p_1',
+            title: '1. Penguasaan Konsep Perniagaan Digital & Model Permulaan',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menerangkan konsep perniagaan digital dan model yang dicadangkan.',
+              2: 'Penerangan model perniagaan terlalu umum dan kurang hujah teknikal.',
+              3: 'Menerangkan konsep, pasaran sasaran dan cadangan nilai dengan jelas.',
+              4: 'Penguasaan teori dan praktikal digital keusahawanan sangat mantap dan mengagumkan.'
+            }
+          },
+          {
+            id: 'de_p_2',
+            title: '2. Demonstrasi Platform E-Dagang & Strategi Pengiklanan',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada demonstrasi platform dan tiada bukti kempen pemasaran digital.',
+              2: 'Demonstrasi platform tidak lancar dan data jualan kurang jelas.',
+              3: 'Menunjukkan platform e-dagang dan bukti kempen pengiklanan yang beroperasi.',
+              4: 'Demonstrasi sangat profesional, platform berfungsi sepenuhnya dengan bukti interaksi pelanggan aktif.'
+            }
+          },
+          {
+            id: 'de_p_3',
+            title: '3. Kualiti Slaid & Bahasa Pembentangan',
+            maxScore: 4,
+            levels: {
+              1: 'Slaid tidak kemas, teks terlalu padat dan bahasa kurang lancar.',
+              2: 'Slaid ringkas tetapi visual kurang menarik perhatian.',
+              3: 'Slaid tersusun kemas, visual menarik dan penyampaian lancar.',
+              4: 'Reka bentuk persembahan bertaraf eksekutif, infografik data kemas dan artikulasi fasih.'
+            }
+          },
+          {
+            id: 'de_p_4',
+            title: '4. Sesi Soal Jawab & Pertahanan Model Bisnes (Q&A)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal menjawab soalan panel penilai mengenai model perniagaan.',
+              2: 'Jawapan teragak-agak dan kurang berasaskan fakta operasi syarikat.',
+              3: 'Menjawab soalan panel penilai dengan yakin dan berasaskan pengalaman kerja.',
+              4: 'Mempertahankan model perniagaan secara kritis, matang dan berpandukan data pasaran kukuh.'
+            }
+          },
+          {
+            id: 'de_p_5',
+            title: '5. Penampilan & Pengurusan Masa',
+            maxScore: 4,
+            levels: {
+              1: 'Pakaian tidak sesuai dan masa pembentangan melebihi had.',
+              2: 'Pengurusan masa kurang seimbang antara topik perbincangan.',
+              3: 'Menepati masa dan berpakaian kemas mematuhi etika korporat.',
+              4: 'Pengurusan masa cemerlang, berkarisma tinggi dan mempamerkan etika profesional teladan.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian D',
+        partTitle: 'Borang Penilaian Laporan Kajian Kes Keusahawanan Digital (TPF - 30%)',
+        evaluator: 'TPF',
+        weightagePercent: 30,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) berdasarkan laporan penuh projek kajian kes keusahawanan digital (CLO1, CLO2, CLO3).',
+        criteria: [
+          {
+            id: 'de_r_1',
+            title: '1. Pengenalan Organisasi & Audit Perniagaan Digital (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Latar belakang syarikat dan audit perniagaan digital sangat kabur.',
+              2: 'Audit perniagaan dilaksanakan secara asas tanpa bukti operasi jelas.',
+              3: 'Penerangan latar belakang dan audit operasi digital firma dihuraikan dengan teratur.',
+              4: 'Audit perniagaan digital komprehensif, merangkumi analisis rantaian nilai e-dagang terperinci.'
+            }
+          },
+          {
+            id: 'de_r_2',
+            title: '2. Pembangunan Digital Business Model Canvas (BMC) (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Digital BMC tidak lengkap dan tiada strategi pengewangan.',
+              2: 'Digital BMC asas tetapi blok hubungan pelanggan dan saluran kurang jelas.',
+              3: 'Digital BMC lengkap, cadangan nilai dan rakan strategik dikenal pasti dengan tepat.',
+              4: 'Digital BMC sangat inovatif, disokong analisis kebolehlaksanaan pasaran dan unjuran kewangan realistik.'
+            }
+          },
+          {
+            id: 'de_r_3',
+            title: '3. Pelaksanaan Kempen Pemasaran Media Sosial & E-Pasaran (25%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada bukti kempen pemasaran digital dan operasi e-pasaran tidak dilaksanakan.',
+              2: 'Kempen pemasaran dilaksanakan secara minimum tanpa analisis ROI.',
+              3: 'Kempen media sosial dan pengurusan e-pasaran dihuraikan dengan bukti pelaksanaan jelas.',
+              4: 'Kempen pemasaran digital sangat kreatif, integrasi omnichannel mantap dengan bukti data jualan konkrit.'
+            }
+          },
+          {
+            id: 'de_r_4',
+            title: '4. Analisis Prestasi Digital, Metrik & Cadangan Skalabiliti (20%)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada metrik prestasi digital dan tiada pelan pertumbuhan syarikat.',
+              2: 'Metrik digital asas tanpa cerapan strategi masa hadapan.',
+              3: 'Analisis metrik prestasi (trafik, penukaran, jualan) jelas beserta cadangan pertumbuhan.',
+              4: 'Analisis prestasi mendalam berasaskan data sebenar, pelan skalabiliti perniagaan bernilai tinggi dan berdaya maju.'
+            }
+          },
+          {
+            id: 'de_r_5',
+            title: '5. Format, Gaya Penulisan & Rujukan Industri (15%)',
+            maxScore: 4,
+            levels: {
+              1: 'Format tidak teratur, tiada rujukan dan plagiarisme tinggi.',
+              2: 'Format laporan sederhana dan senarai rujukan terhad.',
+              3: 'Format mematuhi panduan fakulti, rujukan relevan dan bahasa kemas.',
+              4: 'Laporan bertaraf dokumen pelaburan profesional, visualisasi kemas dan rujukan terkini.'
+            }
+          }
+        ]
+      }
+    ]
+  },
+
+  // Course 7: BTMU 4066(i) Technopreneurship Portfolio (6 Kredit)
+  'BTMU 4066(i)': {
+    courseCode: 'BTMU 4066(i)',
+    courseName: 'Technopreneurship Portfolio',
+    creditHours: 6,
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiTotalPercent: 60,
+    tpfTotalPercent: 40,
+    componentsSummary: [
+      { no: 1, componentName: 'Portfolio Content & Technical Verification', domain: 'Kognitif & Psikomotor (C4, P4)', clo: 'CLO1, CLO2', plo: 'PLO6, PLO8', evaluator: 'Jurulatih Industri (JI)', weightPercent: 60 },
+      { no: 2, componentName: 'Portfolio Academic & Impact Evaluation', domain: 'Afektif (A3)', clo: 'CLO3', plo: 'PLO9', evaluator: 'Tenaga Pengajar Fakulti (TPF)', weightPercent: 40 }
+    ],
+    parts: [
+      {
+        partCode: 'Bahagian A',
+        partTitle: 'Pengesahan Kandungan Teknikal Portfolio (JI - 60%)',
+        evaluator: 'JI',
+        weightagePercent: 60,
+        description: 'Dinilai oleh Jurulatih Industri (JI) bagi mengesahkan pelaksanaan sebenar projek inovasi dan impak teknikal di premis firma.',
+        criteria: [
+          {
+            id: 'tp_ji_1',
+            title: '1. Pengecaman Masalah & Pengesahan Proses Operasi (CLO1)',
+            maxScore: 4,
+            levels: {
+              1: 'Gagal mendokumentasikan masalah operasi firma secara terperinci.',
+              2: 'Masalah dikenal pasti tetapi kurang evidens pelaksanaan di industri.',
+              3: 'Proses pengecaman masalah disahkan dengan bukti dokumentasi yang baik.',
+              4: 'Dokumentasi masalah sangat komprehensif, disokong data sebenar dan disahkan sepenuhnya oleh JI.'
+            }
+          },
+          {
+            id: 'tp_ji_2',
+            title: '2. Pembangunan Solusi Inovasi Teknopreneur (CLO2)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada pembangunan penyelesaian inovasi yang bermakna bagi syarikat.',
+              2: 'Solusi asas tanpa integrasi kemahiran teknikal yang mencukupi.',
+              3: 'Membangunkan solusi inovasi yang berfungsi dan menyelesaikan isu operasi.',
+              4: 'Solusi inovasi bertaraf tinggi, memacu kecekapan operasi dan menghasilkan nilai tambah nyata kepada firma.'
+            }
+          },
+          {
+            id: 'tp_ji_3',
+            title: '3. Pelaksanaan & Pengujian Solusi di Industri (CLO3)',
+            maxScore: 4,
+            levels: {
+              1: 'Solusi tidak diuji di persekitaran operasi sebenar.',
+              2: 'Pengujian minimum tanpa metrik pengukuran prestasi yang jelas.',
+              3: 'Solusi berjaya diuji dan dilaksanakan di lantai operasi industri.',
+              4: 'Pelaksanaan solusi berjaya sepenuhnya, melepasi standard piawaian industri dengan rekod pengujian lengkap.'
+            }
+          }
+        ]
+      },
+      {
+        partCode: 'Bahagian B',
+        partTitle: 'Penilaian Akademik & Impak Portfolio (TPF - 40%)',
+        evaluator: 'TPF',
+        weightagePercent: 40,
+        description: 'Dinilai oleh Tenaga Pengajar Fakulti (TPF) bagi menilai kematangan penulisan portfolio saintifik dan impak projek inovasi.',
+        criteria: [
+          {
+            id: 'tp_tpf_1',
+            title: '1. Kualiti Penulisan Teknikal & Saintifik Portfolio (CLO2)',
+            maxScore: 4,
+            levels: {
+              1: 'Penulisan tidak teratur, hujah kabur dan tiada struktur portfolio.',
+              2: 'Penulisan portfolio sederhana dan kekurangan data saintifik sokongan.',
+              3: 'Penulisan teknikal kemas, mengikut garis panduan buku panduan WBL UTeM.',
+              4: 'Penulisan bertaraf profesional tinggi, hujah saintifik mantap dan struktur dokumentasi sempurna.'
+            }
+          },
+          {
+            id: 'tp_tpf_2',
+            title: '2. Analisis Impak & Kemampanan Solusi Teknopreneur (CLO3)',
+            maxScore: 4,
+            levels: {
+              1: 'Tiada penilaian impak terhadap penyelesaian yang dicadangkan.',
+              2: 'Penilaian impak terhad kepada aspek kos asas tanpa unjuran kemampanan.',
+              3: 'Analisis impak dihuraikan dengan data pulangan pelaburan dan faedah firma yang jelas.',
+              4: 'Analisis impak sangat analitikal, berpandangan jauh, mempunyai potensi komersial dan kemampanan jangka panjang.'
+            }
+          }
+        ]
+      }
+    ]
+  }
+};
