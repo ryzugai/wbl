@@ -1196,12 +1196,200 @@ export const StorageService = {
       const raw = localStorage.getItem(STORAGE_KEYS.LOGBOOKS);
       if (raw) {
         const parsed = JSON.parse(raw) as WeeklyLogbook[];
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           inMemoryLogbooks = parsed;
           return parsed;
         }
       }
     } catch {}
+
+    // Seed default demo logbooks if none exist so all roles can immediately test and review
+    if (inMemoryLogbooks.length === 0) {
+      const demoLogs: WeeklyLogbook[] = [
+        {
+          id: 'logbook_demo_1',
+          studentId: 'student_demo_1',
+          studentName: 'Muhammad Amirul bin Razak',
+          studentMatric: 'B062110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          companyName: 'PETRONAS Digital Sdn Bhd',
+          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          weekNumber: 1,
+          startDate: '2026-09-08',
+          endDate: '2026-09-12',
+          totalHours: 40,
+          entries: [
+            {
+              id: 'entry_demo_1_1',
+              day: 'Isnin',
+              date: '2026-09-08',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Digital Operations & IT Enterprise',
+              tasks: 'Sesi suai kenal bersama Jurulatih Industri dan pasukan IT. Taklimat keselamatan industri, pengenalan sistem tiket ITIL, dan penetapan stesen kerja.',
+              learningOutcomes: 'Memahami carta organisasi bahagian IT syarikat, prosedur keselamatan siber korporat, dan protokol komunikasi dalaman.',
+              toolsUsed: 'Microsoft Teams, Jira Service Management, Cisco AnyConnect VPN',
+              remarks: 'Semua prosedur orientasi selesai dengan baik.'
+            },
+            {
+              id: 'entry_demo_1_2',
+              day: 'Selasa',
+              date: '2026-09-09',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Cloud Solutions & Infrastructure',
+              tasks: 'Membantu jurutera awan mengkonfigurasi persekitaran ujian staging pada portal AWS dan Azure. Meneliti dokumentasi senibina pelayan awan.',
+              learningOutcomes: 'Mempelajari konsep Infrastructure as Code (IaC) dan struktur penempatan perkhidmatan awan hibrid.',
+              toolsUsed: 'AWS Management Console, Terraform, Visual Studio Code',
+              remarks: 'Berjaya melancarkan instans ujian mengikut spesifikasi.'
+            },
+            {
+              id: 'entry_demo_1_3',
+              day: 'Rabu',
+              date: '2026-09-10',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Cloud Solutions & Infrastructure',
+              tasks: 'Menjalankan diagnostik kesihatan sistem dan semakan log pelayan pangkalan data. Menyediakan laporan ringkas penggunaan sumber CPU & memori.',
+              learningOutcomes: 'Kemahiran menganalisis metrik prestasi pelayan dan mengesan latensi dalam sistem pengeluaran.',
+              toolsUsed: 'Datadog, Prometheus, Grafana Dashboard',
+              remarks: 'Tiada ralat kritikal dikesan.'
+            },
+            {
+              id: 'entry_demo_1_4',
+              day: 'Khamis',
+              date: '2026-09-11',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Software Quality Assurance',
+              tasks: 'Menyertai ujian penerimaan pengguna (UAT) bagi modul pengurusan inventori digital syarikat. Merekodkan pepijat dan mengesahkan patch kemas kini.',
+              learningOutcomes: 'Mengaplikasikan kaedah ujian regresi dan dokumentasi kes ujian (test cases) mengikut piawaian industri.',
+              toolsUsed: 'Postman API Client, Jira Bug Tracker, Selenium Webdriver',
+              remarks: 'Menjumpai 2 isu kecil susun atur responsif dan telah dilaporkan kepada pembangun.'
+            },
+            {
+              id: 'entry_demo_1_5',
+              day: 'Jumaat',
+              date: '2026-09-12',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Digital Operations & IT Enterprise',
+              tasks: 'Mengemas kini pangkalan pengetahuan (knowledge base) teknikal untuk panduan pengguna baru. Sesi semakan mingguan bersama jurulatih industri.',
+              learningOutcomes: 'Kemahiran penulisan dokumentasi teknikal yang jelas serta kemahiran komunikasi profesional semasa pembentangan kemajuan kerja.',
+              toolsUsed: 'Confluence Wiki, Microsoft SharePoint, MS Office 365',
+              remarks: 'Jurulatih industri memberikan maklum balas positif terhadap inisiatif pembelajaran.'
+            }
+          ],
+          weeklySummary: 'Minggu pertama latihan industri di PETRONAS Digital memberi pendedahan menyeluruh terhadap ekosistem teknologi perusahaan. Saya telah berjaya membiasakan diri dengan aliran kerja harian dan persekitaran ITIL.',
+          status: 'verified',
+          submittedAt: '2026-09-12T17:45:00.000Z',
+          verifiedByTrainerId: 'trainer_azman',
+          trainerName: 'En. Azman bin Khalid',
+          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
+          trainerCompany: 'PETRONAS Digital Sdn Bhd',
+          trainerEmail: 'azman.khalid@petronas.com',
+          trainerPhone: '012-3849102',
+          trainerRating: 'cemerlang',
+          trainerComments: 'Pelajar menunjukkan sikap inisiatif yang sangat cemerlang, pantas mempelajari alat baharu, dan sentiasa mematuhi prosedur kerja syarikat.',
+          verifiedAt: '2026-09-13T10:30:00.000Z',
+          supervisorName: 'Dr. Mohd Guzairy bin Abd Ghani',
+          supervisorComments: 'Perkembangan awal yang sangat memuaskan. Teruskan usaha dan terapkan teori pengurusan teknologi dalam tugasan harian.',
+          supervisorReviewedAt: '2026-09-14T09:15:00.000Z',
+          createdAt: '2026-09-08T08:00:00.000Z',
+          updatedAt: '2026-09-14T09:15:00.000Z'
+        },
+        {
+          id: 'logbook_demo_2',
+          studentId: 'student_demo_1',
+          studentName: 'Muhammad Amirul bin Razak',
+          studentMatric: 'B062110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          companyName: 'PETRONAS Digital Sdn Bhd',
+          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          weekNumber: 2,
+          startDate: '2026-09-15',
+          endDate: '2026-09-19',
+          totalHours: 40,
+          entries: [
+            {
+              id: 'entry_demo_2_1',
+              day: 'Isnin',
+              date: '2026-09-15',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Data Analytics & AI Engineering',
+              tasks: 'Mempelajari pipeline pengekstrakan data (ETL) menggunakan Apache Spark. Melakukan pembersihan dataset jualan bulanan.',
+              learningOutcomes: 'Memahami teknik data wrangling dan pengesahan kualiti data sebelum dimasukkan ke dalam model analitik.',
+              toolsUsed: 'Python, Pandas, Jupyter Notebook, Apache Spark',
+              remarks: 'Berjaya membersihkan 95% data tidak lengkap.'
+            },
+            {
+              id: 'entry_demo_2_2',
+              day: 'Selasa',
+              date: '2026-09-16',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Data Analytics & AI Engineering',
+              tasks: 'Membangunkan papan pemuka (dashboard) visualisasi KPI operasi menggunakan Power BI.',
+              learningOutcomes: 'Pendedahan kepada reka bentuk visualisasi data yang mesra eksekutif (Executive BI Reporting).',
+              toolsUsed: 'Power BI Desktop, SQL Server Management Studio',
+              remarks: 'Menerima maklum balas daripada pasukan kanan untuk menambah penapis tarikh dinamik.'
+            },
+            {
+              id: 'entry_demo_2_3',
+              day: 'Rabu',
+              date: '2026-09-17',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Digital Operations & IT Enterprise',
+              tasks: 'Menyertai taklimat pengurusan insiden keselamatan siber (SOC). Mengkaji corak percubaan pencerobohan sistem.',
+              learningOutcomes: 'Memahami rangka kerja tindak balas insiden (NIST Incident Response) dan analisis forensik log keselamatan.',
+              toolsUsed: 'Splunk Enterprise SIEM, Wireshark',
+              remarks: 'Latihan simulasi ancaman keselamatan dijalankan dengan jayanya.'
+            },
+            {
+              id: 'entry_demo_2_4',
+              day: 'Khamis',
+              date: '2026-09-18',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'DevOps & Continuous Integration',
+              tasks: 'Menulis skrip automasi pengujian kod dalam pipeline GitHub Actions. Menguji binaan aplikasi mudah alih dalaman.',
+              learningOutcomes: 'Menguasai konsep CI/CD dan automasi semakan kualiti kod (SonarQube analysis).',
+              toolsUsed: 'GitHub Actions, Docker, SonarQube, YAML',
+              remarks: 'Pipeline berjaya diintegrasikan dengan cawangan staging.'
+            },
+            {
+              id: 'entry_demo_2_5',
+              day: 'Jumaat',
+              date: '2026-09-19',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'DevOps & Continuous Integration',
+              tasks: 'Melakukan semakan kod (code review) dan dokumentasi penambahbaikan pipeline. Menyelesaikan ringkasan aktiviti mingguan untuk semakan jurulatih.',
+              learningOutcomes: 'Kemahiran bekerjasama dalam pasukan kejuruteraan perisian dan pematuhan standard pengekodan.',
+              toolsUsed: 'Git, GitHub Enterprise, Markdown',
+              remarks: 'Logbook dihantar tepat pada waktu untuk pengesahan jurulatih industri.'
+            }
+          ],
+          weeklySummary: 'Minggu kedua memberi tumpuan kepada kejuruteraan data dan automasi CI/CD. Saya mempelajari banyak alatan baharu yang digunakan secara meluas di peringkat perusahaan.',
+          status: 'submitted',
+          submittedAt: '2026-09-19T17:30:00.000Z',
+          trainerName: 'En. Azman bin Khalid',
+          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
+          trainerCompany: 'PETRONAS Digital Sdn Bhd',
+          trainerEmail: 'azman.khalid@petronas.com',
+          trainerPhone: '012-3849102',
+          createdAt: '2026-09-15T08:00:00.000Z',
+          updatedAt: '2026-09-19T17:30:00.000Z'
+        }
+      ];
+
+      inMemoryLogbooks = demoLogs;
+      safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, demoLogs);
+      return demoLogs;
+    }
+
     return inMemoryLogbooks;
   },
 
@@ -1463,6 +1651,112 @@ export const StorageService = {
     } catch {}
 
     return updated;
+  },
+
+  directVerifyWeeklyLogbook: async (id: string, trainer: {
+    trainerId: string;
+    trainerName: string;
+    trainerPosition?: string;
+    trainerCompany?: string;
+    trainerEmail?: string;
+    trainerPhone?: string;
+    trainerRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+    trainerComments?: string;
+  }): Promise<WeeklyLogbook> => {
+    return StorageService.verifyWeeklyLogbook(id, {
+      trainerName: trainer.trainerName,
+      trainerPosition: trainer.trainerPosition || 'Jurulatih Industri (Industry Coach)',
+      trainerCompany: trainer.trainerCompany,
+      trainerComments: trainer.trainerComments?.trim() || 'Disahkan aktiviti harian dan kemahiran industri pelajar telah disemak, menepati sukatan latihan dan memuaskan.',
+      trainerRating: trainer.trainerRating || 'cemerlang',
+      verifiedByTrainerId: trainer.trainerId,
+      trainerEmail: trainer.trainerEmail,
+      trainerPhone: trainer.trainerPhone
+    });
+  },
+
+  addSupervisorReview: async (id: string, review: {
+    supervisorId: string;
+    supervisorName: string;
+    supervisorStaffId?: string;
+    supervisorComments: string;
+  }): Promise<WeeklyLogbook> => {
+    const all = StorageService.getWeeklyLogbooks();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log tidak dijumpai.');
+
+    const now = new Date().toISOString();
+    const updated: WeeklyLogbook = {
+      ...target,
+      supervisorId: review.supervisorId,
+      supervisorName: review.supervisorName,
+      supervisorStaffId: review.supervisorStaffId,
+      supervisorComments: review.supervisorComments,
+      supervisorReviewedAt: now,
+      updatedAt: now
+    };
+
+    const newAll = all.map(l => l.id === id ? updated : l);
+    inMemoryLogbooks = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'weekly_logbooks', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.error('Cloud sync error for supervisor review:', e);
+      }
+    }
+
+    // Send notification to student
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: review.supervisorName,
+        title_ms: `Ulasan Penyelia Fakulti - Minggu ${updated.weekNumber}`,
+        title_en: `Faculty Supervisor Review - Week ${updated.weekNumber}`,
+        message_ms: `Penyelia Fakulti (${review.supervisorName}) telah menyemak logbook harian anda bagi Minggu ${updated.weekNumber} dan memberikan maklum balas pemantauan.`,
+        message_en: `Faculty Supervisor (${review.supervisorName}) reviewed your Week ${updated.weekNumber} logbook and provided feedback.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      await StorageService.logActivity(
+        currentUser.id,
+        currentUser.username,
+        currentUser.role,
+        currentUser.name,
+        'SUPERVISOR_LOGBOOK_REVIEW',
+        `Menyemak dan memberi ulasan pemantauan pada Logbook Minggu ${updated.weekNumber} bagi pelajar ${updated.studentName}.`,
+        `Reviewed and commented on Week ${updated.weekNumber} Logbook for student ${updated.studentName}.`
+      );
+    }
+
+    return updated;
+  },
+
+  sendTrainerVerificationReminder: async (logbookId: string, senderName: string): Promise<void> => {
+    const all = StorageService.getWeeklyLogbooks();
+    const target = all.find(l => l.id === logbookId);
+    if (!target) throw new Error('Buku log tidak ditemui.');
+
+    const now = new Date().toISOString();
+    await StorageService.createNotification({
+      recipient_id: target.verifiedByTrainerId || 'trainer',
+      recipient_role: UserRole.TRAINER,
+      sender_name: senderName,
+      title_ms: `Peringatan: Pengesahan Logbook Diperlukan - Minggu ${target.weekNumber}`,
+      title_en: `Reminder: Logbook Verification Needed - Week ${target.weekNumber}`,
+      message_ms: `Peringatan daripada Penyelaras WBL (${senderName}): Sila buat pengesahan bagi Log Latihan Harian Minggu ${target.weekNumber} untuk pelajar ${target.studentName} (${target.studentMatric}) di ${target.companyName}.`,
+      message_en: `Reminder from WBL Coordinator (${senderName}): Please verify Week ${target.weekNumber} Daily Training Log for ${target.studentName} at ${target.companyName}.`,
+      is_read: false,
+      created_at: now
+    });
   },
 
   deleteWeeklyLogbook: async (id: string): Promise<void> => {

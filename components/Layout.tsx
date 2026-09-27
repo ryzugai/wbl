@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole, Notification } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2 } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -63,7 +63,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
 
   const isCoordinator = currentUser.role === UserRole.COORDINATOR;
   const isJKWBL = currentUser.is_jkwbl === true;
-  const isLecturer = currentUser.role === UserRole.LECTURER;
+  const isSupervisor = currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR;
+  const isLecturer = isSupervisor;
+  const isTrainer = currentUser.role === UserRole.TRAINER;
   const isStudent = currentUser.role === UserRole.STUDENT;
   const hasSystemAccess = isCoordinator || isJKWBL;
 
@@ -179,17 +181,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           )}
 
           {/* Logbook Verification for Industry Trainers */}
-          {currentUser.role === UserRole.TRAINER && (
-             <NavItem view="dailyLogbook" label={t(language, 'logbookVerification')} icon={UserCheck} />
+          {isTrainer && (
+             <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pengesahan Log Harian' : 'Logbook Verification'} icon={CheckCircle2} />
           )}
 
-          {/* Logbook Review & Monitoring for Lecturers & Coordinator */}
-          {(hasSystemAccess || isLecturer) && (
-             <NavItem view="dailyLogbook" label={t(language, 'logbook')} icon={BookOpen} />
+          {/* Logbook Review & Monitoring for Faculty Supervisors (Penyelia Fakulti) */}
+          {isSupervisor && !hasSystemAccess && (
+             <NavItem view="dailyLogbook" label={language === 'ms' ? 'Buku Log Pelajar Seliaan' : 'Supervised Logbooks'} icon={BookOpen} />
           )}
 
-          {/* New Tab for Lecturers to see their students */}
-          {(isLecturer || hasSystemAccess) && (
+          {/* Logbook Cohort Oversight for WBL Coordinator & JKWBL */}
+          {hasSystemAccess && (
+             <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pemantauan Buku Log' : 'Logbook Monitoring'} icon={BookOpen} />
+          )}
+
+          {/* Tab for Lecturers/Supervisors to see their students */}
+          {(isSupervisor || hasSystemAccess) && (
             <NavItem view="supervised" label={t(language, 'supervisedTab')} icon={UsersRound} />
           )}
 

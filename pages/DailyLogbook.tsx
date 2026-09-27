@@ -5,7 +5,8 @@ import { generateWeeklyLogbookPrint } from '../utils/logbookGenerator';
 import { 
   BookOpen, Calendar, Clock, CheckCircle2, AlertCircle, FileText, 
   Printer, Send, Save, Plus, Trash2, Edit3, UserCheck, ShieldCheck, 
-  Building2, MessageSquare, Star, ArrowRight, Eye, RefreshCw, ChevronDown, ChevronUp, Search, Filter
+  Building2, MessageSquare, Star, ArrowRight, Eye, RefreshCw, ChevronDown, ChevronUp, Search, Filter,
+  Zap, Bell, Check, Award, Info, ExternalLink, User as UserIcon
 } from 'lucide-react';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
@@ -25,13 +26,14 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
   users,
   language
 }) => {
+  // Roles
   const isStudent = currentUser.role === UserRole.STUDENT;
   const isTrainer = currentUser.role === UserRole.TRAINER;
-  const isLecturer = currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR;
-  const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl === true;
-  const canVerify = isTrainer || isCoordinator || isLecturer;
+  const isSupervisor = currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR;
+  const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl === true || (currentUser as any).is_admin === true;
+  const canVerify = isTrainer || isCoordinator || isSupervisor;
 
-  // Student placement information
+  // Student placement information (for student workspace)
   const studentPlacementApp = useMemo(() => {
     if (!isStudent) return null;
     return applications.find(a => 
@@ -46,22 +48,41 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
   const [logbooks, setLogbooks] = useState<WeeklyLogbook[]>([]);
   const [selectedWeekNumber, setSelectedWeekNumber] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'my_logbook' | 'verification_queue'>('my_logbook');
+  const [activeTab, setActiveTab] = useState<'my_logbook' | 'verification_queue'>(
+    isStudent ? 'my_logbook' : 'verification_queue'
+  );
 
-  // Active weekly log state (for student or editor)
+  // Active weekly log state (for student editor)
   const [currentWeekLog, setCurrentWeekLog] = useState<WeeklyLogbook | null>(null);
 
-  // Review modal state (for Trainer/Supervisor)
+  // Review modal state (for detailed inspection by Trainer, Supervisor, Coordinator)
   const [reviewingLogbook, setReviewingLogbook] = useState<WeeklyLogbook | null>(null);
   const [trainerComments, setTrainerComments] = useState('');
   const [trainerRating, setTrainerRating] = useState<'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan'>('cemerlang');
   const [revisionNotes, setRevisionNotes] = useState('');
   const [isRevisionMode, setIsRevisionMode] = useState(false);
 
-  // Filter state for coordinator / trainer list
+  // Supervisor Review note state inside review modal
+  const [supervisorCommentsInput, setSupervisorCommentsInput] = useState('');
+
+  // 1-Click Direct Verify Modal for Industry Trainer
+  const [directVerifyTarget, setDirectVerifyTarget] = useState<WeeklyLogbook | null>(null);
+  const [directRating, setDirectRating] = useState<'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan'>('cemerlang');
+  const [directComments, setDirectComments] = useState(
+    'Disahkan aktiviti latihan harian dan kemahiran industri pelajar telah disemak, menepati sukatan latihan dan memuaskan.'
+  );
+
+  // Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [studentFilter, setStudentFilter] = useState<string>('all');
+  
+  // Scope filter: 'my_scope' (Pelajar Seliaan / Syarikat Saya) vs 'all' (Semua Pelajar)
+  const [scopeFilter, setScopeFilter] = useState<'my_scope' | 'all'>(
+    (isSupervisor || isTrainer) ? 'my_scope' : 'all'
+  );
+
+  // Trainer Verification Filter (Specifically for Penyelaras to audit verification status)
+  const [trainerVerifyFilter, setTrainerVerifyFilter] = useState<'all' | 'unverified' | 'verified' | 'revision' | 'draft'>('all');
 
   // Reload logbooks
   const loadLogbooks = () => {
@@ -255,7 +276,6 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
   const handleSubmitWeekly = async () => {
     if (!currentWeekLog) return;
 
-    // Basic validation
     if (!currentWeekLog.startDate || !currentWeekLog.endDate) {
       toast.error(language === 'ms' 
         ? 'Sila masukkan tarikh mula dan tarikh akhir minggu latihan.' 
@@ -279,10 +299,8 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
 
     setIsSaving(true);
     try {
-      // First ensure it is saved
       const saved = await StorageService.saveWeeklyLogbook(currentWeekLog);
       
-      // Then submit
       const submitted = await StorageService.submitWeeklyLogbook(saved.id, {
         name: currentWeekLog.trainerName,
         email: currentWeekLog.trainerEmail,
@@ -309,16 +327,55 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
     generateWeeklyLogbookPrint(target, currentUser, language);
   };
 
-  // Open Review Modal (Trainer/Coordinator)
+  // Open Full Review Modal (Trainer / Supervisor / Coordinator)
   const handleOpenReview = (logbook: WeeklyLogbook) => {
     setReviewingLogbook(logbook);
     setTrainerComments(logbook.trainerComments || '');
     setTrainerRating(logbook.trainerRating || 'cemerlang');
     setRevisionNotes('');
     setIsRevisionMode(false);
+    setSupervisorCommentsInput(logbook.supervisorComments || '');
   };
 
-  // Confirm Verification
+  // Open 1-Click Direct Verify Modal for Industry Trainer
+  const handleOpenDirectVerify = (logbook: WeeklyLogbook) => {
+    setDirectVerifyTarget(logbook);
+    setDirectRating('cemerlang');
+    setDirectComments('Disahkan aktiviti latihan harian dan kemahiran industri pelajar telah disemak, menepati sukatan latihan dan memuaskan.');
+  };
+
+  // Confirm 1-Click Direct Verification
+  const handleConfirmDirectVerify = async () => {
+    if (!directVerifyTarget) return;
+    setIsSaving(true);
+    try {
+      const verified = await StorageService.directVerifyWeeklyLogbook(directVerifyTarget.id, {
+        trainerId: currentUser.id,
+        trainerName: currentUser.name,
+        trainerPosition: currentUser.company_position || currentUser.company_affiliation || 'Jurulatih Industri (Industry Coach)',
+        trainerCompany: currentUser.company_affiliation || directVerifyTarget.companyName,
+        trainerEmail: currentUser.email,
+        trainerPhone: currentUser.phone,
+        trainerRating: directRating,
+        trainerComments: directComments
+      });
+
+      loadLogbooks();
+      setDirectVerifyTarget(null);
+      if (reviewingLogbook?.id === directVerifyTarget.id) {
+        setReviewingLogbook(verified);
+      }
+      toast.success(language === 'ms' 
+        ? `⚡ Logbook Minggu ${verified.weekNumber} bagi ${verified.studentName} berjaya DISAHKAN DIRECT!` 
+        : `⚡ Week ${verified.weekNumber} logbook for ${verified.studentName} directly verified!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal membuat pengesahan direct');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Confirm Standard Verification inside detailed review modal
   const handleConfirmVerification = async () => {
     if (!reviewingLogbook) return;
     if (!trainerComments.trim()) {
@@ -379,57 +436,117 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
     }
   };
 
-  // Filtered logbooks for Verification Queue
+  // Save Supervisor Review & Comments (Penyelia Universiti)
+  const handleSaveSupervisorReview = async () => {
+    if (!reviewingLogbook) return;
+    if (!supervisorCommentsInput.trim()) {
+      toast.error(language === 'ms' ? 'Sila masukkan ulasan atau catatan pemantauan.' : 'Please enter supervisor comments.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const updated = await StorageService.addSupervisorReview(reviewingLogbook.id, {
+        supervisorId: currentUser.id,
+        supervisorName: currentUser.name,
+        supervisorStaffId: currentUser.staff_id,
+        supervisorComments: supervisorCommentsInput.trim()
+      });
+      loadLogbooks();
+      setReviewingLogbook(updated);
+      toast.success(language === 'ms' ? 'Ulasan pemantauan penyelia universiti berjaya disimpan!' : 'Supervisor review comments saved!');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menyimpan ulasan');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Send Reminder to Industry Trainer (Penyelaras / Supervisor)
+  const handleSendReminder = async (log: WeeklyLogbook) => {
+    try {
+      await StorageService.sendTrainerVerificationReminder(log.id, currentUser.name);
+      toast.success(language === 'ms' 
+        ? `Peringatan pengesahan telah dihantar kepada jurulatih industri (${log.trainerName || 'Jurulatih Penempatan'})!` 
+        : `Verification reminder sent to industry coach!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghantar peringatan');
+    }
+  };
+
+  // Filtered logbooks for Verification & Monitoring Queue
   const queueLogbooks = useMemo(() => {
     return logbooks.filter(l => {
-      // If trainer, prioritize their company or verified items
-      if (isTrainer) {
-        const trainerComp = (currentUser.company_affiliation || '').trim().toLowerCase();
-        const matchesComp = !trainerComp || (l.companyName && l.companyName.trim().toLowerCase().includes(trainerComp));
-        const matchesSelf = l.verifiedByTrainerId === currentUser.id;
-        if (!matchesComp && !matchesSelf) return false;
+      // 1. Role Scope Filter
+      if (scopeFilter === 'my_scope') {
+        if (isSupervisor) {
+          // Match supervised students
+          const studentUser = users.find(u => u.id === l.studentId || u.matric_no === l.studentMatric);
+          const isMyById = studentUser?.faculty_supervisor_id === currentUser.id;
+          const isMyByName = studentUser?.faculty_supervisor_name && studentUser.faculty_supervisor_name.trim().toLowerCase() === currentUser.name.trim().toLowerCase();
+          const isMyInApps = applications.some(a => 
+            (a.student_id === l.studentMatric || a.created_by === studentUser?.username) &&
+            (a.faculty_supervisor_id === currentUser.id || (a.faculty_supervisor_name && a.faculty_supervisor_name.trim().toLowerCase() === currentUser.name.trim().toLowerCase()))
+          );
+          if (!isMyById && !isMyByName && !isMyInApps) return false;
+        } else if (isTrainer) {
+          const trainerComp = (currentUser.company_affiliation || '').trim().toLowerCase();
+          const matchesComp = !trainerComp || (l.companyName && l.companyName.trim().toLowerCase().includes(trainerComp));
+          const matchesSelf = l.verifiedByTrainerId === currentUser.id || (l.trainerName && l.trainerName.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
+          if (!matchesComp && !matchesSelf) return false;
+        }
       }
 
-      // Search query filter
+      // 2. Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesSearch = 
           (l.studentName && l.studentName.toLowerCase().includes(q)) ||
           (l.studentMatric && l.studentMatric.toLowerCase().includes(q)) ||
           (l.companyName && l.companyName.toLowerCase().includes(q)) ||
+          (l.trainerName && l.trainerName.toLowerCase().includes(q)) ||
           (`minggu ${l.weekNumber}`.includes(q));
         if (!matchesSearch) return false;
       }
 
-      // Status filter
-      if (statusFilter !== 'all' && l.status !== statusFilter) {
-        return false;
+      // 3. Trainer Verification Status Filter (Crucial for Penyelaras: semak status pengesahan jurulatih industri)
+      if (trainerVerifyFilter === 'unverified') {
+        // Submitted but not verified by trainer
+        if (l.status !== 'submitted') return false;
+      } else if (trainerVerifyFilter === 'verified') {
+        // Verified by trainer
+        if (l.status !== 'verified') return false;
+      } else if (trainerVerifyFilter === 'revision') {
+        if (l.status !== 'revision') return false;
+      } else if (trainerVerifyFilter === 'draft') {
+        if (l.status !== 'draft') return false;
       }
 
-      // Student filter
+      // 4. Student filter
       if (studentFilter !== 'all' && l.studentId !== studentFilter) {
         return false;
       }
 
       return true;
     }).sort((a, b) => {
-      // Pending first, then by week
+      // Pending unverified first, then by week
       if (a.status === 'submitted' && b.status !== 'submitted') return -1;
       if (b.status === 'submitted' && a.status !== 'submitted') return 1;
       return b.weekNumber - a.weekNumber;
     });
-  }, [logbooks, isTrainer, currentUser, searchQuery, statusFilter, studentFilter]);
+  }, [logbooks, scopeFilter, isSupervisor, isTrainer, currentUser, users, applications, searchQuery, trainerVerifyFilter, studentFilter]);
 
-  // Stats for Queue
+  // Overall Statistics for Queue
   const queueStats = useMemo(() => {
-    const total = queueLogbooks.length;
-    const pending = queueLogbooks.filter(l => l.status === 'submitted').length;
-    const verified = queueLogbooks.filter(l => l.status === 'verified').length;
-    const revision = queueLogbooks.filter(l => l.status === 'revision').length;
-    return { total, pending, verified, revision };
-  }, [queueLogbooks]);
+    const total = logbooks.length;
+    const unverifiedByTrainer = logbooks.filter(l => l.status === 'submitted').length;
+    const verifiedByTrainer = logbooks.filter(l => l.status === 'verified').length;
+    const revision = logbooks.filter(l => l.status === 'revision').length;
+    const draft = logbooks.filter(l => l.status === 'draft').length;
+    const verifiedPct = total > 0 ? Math.round((verifiedByTrainer / total) * 100) : 0;
+    return { total, unverifiedByTrainer, verifiedByTrainer, revision, draft, verifiedPct };
+  }, [logbooks]);
 
-  // Unique students in queue for filter dropdown
+  // Unique students in logbooks for filter dropdown
   const uniqueStudents = useMemo(() => {
     const map = new Map<string, string>();
     logbooks.forEach(l => {
@@ -442,37 +559,47 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+            <span className="p-2.5 bg-blue-100 text-blue-700 rounded-xl">
               <BookOpen size={24} />
             </span>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-              {t(language, 'logbookTitle')}
+              {isCoordinator ? (language === 'ms' ? 'Pemantauan Buku Log Pelajar (Penyelaras WBL)' : 'Logbook Cohort Oversight') :
+               isSupervisor ? (language === 'ms' ? 'Buku Log Pelajar Seliaan (Penyelia Universiti)' : 'Supervised Students Logbook') :
+               isTrainer ? (language === 'ms' ? 'Pengesahan Log Latihan Harian (Jurulatih Industri)' : 'Daily Training Log Verification') :
+               t(language, 'logbookTitle')}
             </h2>
           </div>
-          <p className="text-sm text-slate-500 mt-1 max-w-2xl">
-            {t(language, 'logbookDesc')}
+          <p className="text-sm text-slate-500 mt-1 max-w-3xl">
+            {isCoordinator ? (language === 'ms' 
+              ? 'Memantau setiap buku log harian pelajar merentas seluruh kohort, menyemak status pengesahan jurulatih industri, dan memastikan pematuhan silibus WBL.'
+              : 'Monitor every student daily logbook across the cohort, check industry trainer verification status, and ensure WBL syllabus compliance.') :
+             isSupervisor ? (language === 'ms'
+              ? 'Akses dan semak buku log aktiviti harian pelajar seliaan anda, semak status pengesahan jurulatih industri, dan tinggalkan catatan pemantauan penyelia.'
+              : 'Access and review supervised students daily logbooks, check industry coach endorsement, and leave supervisory feedback.') :
+             isTrainer ? (language === 'ms'
+              ? 'Akses buku log pelajar industri di syarikat anda dan buat pengesahan secara terus (Direct Verify 1-Klik) bagi aktiviti serta pembelajaran mingguan.'
+              : 'Access student logbooks and directly verify daily activities and weekly reflections with 1-click endorsement.') :
+             t(language, 'logbookDesc')}
           </p>
         </div>
 
-        {/* View Toggle Tabs for Trainers / Coordinators / Lecturers */}
-        {canVerify && (
+        {/* View Toggle Tabs for Student vs Queue */}
+        {canVerify && isStudent && (
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
-            {isStudent && (
-              <button
-                onClick={() => setActiveTab('my_logbook')}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  activeTab === 'my_logbook' 
-                    ? 'bg-white text-blue-700 shadow-sm font-black' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {language === 'ms' ? 'Logbook Saya' : 'My Logbook'}
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('my_logbook')}
+              className={`px-4 py-2 rounded-lg transition-all ${
+                activeTab === 'my_logbook' 
+                  ? 'bg-white text-blue-700 shadow-sm font-black' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {language === 'ms' ? 'Logbook Saya' : 'My Logbook'}
+            </button>
             <button
               onClick={() => setActiveTab('verification_queue')}
               className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
@@ -483,9 +610,9 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
             >
               <UserCheck size={14} />
               <span>{language === 'ms' ? 'Semakan & Pengesahan' : 'Review & Verification'}</span>
-              {queueStats.pending > 0 && (
-                <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full">
-                  {queueStats.pending}
+              {queueStats.unverifiedByTrainer > 0 && (
+                <span className="ml-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                  {queueStats.unverifiedByTrainer}
                 </span>
               )}
             </button>
@@ -599,169 +726,236 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                 currentWeekLog.status === 'verified' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
                 currentWeekLog.status === 'submitted' ? 'bg-blue-50 border-blue-200 text-blue-800' :
                 currentWeekLog.status === 'revision' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                'bg-slate-50 border-slate-200 text-slate-700'
+                'bg-slate-100 border-slate-200 text-slate-700'
               }`}>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white shadow-sm shrink-0">
-                    {currentWeekLog.status === 'verified' ? <CheckCircle2 className="text-emerald-600" size={24} /> :
-                     currentWeekLog.status === 'submitted' ? <Clock className="text-blue-600" size={24} /> :
-                     currentWeekLog.status === 'revision' ? <AlertCircle className="text-amber-600" size={24} /> :
-                     <Edit3 className="text-slate-600" size={24} />}
-                  </div>
+                  <span className="p-2 rounded-xl bg-white shadow-sm">
+                    {currentWeekLog.status === 'verified' ? <CheckCircle2 className="text-emerald-600" size={20} /> :
+                     currentWeekLog.status === 'submitted' ? <Clock className="text-blue-600" size={20} /> :
+                     currentWeekLog.status === 'revision' ? <AlertCircle className="text-amber-600" size={20} /> :
+                     <FileText className="text-slate-500" size={20} />}
+                  </span>
                   <div>
                     <h4 className="font-bold text-sm">
-                      {currentWeekLog.status === 'verified' ? (language === 'ms' ? 'Logbook Telah Disahkan Oleh Jurulatih Industri' : 'Logbook Verified by Industry Coach') :
-                       currentWeekLog.status === 'submitted' ? (language === 'ms' ? 'Logbook Telah Dihantar - Menunggu Pengesahan Jurulatih Industri' : 'Submitted - Pending Coach Verification') :
-                       currentWeekLog.status === 'revision' ? (language === 'ms' ? 'Pembetulan Diperlukan Oleh Jurulatih Industri' : 'Revision Required by Industry Coach') :
-                       (language === 'ms' ? 'Draf Mingguan - Sedia untuk direkod setiap hari' : 'Weekly Draft - Ready to record daily')}
+                      {currentWeekLog.status === 'verified' ? (language === 'ms' ? 'Status: DISAHKAN OLEH JURULATIH INDUSTRI' : 'Status: VERIFIED BY INDUSTRY COACH') :
+                       currentWeekLog.status === 'submitted' ? (language === 'ms' ? 'Status: MENUNGGU PENGESAHAN JURULATIH INDUSTRI' : 'Status: PENDING TRAINER VERIFICATION') :
+                       currentWeekLog.status === 'revision' ? (language === 'ms' ? 'Status: PERLU PEMBETULAN OLEH PELAJAR' : 'Status: REVISION REQUESTED') :
+                       (language === 'ms' ? 'Status: DRAF (BELUM DIHANTAR)' : 'Status: DRAFT (NOT SUBMITTED)')}
                     </h4>
-                    <p className="text-xs opacity-90">
-                      {currentWeekLog.status === 'verified' 
-                        ? `${language === 'ms' ? 'Disahkan pada' : 'Verified on'} ${currentWeekLog.verifiedAt ? new Date(currentWeekLog.verifiedAt).toLocaleDateString() : '-'} ${language === 'ms' ? 'oleh' : 'by'} ${currentWeekLog.trainerName || 'Jurulatih Industri'}`
-                        : currentWeekLog.status === 'submitted' 
-                        ? (language === 'ms' ? 'Dihantar pada ' + (currentWeekLog.submittedAt ? new Date(currentWeekLog.submittedAt).toLocaleDateString() : '-') : 'Submitted')
-                        : currentWeekLog.status === 'revision'
-                        ? (language === 'ms' ? 'Nota Jurulatih: ' + (currentWeekLog.revisionNotes || 'Sila kemaskini maklumat tugasan.') : 'Revision requested.')
-                        : (language === 'ms' ? 'Isi tugasan harian anda dan klik "Hantar Pengesahan Mingguan" pada akhir minggu.' : 'Fill daily tasks and click submit at week end.')}
+                    <p className="text-xs opacity-90 mt-0.5">
+                      {currentWeekLog.status === 'verified' && currentWeekLog.verifiedAt
+                        ? `${language === 'ms' ? 'Disahkan pada' : 'Verified at'} ${new Date(currentWeekLog.verifiedAt).toLocaleDateString()} ${language === 'ms' ? 'oleh' : 'by'} ${currentWeekLog.trainerName || 'Jurulatih Industri'}`
+                        : currentWeekLog.status === 'submitted'
+                        ? (language === 'ms' ? 'Logbook telah dihantar. Jurulatih industri boleh menyemak dan mengesahkan secara terus.' : 'Submitted. Industry coach can verify directly.')
+                        : (language === 'ms' ? 'Isi aktiviti harian dari Isnin hingga Jumaat dan hantar pada hujung minggu.' : 'Complete daily tasks and submit at end of week.')}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-auto">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handlePrintLogbook(currentWeekLog)}
-                    className="px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                    type="button"
+                    onClick={() => handlePrintLogbook()}
+                    className="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1.5 shadow-sm"
                   >
                     <Printer size={14} className="text-blue-600" />
-                    <span>{language === 'ms' ? 'Muat Turun PDF' : 'Download PDF'}</span>
+                    <span>{language === 'ms' ? 'Cetak / Muat Turun' : 'Print / Download'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Week Date Configuration */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <Calendar size={16} className="text-blue-600" />
-                  <span>{language === 'ms' ? 'Tetapan Tempoh Minggu ' + currentWeekLog.weekNumber : 'Week ' + currentWeekLog.weekNumber + ' Date Settings'}</span>
+              {/* Revision Instructions Banner (if revision requested) */}
+              {currentWeekLog.status === 'revision' && currentWeekLog.revisionNotes && (
+                <div className="bg-amber-100/80 border-l-4 border-amber-600 p-4 rounded-xl text-amber-900 text-xs">
+                  <div className="font-bold mb-1 flex items-center gap-1.5">
+                    <AlertCircle size={14} className="text-amber-700" />
+                    <span>{language === 'ms' ? 'Catatan Pembetulan daripada Jurulatih Industri:' : 'Revision Notes from Industry Coach:'}</span>
+                  </div>
+                  <p className="italic bg-white/70 p-2.5 rounded-lg border border-amber-200">{currentWeekLog.revisionNotes}</p>
+                </div>
+              )}
+
+              {/* Endorsement Details Banner (if verified) */}
+              {currentWeekLog.status === 'verified' && (
+                <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck size={16} className="text-emerald-600" />
+                      {language === 'ms' ? 'Maklumat Pengesahan Jurulatih Industri:' : 'Industry Coach Verification Endorsement:'}
+                    </span>
+                    <span className="px-2.5 py-0.5 bg-emerald-200 text-emerald-900 rounded-full text-[10px] font-black uppercase">
+                      Gred: {currentWeekLog.trainerRating?.toUpperCase() || 'CEMERLANG'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-slate-500 font-medium">{language === 'ms' ? 'Jurulatih Industri:' : 'Coach Name:'} </span>
+                      <strong className="text-slate-800">{currentWeekLog.trainerName || '-'}</strong>
+                      {currentWeekLog.trainerPosition && <div className="text-[11px] text-slate-500">{currentWeekLog.trainerPosition}</div>}
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-medium">{language === 'ms' ? 'Syarikat / Organisasi:' : 'Company:'} </span>
+                      <strong className="text-slate-800">{currentWeekLog.companyName}</strong>
+                    </div>
+                  </div>
+
+                  {currentWeekLog.trainerComments && (
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 text-xs text-slate-700">
+                      <span className="font-bold text-slate-600">{language === 'ms' ? 'Ulasan Jurulatih:' : 'Coach Feedback:'} </span>
+                      <span className="italic">"{currentWeekLog.trainerComments}"</span>
+                    </div>
+                  )}
+
+                  {currentWeekLog.supervisorComments && (
+                    <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 text-xs text-blue-900">
+                      <span className="font-bold text-blue-700">{language === 'ms' ? 'Catatan Penyelia Universiti:' : 'Faculty Supervisor Notes:'} </span>
+                      <span className="italic">"{currentWeekLog.supervisorComments}"</span>
+                      {currentWeekLog.supervisorName && (
+                        <div className="text-[10px] text-blue-600 mt-1">Oleh: {currentWeekLog.supervisorName}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Week Metadata Form Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <h4 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 flex items-center justify-between">
+                  <span>{language === 'ms' ? 'Maklumat Minggu Latihan' : 'Training Week Details'}</span>
+                  <span className="text-xs font-normal text-slate-400">Minggu {currentWeekLog.weekNumber}</span>
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {language === 'ms' ? 'Tarikh Mula (Isnin)' : 'Start Date (Monday)'}
+                      {language === 'ms' ? 'Tarikh Mula (Isnin):' : 'Start Date (Mon):'}
                     </label>
                     <input
                       type="date"
-                      value={currentWeekLog.startDate}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCurrentWeekLog({ ...currentWeekLog, startDate: val });
-                        handleAutoFillDates(val);
-                      }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={currentWeekLog.startDate || ''}
+                      onChange={(e) => handleAutoFillDates(e.target.value)}
+                      disabled={currentWeekLog.status === 'verified'}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {language === 'ms' ? 'Tarikh Akhir (Jumaat/Sabtu)' : 'End Date'}
+                      {language === 'ms' ? 'Tarikh Akhir (Jumaat):' : 'End Date (Fri):'}
                     </label>
                     <input
                       type="date"
-                      value={currentWeekLog.endDate}
+                      value={currentWeekLog.endDate || ''}
                       onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, endDate: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      disabled={currentWeekLog.status === 'verified'}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {language === 'ms' ? 'Jumlah Jam Seminggu' : 'Total Hours'}
+                      {language === 'ms' ? 'Nama Jurulatih Industri:' : 'Industry Coach Name:'}
                     </label>
                     <input
-                      type="number"
-                      value={currentWeekLog.totalHours || 40}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, totalHours: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder="40"
+                      type="text"
+                      placeholder="cth: En. Azman bin Khalid"
+                      value={currentWeekLog.trainerName || ''}
+                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerName: e.target.value })}
+                      disabled={currentWeekLog.status === 'verified'}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                      {language === 'ms' ? 'Jawatan Jurulatih:' : 'Coach Position:'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="cth: Pengurus IT / Jurutera Kanan"
+                      value={currentWeekLog.trainerPosition || ''}
+                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerPosition: e.target.value })}
+                      disabled={currentWeekLog.status === 'verified'}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Daily Log Entries List */}
+              {/* Daily Log Entries Cards */}
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <FileText size={16} className="text-blue-600" />
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <Clock size={18} className="text-blue-600" />
                     <span>{language === 'ms' ? 'Rekod Aktiviti Harian' : 'Daily Activity Records'}</span>
-                    <span className="text-xs font-normal text-slate-500">
-                      ({currentWeekLog.entries.length} {language === 'ms' ? 'hari' : 'days'})
-                    </span>
                   </h4>
 
-                  <button
-                    onClick={handleAddDay}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-                  >
-                    <Plus size={14} />
-                    <span>{language === 'ms' ? 'Tambah Hari' : 'Add Day'}</span>
-                  </button>
+                  {currentWeekLog.status !== 'verified' && (
+                    <button
+                      type="button"
+                      onClick={handleAddDay}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                    >
+                      <Plus size={14} />
+                      <span>{language === 'ms' ? 'Tambah Hari' : 'Add Day'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {currentWeekLog.entries.map((entry, index) => (
-                  <div key={entry.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:border-slate-300">
-                    {/* Day Card Header */}
-                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2">
-                      <div className="flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
+                  <div key={entry.id || index} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
                           {index + 1}
                         </span>
-                        <div>
-                          <input
-                            type="text"
-                            value={entry.day}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'day', e.target.value)}
-                            className="font-bold text-sm text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 outline-none w-28"
-                            placeholder="Hari"
-                          />
-                        </div>
-                        <div>
+                        <input
+                          type="text"
+                          value={entry.day}
+                          onChange={(e) => handleUpdateEntry(entry.id, 'day', e.target.value)}
+                          disabled={currentWeekLog.status === 'verified'}
+                          className="font-bold text-sm text-slate-800 bg-transparent border-b border-transparent focus:border-blue-500 outline-none w-28 disabled:text-slate-800"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                          <label className="text-[10px] uppercase font-bold text-slate-400">Tarikh:</label>
                           <input
                             type="date"
                             value={entry.date}
                             onChange={(e) => handleUpdateEntry(entry.id, 'date', e.target.value)}
-                            className="text-xs text-slate-600 bg-white border border-slate-200 px-2 py-1 rounded-lg outline-none"
+                            disabled={currentWeekLog.status === 'verified'}
+                            className="px-2 py-1 border border-slate-200 rounded-lg text-xs outline-none disabled:bg-slate-50"
                           />
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2">
-                        {/* Time range */}
-                        <div className="flex items-center gap-1 bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-xs">
-                          <Clock size={12} className="text-slate-400" />
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                          <label className="text-[10px] uppercase font-bold text-slate-400">Masa:</label>
                           <input
                             type="text"
                             value={entry.startTime}
                             onChange={(e) => handleUpdateEntry(entry.id, 'startTime', e.target.value)}
-                            className="w-12 text-center outline-none"
-                            placeholder="08:30"
+                            disabled={currentWeekLog.status === 'verified'}
+                            className="w-16 px-1.5 py-1 border border-slate-200 rounded-lg text-center text-xs outline-none disabled:bg-slate-50"
                           />
                           <span>-</span>
                           <input
                             type="text"
                             value={entry.endTime}
                             onChange={(e) => handleUpdateEntry(entry.id, 'endTime', e.target.value)}
-                            className="w-12 text-center outline-none"
-                            placeholder="17:30"
+                            disabled={currentWeekLog.status === 'verified'}
+                            className="w-16 px-1.5 py-1 border border-slate-200 rounded-lg text-center text-xs outline-none disabled:bg-slate-50"
                           />
                         </div>
 
-                        {currentWeekLog.entries.length > 1 && (
+                        {currentWeekLog.status !== 'verified' && currentWeekLog.entries.length > 1 && (
                           <button
+                            type="button"
                             onClick={() => handleRemoveDay(entry.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Padam Hari Ini"
+                            className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                            title="Padam Hari"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -769,230 +963,134 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                       </div>
                     </div>
 
-                    {/* Day Card Body */}
-                    <div className="p-5 space-y-4">
-                      {/* Department */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">
-                          {language === 'ms' ? 'Bahagian / Jabatan / Seksyen Penempatan:' : 'Department / Section:'}
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                          {language === 'ms' ? 'Bahagian / Jabatan / Seksyen:' : 'Department / Section:'}
                         </label>
                         <input
                           type="text"
+                          placeholder="cth: IT Support & Infrastructure"
                           value={entry.department}
                           onChange={(e) => handleUpdateEntry(entry.id, 'department', e.target.value)}
-                          placeholder="cth: Jabatan Operasi & Penyelenggaraan / Bahagian IT & Analisis Data"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          disabled={currentWeekLog.status === 'verified'}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                         />
                       </div>
 
-                      {/* Daily Activities & Tasks */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center justify-between">
-                          <span>{language === 'ms' ? 'Huraian Aktiviti & Tugasan Harian (Perlu Terperinci):' : 'Daily Tasks & Activities Description:'}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">
-                            {language === 'ms' ? 'Format bullet point atau perenggan' : 'Bullet points or paragraph'}
-                          </span>
+                      <div className="md:col-span-2">
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                          {language === 'ms' ? 'Alatan / Mesin / Perisian Digunakan (Pilihan):' : 'Tools / Software Used (Optional):'}
                         </label>
-                        <textarea
-                          rows={3}
-                          value={entry.tasks}
-                          onChange={(e) => handleUpdateEntry(entry.id, 'tasks', e.target.value)}
-                          placeholder={language === 'ms' 
-                            ? "- Melaksanakan taklimat pagi bersama jurutera tapak mengenai jadual kerja harian.\n- Menganalisis laporan kerosakan mesin dan menyediakan semakan data.\n- Membantu penyelia menguji sistem automasi baharu." 
-                            : "- Attended daily briefing with site engineer.\n- Conducted equipment testing and recorded observations."}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        <input
+                          type="text"
+                          placeholder="cth: Visual Studio Code, AWS Cloud, Docker, Git"
+                          value={entry.toolsUsed || ''}
+                          onChange={(e) => handleUpdateEntry(entry.id, 'toolsUsed', e.target.value)}
+                          disabled={currentWeekLog.status === 'verified'}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                         />
                       </div>
+                    </div>
 
-                      {/* Learning Outcomes & Competencies */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">
-                            {language === 'ms' ? 'Hasil Pembelajaran & Kemahiran Diperoleh:' : 'Learning Outcomes & Skills Acquired:'}
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={entry.learningOutcomes}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'learningOutcomes', e.target.value)}
-                            placeholder={language === 'ms' ? "cth: Memahami prosedur keselamatan industri, kemahiran mengendali perisian ERP, komunikasi teknikal" : "e.g. Learned SOP for calibration, team communication"}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-                          />
-                        </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        {language === 'ms' ? 'Ringkasan Tugasan & Aktiviti Yang Dijalankan:' : 'Summary of Daily Tasks & Activities:'}
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder={language === 'ms' ? 'Huraikan aktiviti dan tugasan yang dilaksanakan pada hari ini...' : 'Describe tasks performed today...'}
+                        value={entry.tasks}
+                        onChange={(e) => handleUpdateEntry(entry.id, 'tasks', e.target.value)}
+                        disabled={currentWeekLog.status === 'verified'}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                      />
+                    </div>
 
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">
-                            {language === 'ms' ? 'Peralatan / Perisian / Sistem Digunakan:' : 'Tools, Software or Systems Used:'}
-                          </label>
-                          <input
-                            type="text"
-                            value={entry.toolsUsed || ''}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'toolsUsed', e.target.value)}
-                            placeholder="cth: SAP, AutoCAD, Mesin CNC, Google Workspace"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none mb-2"
-                          />
-
-                          <label className="block text-xs font-bold text-slate-600 mb-1">
-                            {language === 'ms' ? 'Catatan Tambahan (Isu / Halangan):' : 'Remarks / Additional Notes:'}
-                          </label>
-                          <input
-                            type="text"
-                            value={entry.remarks || ''}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'remarks', e.target.value)}
-                            placeholder={language === 'ms' ? "Tiada isu / Masalah sistem diselesaikan bersama penyelia" : "None / Solved with supervisor"}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-                          />
-                        </div>
-                      </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        {language === 'ms' ? 'Hasil Pembelajaran & Kemahiran Yang Diperoleh:' : 'Learning Outcomes & Skills Acquired:'}
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder={language === 'ms' ? 'Kemahiran teknikal atau insaniah yang dipelajari...' : 'Technical or soft skills learned...'}
+                        value={entry.learningOutcomes}
+                        onChange={(e) => handleUpdateEntry(entry.id, 'learningOutcomes', e.target.value)}
+                        disabled={currentWeekLog.status === 'verified'}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                      />
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Weekly Reflection by Student */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              {/* Weekly Reflection Section */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <Star size={16} className="text-amber-500" />
-                  <span>{language === 'ms' ? 'Refleksi & Ringkasan Pembelajaran Mingguan Pelajar' : 'Student Weekly Reflection & Summary'}</span>
+                  <span>{language === 'ms' ? 'Refleksi Mingguan Pelajar (Weekly Summary)' : 'Student Weekly Reflection'}</span>
                 </h4>
                 <p className="text-xs text-slate-500">
                   {language === 'ms' 
-                    ? 'Tuliskan ringkasan pengalaman anda sepanjang minggu ini, termasuk cabaran yang dihadapi, cara penyelesaian, dan kemajuan kemahiran profesional anda.' 
-                    : 'Summarize your key accomplishments, challenges faced, problem solving, and professional development this week.'}
+                    ? 'Ringkaskan pencapaian utama minggu ini, cabaran yang dihadapi serta cara penyelesaiannya.' 
+                    : 'Summarize key weekly achievements, challenges faced, and how you solved them.'}
                 </p>
                 <textarea
                   rows={4}
+                  placeholder={language === 'ms' 
+                    ? 'Pada minggu ini saya telah berjaya menguasai aliran kerja penempatan dan menyelesaikan tugasan bersama pasukan...' 
+                    : 'This week I successfully completed my assignments and collaborated with the team...'}
                   value={currentWeekLog.weeklySummary}
                   onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, weeklySummary: e.target.value })}
-                  placeholder={language === 'ms' 
-                    ? "Sepanjang Minggu ini, saya berjaya menyesuaikan diri dengan sistem pengurusan inventori syarikat. Cabaran utama adalah memahami kod produk baharu, namun dengan bimbingan jurulatih industri Encik..., saya berjaya menguasainya dan menyiapkan tugasan tepat pada masanya." 
-                    : "During this week, I learned..."}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  disabled={currentWeekLog.status === 'verified'}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                 />
               </div>
 
-              {/* Industry Coach Details Block */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <UserCheck size={16} className="text-blue-600" />
-                    <span>{language === 'ms' ? 'Maklumat Jurulatih Industri (Penyelia di Syarikat)' : 'Industry Coach Information'}</span>
-                  </h4>
-                  <span className="text-xs text-slate-400">
-                    {language === 'ms' ? 'Penyelia yang mengesahkan logbook mingguan' : 'Endorsing supervisor'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {language === 'ms' ? 'Nama Jurulatih Industri' : 'Industry Coach Name'}
-                    </label>
-                    <input
-                      type="text"
-                      value={currentWeekLog.trainerName || ''}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerName: e.target.value })}
-                      placeholder="cth: Ir. Ahmad bin Razali"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {language === 'ms' ? 'Jawatan Jurulatih' : 'Coach Designation'}
-                    </label>
-                    <input
-                      type="text"
-                      value={currentWeekLog.trainerPosition || ''}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerPosition: e.target.value })}
-                      placeholder="cth: Pengurus Operasi / Senior Engineer"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {language === 'ms' ? 'E-mel Jurulatih' : 'Coach Email'}
-                    </label>
-                    <input
-                      type="email"
-                      value={currentWeekLog.trainerEmail || ''}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerEmail: e.target.value })}
-                      placeholder="coach@company.com"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Trainer feedback (if verified or revision) */}
-                {currentWeekLog.status === 'verified' && (
-                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                    <div className="flex items-center gap-2 font-bold text-sm text-emerald-800 mb-1">
-                      <CheckCircle2 size={16} className="text-emerald-600" />
-                      <span>{language === 'ms' ? 'Ulasan Rasmi Jurulatih Industri:' : 'Industry Coach Official Review:'}</span>
-                    </div>
-                    <p className="text-xs text-emerald-900 mt-1 italic">
-                      "{currentWeekLog.trainerComments || 'Prestasi sangat baik dan memenuhi hasil pembelajaran.'}"
-                    </p>
-                    {currentWeekLog.trainerRating && (
-                      <div className="mt-2 text-xs font-bold text-emerald-800">
-                        Penilaian Prestasi: <span className="uppercase">{currentWeekLog.trainerRating}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {currentWeekLog.status === 'revision' && (
-                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center gap-2 font-bold text-sm text-amber-800 mb-1">
-                      <AlertCircle size={16} className="text-amber-600" />
-                      <span>{language === 'ms' ? 'Catatan Pembetulan Oleh Jurulatih Industri:' : 'Revision Requested by Coach:'}</span>
-                    </div>
-                    <p className="text-xs text-amber-900 mt-1 font-medium">
-                      "{currentWeekLog.revisionNotes}"
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Sticky Action Buttons */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-wrap justify-between items-center gap-3">
+              {/* Student Action Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Clock size={14} className="text-blue-600" />
+                  <Info size={14} />
                   <span>
-                    {language === 'ms' 
-                      ? 'Simpanan draf boleh dilakukan pada bila-bila masa. Hantar apabila minggu telah selesai.' 
-                      : 'Save drafts anytime. Submit once the week ends.'}
+                    {currentWeekLog.status === 'verified'
+                      ? (language === 'ms' ? 'Logbook telah disahkan dan dikunci daripada sebarang perubahan.' : 'Logbook is verified and locked.')
+                      : (language === 'ms' ? 'Simpan draf semasa atau hantar terus untuk pengesahan jurulatih industri.' : 'Save draft or submit for trainer verification.')}
                   </span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleSaveDraft}
-                    disabled={isSaving}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Save size={16} />
-                    <span>{isSaving ? 'Menyimpan...' : (language === 'ms' ? 'Simpan Draf' : 'Save Draft')}</span>
-                  </button>
-
-                  <button
-                    onClick={() => handlePrintLogbook(currentWeekLog)}
-                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2"
-                  >
-                    <Printer size={16} />
-                    <span>{language === 'ms' ? 'Cetak / Muat Turun (PDF)' : 'Print / Download (PDF)'}</span>
-                  </button>
-
+                <div className="flex items-center gap-2">
                   {currentWeekLog.status !== 'verified' && (
-                    <button
-                      onClick={handleSubmitWeekly}
-                      disabled={isSaving}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <Send size={16} />
-                      <span>{language === 'ms' ? 'Hantar Pengesahan Mingguan' : 'Submit Weekly Log'}</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleSaveDraft}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                      >
+                        <Save size={14} />
+                        <span>{isSaving ? 'Menyimpan...' : (language === 'ms' ? 'Simpan Draf' : 'Save Draft')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSubmitWeekly}
+                        disabled={isSaving}
+                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5"
+                      >
+                        <Send size={14} />
+                        <span>{language === 'ms' ? 'Hantar Pengesahan Mingguan' : 'Submit Weekly Log'}</span>
+                      </button>
+                    </>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => handlePrintLogbook()}
+                    className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    <Printer size={14} />
+                    <span>{language === 'ms' ? 'Cetak PDF' : 'Print PDF'}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1082,85 +1180,151 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. VERIFICATION QUEUE: FOR INDUSTRY TRAINERS, COORDINATORS, & LECTURERS   */}
+      {/* 2. VERIFICATION & MONITORING QUEUE: FOR TRAINER, SUPERVISOR, COORDINATOR  */}
       {/* ========================================================================= */}
       {(!isStudent || activeTab === 'verification_queue') && (
         <div className="space-y-6">
+          {/* Attention Banner for Coordinator: If unverified logbooks exist */}
+          {isCoordinator && queueStats.unverifiedByTrainer > 0 && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-amber-500 text-white rounded-xl shrink-0 animate-pulse">
+                  <AlertCircle size={20} />
+                </span>
+                <div>
+                  <h4 className="font-bold text-amber-900 text-sm">
+                    {language === 'ms' 
+                      ? `Perhatian Penyelaras: ${queueStats.unverifiedByTrainer} Buku Log Pelajar Belum Disahkan oleh Jurulatih Industri` 
+                      : `Coordinator Notice: ${queueStats.unverifiedByTrainer} Logbooks Pending Industry Trainer Verification`}
+                  </h4>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    {language === 'ms'
+                      ? 'Terdapat rekod aktiviti harian yang telah dihantar oleh pelajar tetapi masih menunggu tindakan pengesahan daripada pihak jurulatih industri.'
+                      : 'Students have submitted daily logs waiting for industry coach endorsement.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTrainerVerifyFilter('unverified')}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shrink-0 shadow-sm transition-all"
+              >
+                {language === 'ms' ? 'Tapis Belum Disahkan' : 'Filter Pending'}
+              </button>
+            </div>
+          )}
+
           {/* Queue Statistics Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                {language === 'ms' ? 'Semua Logbook' : 'All Logbooks'}
+                {language === 'ms' ? 'Jumlah Semua Logbook' : 'Total Logbooks'}
               </span>
               <div className="text-3xl font-black text-slate-800 mt-1">
                 {queueStats.total}
               </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm bg-blue-50/30">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
-                <Clock size={12} />
-                {language === 'ms' ? 'Menunggu Pengesahan' : 'Pending Verification'}
-              </span>
-              <div className="text-3xl font-black text-blue-700 mt-1">
-                {queueStats.pending}
+              <div className="text-[11px] text-slate-500 mt-1">
+                {queueStats.draft} draf pelajar
               </div>
             </div>
 
+            {/* Sudah Disahkan Jurulatih */}
             <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm bg-emerald-50/30">
               <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
-                <CheckCircle2 size={12} />
-                {language === 'ms' ? 'Telah Disahkan' : 'Verified'}
+                <CheckCircle2 size={14} />
+                {language === 'ms' ? 'Disahkan Jurulatih' : 'Trainer Verified'}
               </span>
               <div className="text-3xl font-black text-emerald-700 mt-1">
-                {queueStats.verified}
+                {queueStats.verifiedByTrainer}
+              </div>
+              <div className="text-[11px] text-emerald-600 font-bold mt-1">
+                {queueStats.verifiedPct}% kadar pengesahan
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm bg-amber-50/30">
-              <span className="text-xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1">
-                <AlertCircle size={12} />
+            {/* Belum Disahkan Jurulatih */}
+            <div className={`p-5 rounded-2xl border shadow-sm ${
+              queueStats.unverifiedByTrainer > 0 
+                ? 'bg-amber-50/60 border-amber-300 ring-2 ring-amber-100' 
+                : 'bg-white border-slate-200'
+            }`}>
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1">
+                <Clock size={14} />
+                {language === 'ms' ? 'Belum Disahkan Jurulatih' : 'Pending Trainer'}
+              </span>
+              <div className="text-3xl font-black text-amber-800 mt-1">
+                {queueStats.unverifiedByTrainer}
+              </div>
+              <div className="text-[11px] text-amber-700 mt-1 font-medium">
+                {isTrainer ? (language === 'ms' ? 'Menunggu tindakan anda' : 'Awaiting your action') : (language === 'ms' ? 'Menunggu jurulatih industri' : 'Awaiting coach action')}
+              </div>
+            </div>
+
+            {/* Perlu Pembetulan */}
+            <div className="bg-white p-5 rounded-2xl border border-rose-200 shadow-sm bg-rose-50/30">
+              <span className="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1">
+                <AlertCircle size={14} />
                 {language === 'ms' ? 'Perlu Pembetulan' : 'Needs Revision'}
               </span>
-              <div className="text-3xl font-black text-amber-700 mt-1">
+              <div className="text-3xl font-black text-rose-700 mt-1">
                 {queueStats.revision}
+              </div>
+              <div className="text-[11px] text-rose-600 mt-1">
+                {language === 'ms' ? 'Dalam semakan pelajar' : 'In student review'}
               </div>
             </div>
           </div>
 
-          {/* Filters & Search Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder={language === 'ms' ? 'Cari nama pelajar, no. matrik, syarikat, atau minggu...' : 'Search student, matric, company...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
-              />
-            </div>
+          {/* Scope & Role Filtering Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+              {/* Search query input */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder={language === 'ms' 
+                    ? 'Cari nama pelajar, no. matrik, syarikat penempatan, atau nama jurulatih...' 
+                    : 'Search student, matric, company, or trainer...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
+                />
+              </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none"
-              >
-                <option value="all">{language === 'ms' ? 'Semua Status' : 'All Statuses'}</option>
-                <option value="submitted">{language === 'ms' ? '⏳ Menunggu Pengesahan' : 'Pending'}</option>
-                <option value="verified">{language === 'ms' ? '✓ Telah Disahkan' : 'Verified'}</option>
-                <option value="revision">{language === 'ms' ? '⚠️ Perlu Pembetulan' : 'Needs Revision'}</option>
-                <option value="draft">{language === 'ms' ? 'Draf' : 'Draft'}</option>
-              </select>
+              {/* Scope Switcher for Supervisor & Trainer */}
+              {(isSupervisor || isTrainer) && (
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0">
+                  <button
+                    onClick={() => setScopeFilter('my_scope')}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      scopeFilter === 'my_scope'
+                        ? 'bg-blue-600 text-white shadow-sm font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {isSupervisor 
+                      ? (language === 'ms' ? 'Pelajar Seliaan Saya' : 'My Supervised Students')
+                      : (language === 'ms' ? 'Pelajar Syarikat Saya' : 'My Company Interns')}
+                  </button>
+                  <button
+                    onClick={() => setScopeFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      scopeFilter === 'all'
+                        ? 'bg-blue-600 text-white shadow-sm font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {language === 'ms' ? 'Semua Pelajar WBL' : 'All WBL Students'}
+                  </button>
+                </div>
+              )}
 
-              {/* Student Filter */}
+              {/* Student Filter Dropdown */}
               {uniqueStudents.length > 0 && (
                 <select
                   value={studentFilter}
                   onChange={(e) => setStudentFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none max-w-xs truncate"
+                  className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none max-w-xs truncate shrink-0"
                 >
                   <option value="all">{language === 'ms' ? 'Semua Pelajar' : 'All Students'}</option>
                   {uniqueStudents.map(s => (
@@ -1169,20 +1333,95 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                 </select>
               )}
             </div>
+
+            {/* Quick Status Filter Pills (Crucial for Penyelaras: Semak status pengesahan jurulatih) */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mr-1">
+                <Filter size={12} />
+                {language === 'ms' ? 'Status Pengesahan Jurulatih:' : 'Trainer Status:'}
+              </span>
+
+              <button
+                onClick={() => setTrainerVerifyFilter('all')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all text-xs ${
+                  trainerVerifyFilter === 'all'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {language === 'ms' ? 'Semua' : 'All'} ({logbooks.length})
+              </button>
+
+              <button
+                onClick={() => setTrainerVerifyFilter('unverified')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all text-xs flex items-center gap-1.5 ${
+                  trainerVerifyFilter === 'unverified'
+                    ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-300'
+                    : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                }`}
+              >
+                <Clock size={12} />
+                <span>{language === 'ms' ? '⏳ Belum Disahkan oleh Jurulatih' : '⏳ Pending Trainer'}</span>
+                <span className="bg-white/30 px-1.5 py-0.2 rounded-full text-[10px]">
+                  {queueStats.unverifiedByTrainer}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setTrainerVerifyFilter('verified')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all text-xs flex items-center gap-1.5 ${
+                  trainerVerifyFilter === 'verified'
+                    ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-300'
+                    : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                }`}
+              >
+                <CheckCircle2 size={12} />
+                <span>{language === 'ms' ? '✓ Sudah Disahkan oleh Jurulatih' : '✓ Trainer Verified'}</span>
+                <span className="bg-white/30 px-1.5 py-0.2 rounded-full text-[10px]">
+                  {queueStats.verifiedByTrainer}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setTrainerVerifyFilter('revision')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all text-xs flex items-center gap-1.5 ${
+                  trainerVerifyFilter === 'revision'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                }`}
+              >
+                <AlertCircle size={12} />
+                <span>{language === 'ms' ? 'Perlu Pembetulan' : 'Needs Revision'}</span>
+                <span className="bg-white/30 px-1.5 py-0.2 rounded-full text-[10px]">
+                  {queueStats.revision}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setTrainerVerifyFilter('draft')}
+                className={`px-3 py-1 rounded-lg font-bold transition-all text-xs ${
+                  trainerVerifyFilter === 'draft'
+                    ? 'bg-slate-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {language === 'ms' ? 'Draf' : 'Draft'} ({queueStats.draft})
+              </button>
+            </div>
           </div>
 
-          {/* Submissions List */}
+          {/* Submissions & Verification Queue Table */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
                     <th className="py-3.5 px-4">Pelajar & No. Matrik</th>
                     <th className="py-3.5 px-4">Syarikat Penempatan</th>
                     <th className="py-3.5 px-4">Minggu Latihan</th>
-                    <th className="py-3.5 px-4">Entri Harian</th>
-                    <th className="py-3.5 px-4">Status Pengesahan</th>
-                    <th className="py-3.5 px-4">Tarikh Dihantar</th>
+                    <th className="py-3.5 px-4">Aktiviti Harian</th>
+                    <th className="py-3.5 px-4">Status Pengesahan Jurulatih Industri</th>
+                    <th className="py-3.5 px-4">Penyelia Universiti</th>
                     <th className="py-3.5 px-4 text-right">Tindakan</th>
                   </tr>
                 </thead>
@@ -1190,79 +1429,170 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                   {queueLogbooks.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-slate-400">
-                        <UserCheck size={36} className="mx-auto mb-2 opacity-30 text-slate-400" />
-                        <p>{language === 'ms' ? 'Tiada logbook mingguan sepadan dengan carian anda.' : 'No weekly logbooks matching criteria.'}</p>
+                        <BookOpen size={36} className="mx-auto mb-2 opacity-30 text-slate-400" />
+                        <p className="font-medium">
+                          {language === 'ms' 
+                            ? 'Tiada rekod buku log sepadan dengan kriteria tapisan semasa.' 
+                            : 'No logbook records matching current filter.'}
+                        </p>
                       </td>
                     </tr>
                   ) : (
-                    queueLogbooks.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-800 text-sm">{log.studentName}</div>
-                          <div className="text-[11px] text-slate-500">{log.studentMatric} • {log.studentProgram}</div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-700">{log.companyName}</div>
-                          <div className="text-[10px] text-slate-400">{log.companyAddress || '-'}</div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">
-                            Minggu {log.weekNumber}
-                          </span>
-                          <div className="text-[10px] text-slate-500 mt-1">
-                            {log.startDate && log.endDate ? `${log.startDate} hingga ${log.endDate}` : '-'}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-700">
-                            {log.entries?.length || 0} hari bekerja
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {log.totalHours || 40} jam
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black inline-flex items-center gap-1 ${
-                            log.status === 'verified' ? 'bg-emerald-100 text-emerald-800' :
-                            log.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                            log.status === 'revision' ? 'bg-amber-100 text-amber-800' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {log.status === 'verified' && '✓'}
-                            {log.status === 'verified' ? 'Disahkan' :
-                             log.status === 'submitted' ? 'Menunggu Pengesahan' :
-                             log.status === 'revision' ? 'Perlu Pembetulan' :
-                             'Draf'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-600 text-[11px]">
-                          {log.submittedAt ? new Date(log.submittedAt).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleOpenReview(log)}
-                              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
-                                log.status === 'submitted'
-                                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                              }`}
-                            >
-                              <Eye size={14} />
-                              <span>{log.status === 'submitted' ? (language === 'ms' ? 'Semak & Sahkan' : 'Review & Verify') : (language === 'ms' ? 'Semak Log' : 'Review')}</span>
-                            </button>
+                    queueLogbooks.map((log) => {
+                      const isVerified = log.status === 'verified';
+                      const isUnverified = log.status === 'submitted';
+                      const studentUser = users.find(u => u.id === log.studentId || u.matric_no === log.studentMatric);
+                      const supervisorName = log.supervisorName || studentUser?.faculty_supervisor_name || '-';
 
-                            <button
-                              onClick={() => handlePrintLogbook(log)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl"
-                              title="Cetak PDF"
-                            >
-                              <Printer size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                          {/* Student Info */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-800 text-sm">{log.studentName}</div>
+                            <div className="text-[11px] text-slate-500 font-mono">{log.studentMatric}</div>
+                            <div className="text-[10px] text-slate-400 truncate max-w-[200px]">{log.studentProgram}</div>
+                          </td>
+
+                          {/* Company */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-700">{log.companyName}</div>
+                            <div className="text-[10px] text-slate-400">{log.companyAddress || '-'}</div>
+                          </td>
+
+                          {/* Week */}
+                          <td className="py-3.5 px-4">
+                            <span className="font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">
+                              Minggu {log.weekNumber}
+                            </span>
+                            <div className="text-[10px] text-slate-500 mt-1 font-medium">
+                              {log.startDate && log.endDate ? `${log.startDate} hingga ${log.endDate}` : '-'}
+                            </div>
+                          </td>
+
+                          {/* Entries & Hours */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-700">
+                              {log.entries?.length || 0} hari kerja
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {log.totalHours || 40} jam latihan
+                            </div>
+                          </td>
+
+                          {/* STATUS PENGESAHAN JURULATIH INDUSTRI (Explicit audit check for Penyelaras) */}
+                          <td className="py-3.5 px-4">
+                            {isVerified ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                  <CheckCircle2 size={12} className="text-emerald-600" />
+                                  <span>{language === 'ms' ? 'Sudah Disahkan' : 'Verified'}</span>
+                                </span>
+                                <div className="text-[11px] font-bold text-slate-700">
+                                  {log.trainerName || 'Jurulatih Industri'}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {log.verifiedAt ? new Date(log.verifiedAt).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'} • 
+                                  <span className="font-bold text-emerald-700 uppercase ml-1">{log.trainerRating || 'Cemerlang'}</span>
+                                </div>
+                              </div>
+                            ) : isUnverified ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                                  <Clock size={12} className="text-amber-600" />
+                                  <span>{language === 'ms' ? 'Belum Disahkan Jurulatih' : 'Pending Trainer'}</span>
+                                </span>
+                                <div className="text-[10px] text-amber-800 font-medium">
+                                  Menunggu: <strong>{log.trainerName || 'Jurulatih Industri'}</strong>
+                                </div>
+                                {isCoordinator && (
+                                  <button
+                                    onClick={() => handleSendReminder(log)}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 mt-0.5"
+                                    title="Hantar notifikasi peringatan kepada jurulatih"
+                                  >
+                                    <Bell size={10} />
+                                    <span>{language === 'ms' ? 'Hantar Peringatan' : 'Send Reminder'}</span>
+                                  </button>
+                                )}
+                              </div>
+                            ) : log.status === 'revision' ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800">
+                                  <AlertCircle size={12} className="text-rose-600" />
+                                  <span>{language === 'ms' ? 'Perlu Pembetulan' : 'Needs Revision'}</span>
+                                </span>
+                                <div className="text-[10px] text-rose-700 italic truncate max-w-[180px]">
+                                  {log.revisionNotes || '-'}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                                <span>{language === 'ms' ? 'Draf Pelajar' : 'Draft'}</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Supervisor Info */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-700">{supervisorName}</div>
+                            {log.supervisorReviewedAt ? (
+                              <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-0.5">
+                                <Check size={10} />
+                                <span>{language === 'ms' ? 'Disemak Penyelia' : 'Supervisor Reviewed'}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                {language === 'ms' ? 'Belum disemak' : 'Not reviewed'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* ACTIONS */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Fast 1-Click Direct Verify for Industry Trainer (or Coordinator) */}
+                              {(isTrainer || isCoordinator) && !isVerified && (
+                                <button
+                                  onClick={() => handleOpenDirectVerify(log)}
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs transition-all flex items-center gap-1 shadow-sm"
+                                  title={language === 'ms' ? 'Sahkan Direct (1-Klik)' : 'Direct Verify (1-Click)'}
+                                >
+                                  <Zap size={13} className="text-amber-300" />
+                                  <span>{language === 'ms' ? 'Sahkan Direct' : 'Direct Verify'}</span>
+                                </button>
+                              )}
+
+                              {/* Standard Review & Inspection Modal Button */}
+                              <button
+                                onClick={() => handleOpenReview(log)}
+                                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                                  !isVerified && isTrainer
+                                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                }`}
+                              >
+                                <Eye size={13} />
+                                <span>
+                                  {isCoordinator ? (language === 'ms' ? 'Semak Log' : 'Audit Log') :
+                                   isSupervisor ? (language === 'ms' ? 'Semak & Ulas' : 'Review & Note') :
+                                   isTrainer ? (language === 'ms' ? 'Semak Penuh' : 'Full Review') :
+                                   (language === 'ms' ? 'Lihat' : 'View')}
+                                </span>
+                              </button>
+
+                              {/* Print / Download PDF */}
+                              <button
+                                onClick={() => handlePrintLogbook(log)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl"
+                                title="Cetak / Muat Turun PDF"
+                              >
+                                <Printer size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1272,7 +1602,116 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. REVIEW & VERIFICATION MODAL                                            */}
+      {/* 3. FAST 1-CLICK DIRECT VERIFICATION MODAL FOR INDUSTRY TRAINER             */}
+      {/* ========================================================================= */}
+      {directVerifyTarget && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex justify-between items-center">
+              <div>
+                <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-wider text-emerald-200 flex items-center gap-1 w-max">
+                  <Zap size={12} className="text-amber-300" />
+                  <span>{language === 'ms' ? 'Pengesahan Terus (Direct Verify)' : 'Direct 1-Click Verification'}</span>
+                </span>
+                <h3 className="text-xl font-black mt-1">
+                  {directVerifyTarget.studentName}
+                </h3>
+                <p className="text-xs text-emerald-200">
+                  {directVerifyTarget.studentMatric} • Minggu {directVerifyTarget.weekNumber} ({directVerifyTarget.companyName})
+                </p>
+              </div>
+
+              <button
+                onClick={() => setDirectVerifyTarget(null)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 bg-slate-50">
+              <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm space-y-3">
+                <div className="text-xs text-slate-600">
+                  <div className="font-bold text-slate-800 mb-0.5">Pengesah (Jurulatih Industri):</div>
+                  <div><strong>{currentUser.name}</strong> ({currentUser.company_position || currentUser.company_affiliation || 'Jurulatih Industri'})</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{directVerifyTarget.companyName}</div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {language === 'ms' ? 'Penilaian Prestasi Pelajar:' : 'Performance Rating:'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { val: 'cemerlang', label: '⭐ Cemerlang (Excellent)' },
+                      { val: 'baik', label: '👍 Baik (Good)' },
+                      { val: 'memuaskan', label: '👌 Memuaskan' },
+                      { val: 'perlu_bimbingan', label: 'Bimbingan' },
+                    ].map((rate) => (
+                      <button
+                        key={rate.val}
+                        type="button"
+                        onClick={() => setDirectRating(rate.val as any)}
+                        className={`p-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                          directRating === rate.val 
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {rate.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {language === 'ms' ? 'Komen / Catatan Pengesahan Jurulatih:' : 'Trainer Comments:'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={directComments}
+                    onChange={(e) => setDirectComments(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-500 italic">
+                {language === 'ms' 
+                  ? 'Pengesahan ini akan mengesahkan secara serta-merta semua entri aktiviti harian bagi minggu tersebut dan memaklumkan kepada pelajar serta penyelaras WBL.' 
+                  : 'This directly validates daily activities and notifies the student and coordinator.'}
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDirectVerifyTarget(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+              >
+                {t(language, 'cancel')}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDirectVerify}
+                disabled={isSaving}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
+              >
+                <Zap size={16} className="text-amber-300" />
+                <span>{isSaving ? 'Mengesahkan...' : (language === 'ms' ? '⚡ Sahkan Direct Sekarang' : '⚡ Direct Verify Now')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. DETAILED REVIEW & VERIFICATION MODAL                                    */}
       {/* ========================================================================= */}
       {reviewingLogbook && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
@@ -1281,13 +1720,13 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
             <div className="p-6 bg-gradient-to-r from-blue-900 to-indigo-900 text-white flex justify-between items-center">
               <div>
                 <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-wider text-blue-200">
-                  {language === 'ms' ? 'Pengesahan Log Latihan Harian' : 'Daily Training Log Verification'}
+                  {language === 'ms' ? 'Buku Log Latihan Harian WBL (FPTT UTeM)' : 'Daily Training Log Verification'}
                 </span>
                 <h3 className="text-xl font-black mt-1">
                   {reviewingLogbook.studentName} ({reviewingLogbook.studentMatric})
                 </h3>
                 <p className="text-xs text-blue-200">
-                  {reviewingLogbook.companyName} • Minggu {reviewingLogbook.weekNumber} ({reviewingLogbook.startDate} hingga {reviewingLogbook.endDate})
+                  {reviewingLogbook.companyName} • Minggu {reviewingLogbook.weekNumber} ({reviewingLogbook.startDate || '-'} hingga {reviewingLogbook.endDate || '-'})
                 </p>
               </div>
 
@@ -1368,74 +1807,168 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                 </div>
               </div>
 
-              {/* Verification Form Section */}
-              <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <ShieldCheck size={18} className="text-blue-600" />
-                  <span>{language === 'ms' ? 'Tindakan Pengesahan Jurulatih Industri' : 'Industry Coach Verification Action'}</span>
-                </h4>
+              {/* Status Pengesahan Jurulatih Industri Card */}
+              {reviewingLogbook.status === 'verified' ? (
+                <div className="bg-emerald-50 border border-emerald-300 p-5 rounded-2xl shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck size={18} className="text-emerald-600" />
+                      {language === 'ms' ? 'Telah Disahkan oleh Jurulatih Industri' : 'Verified by Industry Coach'}
+                    </span>
+                    <span className="px-3 py-1 bg-emerald-600 text-white rounded-full text-xs font-black uppercase">
+                      Gred: {reviewingLogbook.trainerRating?.toUpperCase() || 'CEMERLANG'}
+                    </span>
+                  </div>
 
-                {!isRevisionMode ? (
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white p-4 rounded-xl border border-emerald-100">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {language === 'ms' ? 'Penilaian Prestasi Mingguan Pelajar:' : 'Weekly Performance Rating:'}
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { val: 'cemerlang', label: 'Cemerlang (Excellent)' },
-                          { val: 'baik', label: 'Baik (Good)' },
-                          { val: 'memuaskan', label: 'Memuaskan (Satisfactory)' },
-                          { val: 'perlu_bimbingan', label: 'Perlu Bimbingan' },
-                        ].map((rate) => (
-                          <button
-                            key={rate.val}
-                            type="button"
-                            onClick={() => setTrainerRating(rate.val as any)}
-                            className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-center ${
-                              trainerRating === rate.val 
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                            }`}
-                          >
-                            {rate.label}
-                          </button>
-                        ))}
-                      </div>
+                      <span className="text-slate-500">{language === 'ms' ? 'Nama Jurulatih:' : 'Coach Name:'} </span>
+                      <strong className="text-slate-800">{reviewingLogbook.trainerName}</strong>
+                      <div className="text-[11px] text-slate-500">{reviewingLogbook.trainerPosition || '-'}</div>
                     </div>
-
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {language === 'ms' ? 'Ulasan & Komen Jurulatih Industri:' : 'Industry Coach Feedback & Comments:'}
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={trainerComments}
-                        onChange={(e) => setTrainerComments(e.target.value)}
-                        placeholder={language === 'ms' 
-                          ? "Pelajar menunjukkan inisiatif yang sangat baik, menyelesaikan tugasan tepat pada waktu, dan mematuhi piawaian keselamatan industri." 
-                          : "Student demonstrated good initiative..."}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <span className="text-slate-500">{language === 'ms' ? 'Tarikh Pengesahan:' : 'Verified At:'} </span>
+                      <strong className="text-slate-800">
+                        {reviewingLogbook.verifiedAt ? new Date(reviewingLogbook.verifiedAt).toLocaleString('ms-MY') : '-'}
+                      </strong>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
-                    <label className="block text-xs font-bold text-amber-900 mb-1">
-                      {language === 'ms' ? 'Sebab & Arahan Pembetulan Kepada Pelajar:' : 'Revision Instructions to Student:'}
+
+                  {reviewingLogbook.trainerComments && (
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 text-xs text-slate-700">
+                      <span className="font-bold text-emerald-800">{language === 'ms' ? 'Ulasan Jurulatih Industri:' : 'Industry Coach Comments:'} </span>
+                      <span className="italic">"{reviewingLogbook.trainerComments}"</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Verification Action Form for Industry Trainer */
+                (isTrainer || isCoordinator) && (
+                  <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
+                      <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <ShieldCheck size={18} className="text-blue-600" />
+                        <span>{language === 'ms' ? 'Tindakan Pengesahan Jurulatih Industri' : 'Industry Coach Verification Action'}</span>
+                      </h4>
+
+                      {/* Direct Verification Shortcut */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDirectVerify(reviewingLogbook)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-all"
+                      >
+                        <Zap size={14} className="text-amber-300" />
+                        <span>{language === 'ms' ? '⚡ Sahkan Direct (Cemerlang)' : '⚡ Direct Verify (Excellent)'}</span>
+                      </button>
+                    </div>
+
+                    {!isRevisionMode ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            {language === 'ms' ? 'Penilaian Prestasi Mingguan Pelajar:' : 'Weekly Performance Rating:'}
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {[
+                              { val: 'cemerlang', label: 'Cemerlang (Excellent)' },
+                              { val: 'baik', label: 'Baik (Good)' },
+                              { val: 'memuaskan', label: 'Memuaskan' },
+                              { val: 'perlu_bimbingan', label: 'Perlu Bimbingan' },
+                            ].map((rate) => (
+                              <button
+                                key={rate.val}
+                                type="button"
+                                onClick={() => setTrainerRating(rate.val as any)}
+                                className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-center ${
+                                  trainerRating === rate.val 
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {rate.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            {language === 'ms' ? 'Ulasan & Komen Jurulatih Industri:' : 'Industry Coach Feedback & Comments:'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={trainerComments}
+                            onChange={(e) => setTrainerComments(e.target.value)}
+                            placeholder={language === 'ms' 
+                              ? "Pelajar menunjukkan inisiatif yang sangat baik, menyelesaikan tugasan tepat pada waktu, dan mematuhi piawaian keselamatan industri." 
+                              : "Student demonstrated good initiative..."}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                        <label className="block text-xs font-bold text-amber-900 mb-1">
+                          {language === 'ms' ? 'Sebab & Arahan Pembetulan Kepada Pelajar:' : 'Revision Instructions to Student:'}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={revisionNotes}
+                          onChange={(e) => setRevisionNotes(e.target.value)}
+                          placeholder={language === 'ms' 
+                            ? "cth: Sila huraikan dengan lebih terperinci aktiviti pada hari Rabu dan masukkan bahagian jabatan yang betul." 
+                            : "Please describe Wednesday's tasks in more detail..."}
+                          className="w-full px-3 py-2 border border-amber-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+
+              {/* Supervisory Review Section for Faculty Supervisor & Coordinator */}
+              {(isSupervisor || isCoordinator) && (
+                <div className="bg-white p-5 rounded-2xl border border-indigo-200 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h4 className="font-bold text-indigo-900 text-sm flex items-center gap-2">
+                      <UserIcon size={16} className="text-indigo-600" />
+                      <span>{language === 'ms' ? 'Catatan & Pemantauan Penyelia Universiti' : 'Faculty Supervisor Monitoring Review'}</span>
+                    </h4>
+                    {reviewingLogbook.supervisorReviewedAt && (
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full">
+                        Disemak: {new Date(reviewingLogbook.supervisorReviewedAt).toLocaleDateString('ms-MY')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      {language === 'ms' ? 'Ulasan / Catatan Penyelia Universiti:' : 'Supervisor Feedback / Notes:'}
                     </label>
                     <textarea
-                      rows={3}
-                      value={revisionNotes}
-                      onChange={(e) => setRevisionNotes(e.target.value)}
-                      placeholder={language === 'ms' 
-                        ? "cth: Sila huraikan dengan lebih terperinci aktiviti pada hari Rabu dan masukkan bahagian jabatan yang betul." 
-                        : "Please describe Wednesday's tasks in more detail..."}
-                      className="w-full px-3 py-2 border border-amber-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      rows={2}
+                      value={supervisorCommentsInput}
+                      onChange={(e) => setSupervisorCommentsInput(e.target.value)}
+                      placeholder={language === 'ms'
+                        ? 'Catatan pemantauan akademik, bimbingan, atau nasihat kepada pelajar berkaitan tugasan industri...'
+                        : 'Academic supervision notes, guidance, or feedback...'}
+                      className="w-full px-3 py-2 border border-indigo-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     />
                   </div>
-                )}
-              </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSaveSupervisorReview}
+                      disabled={isSaving}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                    >
+                      <Save size={14} />
+                      <span>{isSaving ? 'Menyimpan...' : (language === 'ms' ? 'Simpan Catatan Penyelia' : 'Save Supervisor Notes')}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer Actions */}
@@ -1449,47 +1982,50 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
               </button>
 
               <div className="flex items-center gap-2">
-                {!isRevisionMode ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsRevisionMode(true)}
-                      className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5"
-                    >
-                      <AlertCircle size={14} />
-                      <span>{language === 'ms' ? 'Minta Pembetulan' : 'Request Revision'}</span>
-                    </button>
+                {/* Actions for trainer verification if not yet verified */}
+                {(isTrainer || isCoordinator) && reviewingLogbook.status !== 'verified' && (
+                  !isRevisionMode ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsRevisionMode(true)}
+                        className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <AlertCircle size={14} />
+                        <span>{language === 'ms' ? 'Minta Pembetulan' : 'Request Revision'}</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={handleConfirmVerification}
-                      disabled={isSaving}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <CheckCircle2 size={16} />
-                      <span>{isSaving ? 'Menyahkan...' : (language === 'ms' ? 'Sahkan Log Mingguan' : 'Verify Weekly Log')}</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsRevisionMode(false)}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
-                    >
-                      {language === 'ms' ? 'Kembali ke Pengesahan' : 'Back to Verify'}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmVerification}
+                        disabled={isSaving}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>{isSaving ? 'Mengesahkan...' : (language === 'ms' ? 'Sahkan Log Mingguan' : 'Verify Weekly Log')}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsRevisionMode(false)}
+                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                      >
+                        {language === 'ms' ? 'Kembali' : 'Back'}
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={handleConfirmRevision}
-                      disabled={isSaving}
-                      className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <Send size={14} />
-                      <span>{isSaving ? 'Menghantar...' : (language === 'ms' ? 'Hantar Pembetulan' : 'Send Revision Request')}</span>
-                    </button>
-                  </>
+                      <button
+                        type="button"
+                        onClick={handleConfirmRevision}
+                        disabled={isSaving}
+                        className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Send size={14} />
+                        <span>{isSaving ? 'Menghantar...' : (language === 'ms' ? 'Hantar Pembetulan' : 'Send Revision Request')}</span>
+                      </button>
+                    </>
+                  )
                 )}
               </div>
             </div>

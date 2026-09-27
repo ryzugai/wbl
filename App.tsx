@@ -287,6 +287,7 @@ function App() {
                 users={users}
                 applications={applications}
                 onUpdateApplication={handleUpdateApplication}
+                onNavigate={setCurrentView}
             />
         )}
 

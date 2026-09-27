@@ -198,6 +198,12 @@ export interface WeeklyLogbook {
   trainerComments?: string;
   verifiedAt?: string;
   revisionNotes?: string;
+  // Semakan & Ulasan Penyelia Fakulti / Universiti (Supervisor)
+  supervisorId?: string;
+  supervisorName?: string;
+  supervisorStaffId?: string;
+  supervisorComments?: string;
+  supervisorReviewedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock } from 'lucide-react';
+import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock, BookOpen } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { DocumentViewer } from '../components/DocumentViewer';
 import { Language, t } from '../translations';
@@ -13,9 +13,10 @@ interface SupervisedStudentsProps {
   applications: Application[];
   language: Language;
   onUpdateApplication: (app: Application) => Promise<void>;
+  onNavigate?: (view: string) => void;
 }
 
-export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentUser, users, applications, language, onUpdateApplication }) => {
+export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentUser, users, applications, language, onUpdateApplication, onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -325,8 +326,18 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                 </div>
               </div>
               
-              <div className="px-5 py-3 bg-slate-50/30 border-t border-slate-100 flex justify-between items-center">
-                 <span className="text-[9px] text-slate-400 font-medium italic">WBL Session 2026/2027</span>
+              <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                 <div className="flex items-center gap-2">
+                   {onNavigate && (
+                     <button
+                       onClick={() => onNavigate('dailyLogbook')}
+                       className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                     >
+                       <BookOpen size={12} />
+                       <span>{language === 'ms' ? 'Buku Log Harian' : 'Daily Logbook'}</span>
+                     </button>
+                   )}
+                 </div>
                  {student.activeApp?.reply_form_uploaded_at && (
                     <span className="text-[8px] text-slate-400 font-medium">
                       Kemas Kini: {new Date(student.activeApp.reply_form_uploaded_at).toLocaleDateString()}
