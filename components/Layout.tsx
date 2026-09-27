@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole, Notification } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -171,6 +171,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           {/* New Tab for Students to see their assigned Supervisor */}
           {isStudent && (
              <NavItem view="studentSupervision" label={t(language, 'menuSeliaan')} icon={UserCheck} />
+          )}
+
+          {/* Daily Training Logbook for Students */}
+          {isStudent && (
+             <NavItem view="dailyLogbook" label={t(language, 'logbook')} icon={BookOpen} />
+          )}
+
+          {/* Logbook Verification for Industry Trainers */}
+          {currentUser.role === UserRole.TRAINER && (
+             <NavItem view="dailyLogbook" label={t(language, 'logbookVerification')} icon={UserCheck} />
+          )}
+
+          {/* Logbook Review & Monitoring for Lecturers & Coordinator */}
+          {(hasSystemAccess || isLecturer) && (
+             <NavItem view="dailyLogbook" label={t(language, 'logbook')} icon={BookOpen} />
           )}
 
           {/* New Tab for Lecturers to see their students */}

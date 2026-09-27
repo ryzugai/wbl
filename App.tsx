@@ -20,6 +20,7 @@ import { Statistics } from './pages/Statistics';
 import { Analysis } from './pages/Analysis';
 import { PosterFlipbook } from './pages/PosterFlipbook';
 import { UserActivities } from './pages/UserActivities';
+import { DailyLogbook } from './pages/DailyLogbook';
 import { Toaster, toast } from 'react-hot-toast';
 import { Language } from './translations';
 
@@ -295,6 +296,15 @@ function App() {
                 currentUser={currentUser}
                 applications={applications}
                 users={users}
+            />
+        )}
+
+        {currentView === 'dailyLogbook' && (
+            <DailyLogbook 
+                currentUser={currentUser}
+                applications={applications}
+                users={users}
+                language={language}
             />
         )}
 

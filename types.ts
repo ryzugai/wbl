@@ -34,6 +34,13 @@ export interface User {
   faculty_supervisor_name?: string;
   faculty_supervisor_staff_id?: string;
   faculty_supervisor_email?: string;
+  // Industry Trainer / Jurulatih Industri assigned directly to student
+  industry_trainer_id?: string;
+  industry_trainer_name?: string;
+  industry_trainer_position?: string;
+  industry_trainer_company?: string;
+  industry_trainer_email?: string;
+  industry_trainer_phone?: string;
   // Teaching Subjects (for Lecturers)
   teaching_subjects?: string; // JSON string array
   // Resume Data Fields
@@ -148,4 +155,51 @@ export interface Notification {
   sender_matric?: string;
   application_id?: string;
 }
+
+export interface DailyLogEntry {
+  id: string;
+  day: string; // e.g. 'Isnin' | 'Selasa' | 'Rabu' | 'Khamis' | 'Jumaat' | 'Sabtu' | 'Ahad'
+  date: string; // YYYY-MM-DD
+  startTime: string; // e.g. "08:30"
+  endTime: string; // e.g. "17:30"
+  department: string; // Bahagian / Jabatan / Seksyen
+  tasks: string; // Ringkasan tugasan & aktiviti harian
+  learningOutcomes: string; // Kemahiran & pengetahuan / hasil pembelajaran yang diperoleh
+  toolsUsed?: string; // Peralatan, mesin, perisian, atau sistem yang digunakan
+  remarks?: string; // Catatan tambahan
+}
+
+export type LogbookStatus = 'draft' | 'submitted' | 'verified' | 'revision';
+
+export interface WeeklyLogbook {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentMatric: string;
+  studentProgram: string;
+  companyName: string;
+  companyAddress?: string;
+  weekNumber: number; // 1 to 52
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  totalHours?: number;
+  entries: DailyLogEntry[];
+  weeklySummary: string; // Refleksi Mingguan Pelajar (pencapaian, cabaran & penyelesaian)
+  status: LogbookStatus;
+  submittedAt?: string;
+  // Pengesahan Jurulatih Industri
+  verifiedByTrainerId?: string;
+  trainerName?: string;
+  trainerPosition?: string;
+  trainerCompany?: string;
+  trainerEmail?: string;
+  trainerPhone?: string;
+  trainerRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+  trainerComments?: string;
+  verifiedAt?: string;
+  revisionNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 

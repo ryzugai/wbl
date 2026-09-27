@@ -1,5 +1,5 @@
 
-import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification } from '../types';
+import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry } from '../types';
 import { COORDINATOR_ACCOUNT } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
@@ -12,7 +12,8 @@ const STORAGE_KEYS = {
   SESSION: 'wbl_session',
   AD_CONFIG: 'wbl_ad_config',
   ACTIVITIES: 'wbl_activities',
-  NOTIFICATIONS: 'wbl_notifications'
+  NOTIFICATIONS: 'wbl_notifications',
+  LOGBOOKS: 'wbl_weekly_logbooks'
 };
 
 const firebaseConfig = {
@@ -27,7 +28,9 @@ const firebaseConfig = {
 
 let db: any = null;
 let unsubscribeListeners: (() => void)[] = [];
+let inMemoryUsers: User[] = [];
 let inMemoryApplications: Application[] = [];
+let inMemoryLogbooks: WeeklyLogbook[] = [];
 
 const stripHeavyFields = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -41,23 +44,149 @@ const stripHeavyFields = (obj: any): any => {
   if (typeof clone.offer_letter_image === 'string' && clone.offer_letter_image.length > 50000) {
     clone.offer_letter_image = 'idb_stored';
   }
+  if (typeof clone.profile_image === 'string' && clone.profile_image.length > 5000) {
+    clone.profile_image = 'idb_stored';
+  }
   return clone;
 };
 
 const safeSaveLocalStorage = (key: string, data: any) => {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.warn(`localStorage quota exceeded for ${key}, using stripped fallback:`, e);
+    let payload = data;
     if (Array.isArray(data)) {
-      const stripped = data.map(item => stripHeavyFields(item));
+      payload = data.map(item => stripHeavyFields(item));
+    } else if (data && typeof data === 'object') {
+      payload = stripHeavyFields(data);
+    }
+    localStorage.setItem(key, JSON.stringify(payload));
+  } catch (e) {
+    console.warn(`localStorage quota exceeded for ${key}, running aggressive quota relief:`, e);
+    try {
+      // 1. Trim activities in storage to 25 items
       try {
-        localStorage.setItem(key, JSON.stringify(stripped));
-      } catch (err2) {
-        console.error('Failed to save stripped array to localStorage:', err2);
+        const rawActs = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
+        if (rawActs) {
+          const acts = JSON.parse(rawActs);
+          if (acts.length > 25) {
+            localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(acts.slice(0, 25)));
+          }
+        }
+      } catch {}
+
+      // 2. Trim notifications in storage to 25 items
+      try {
+        const rawNotifs = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+        if (rawNotifs) {
+          const notifs = JSON.parse(rawNotifs);
+          if (notifs.length > 25) {
+            localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifs.slice(0, 25)));
+          }
+        }
+      } catch {}
+
+      // 3. Offload any heavy user profile image from data to IDB if saving USERS
+      let stripped = data;
+      if (Array.isArray(data)) {
+        stripped = data.map(item => {
+          const s = stripHeavyFields(item);
+          if (s.profile_image && s.profile_image.length > 200) {
+            IDBDocStorage.saveDocument(`${s.id}_profile_image`, s.profile_image).catch(() => {});
+            s.profile_image = 'idb_stored';
+          }
+          return s;
+        });
+      } else if (data && typeof data === 'object') {
+        stripped = stripHeavyFields(data);
+      }
+
+      localStorage.setItem(key, JSON.stringify(stripped));
+    } catch (err2) {
+      console.warn(`Secondary quota relief failed for ${key}, executing emergency cleanup:`, err2);
+      try {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVITIES);
+        localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
+
+        let minimal = data;
+        if (Array.isArray(data)) {
+          minimal = data.map(item => {
+            const s = stripHeavyFields(item);
+            if (s.profile_image) s.profile_image = 'idb_stored';
+            return s;
+          });
+        }
+        localStorage.setItem(key, JSON.stringify(minimal));
+      } catch (err3) {
+        console.error(`Emergency save failed for ${key}. Data retained in memory:`, err3);
       }
     }
   }
+};
+
+const hydrateUsersFromIDB = async () => {
+  try {
+    const docs = await IDBDocStorage.getAllDocuments();
+    let updated = false;
+    inMemoryUsers = inMemoryUsers.map(user => {
+      let userCopy = { ...user };
+      const profileKey = `${user.id}_profile_image`;
+      if (docs[profileKey] && (!userCopy.profile_image || userCopy.profile_image === 'idb_stored')) {
+        userCopy.profile_image = docs[profileKey];
+        updated = true;
+      }
+      return userCopy;
+    });
+    if (updated) {
+      notifyListeners();
+    }
+  } catch (err) {
+    console.warn('Failed to hydrate users from IndexedDB:', err);
+  }
+};
+
+const cleanAndMigrateLocalStorage = async () => {
+  try {
+    const rawUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+    if (rawUsers) {
+      const users: User[] = JSON.parse(rawUsers);
+      let modified = false;
+      for (const u of users) {
+        if (u.profile_image && u.profile_image.startsWith('data:') && u.profile_image.length > 5000) {
+          try {
+            await IDBDocStorage.saveDocument(`${u.id}_profile_image`, u.profile_image);
+            u.profile_image = 'idb_stored';
+            modified = true;
+          } catch (e) {
+            console.warn('Failed to migrate user photo to IDB:', e);
+          }
+        }
+      }
+      if (modified) {
+        safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
+      }
+    }
+  } catch (e) {
+    console.warn('cleanAndMigrateLocalStorage error:', e);
+  }
+
+  try {
+    const rawActs = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
+    if (rawActs) {
+      const acts = JSON.parse(rawActs);
+      if (acts.length > 40) {
+        safeSaveLocalStorage(STORAGE_KEYS.ACTIVITIES, acts.slice(0, 40));
+      }
+    }
+  } catch {}
+
+  try {
+    const rawNotifs = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    if (rawNotifs) {
+      const notifs = JSON.parse(rawNotifs);
+      if (notifs.length > 40) {
+        safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, notifs.slice(0, 40));
+      }
+    }
+  } catch {}
 };
 
 const hydrateAppsFromIDB = async () => {
@@ -115,7 +244,17 @@ const setupRealtimeListeners = () => {
         data.push(doc.data());
       });
       if (!snapshot.empty || snapshot.metadata.fromCache === false) {
-        if (colName === 'applications') {
+        if (colName === 'users') {
+          const firestoreUsers = data as User[];
+          inMemoryUsers = firestoreUsers.map(fUser => {
+            const localUser = inMemoryUsers.find(u => u.id === fUser.id);
+            return {
+              ...fUser,
+              profile_image: (fUser.profile_image && fUser.profile_image !== 'idb_stored') ? fUser.profile_image : localUser?.profile_image,
+            };
+          });
+          safeSaveLocalStorage(storageKey, inMemoryUsers);
+        } else if (colName === 'applications') {
           const firestoreApps = data as Application[];
           inMemoryApplications = firestoreApps.map(fApp => {
             const localApp = inMemoryApplications.find(a => a.id === fApp.id);
@@ -143,6 +282,7 @@ const setupRealtimeListeners = () => {
   syncCollection('applications', STORAGE_KEYS.APPLICATIONS);
   syncCollection('activities', STORAGE_KEYS.ACTIVITIES);
   syncCollection('notifications', STORAGE_KEYS.NOTIFICATIONS);
+  syncCollection('weekly_logbooks', STORAGE_KEYS.LOGBOOKS);
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
@@ -182,8 +322,20 @@ const sanitizeForFirebase = (obj: any): any => {
 };
 
 const getCurrentUser = (): User | null => {
-  const session = localStorage.getItem(STORAGE_KEYS.SESSION);
-  return session ? JSON.parse(session) : null;
+  try {
+    const session = localStorage.getItem(STORAGE_KEYS.SESSION);
+    if (!session) return null;
+    const user = JSON.parse(session);
+    if (user && user.profile_image === 'idb_stored') {
+      const full = inMemoryUsers.find(u => u.id === user.id);
+      if (full?.profile_image && full.profile_image !== 'idb_stored') {
+        user.profile_image = full.profile_image;
+      }
+    }
+    return user;
+  } catch {
+    return null;
+  }
 };
 
 const isCoordinator = () => {
@@ -200,14 +352,21 @@ const isJKWBL = () => {
 const hasSystemAccess = () => isCoordinator() || isJKWBL();
 
 const init = () => {
-  if (!localStorage.getItem(STORAGE_KEYS.USERS)) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
-  if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify([]));
-  if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify([]));
-  if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+  if (!localStorage.getItem(STORAGE_KEYS.USERS)) safeSaveLocalStorage(STORAGE_KEYS.USERS, []);
+  if (!localStorage.getItem(STORAGE_KEYS.COMPANIES)) safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, []);
+  if (!localStorage.getItem(STORAGE_KEYS.APPLICATIONS)) safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, []);
+  if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+  if (!localStorage.getItem(STORAGE_KEYS.LOGBOOKS)) safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, []);
   
   const rawAd = localStorage.getItem(STORAGE_KEYS.AD_CONFIG);
   if (!rawAd) {
-    localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify({ items: [], isEnabled: false }));
+    safeSaveLocalStorage(STORAGE_KEYS.AD_CONFIG, { items: [], isEnabled: false });
+  }
+
+  try {
+    inMemoryUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  } catch {
+    inMemoryUsers = [];
   }
 
   try {
@@ -216,6 +375,14 @@ const init = () => {
     inMemoryApplications = [];
   }
 
+  try {
+    inMemoryLogbooks = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGBOOKS) || '[]');
+  } catch {
+    inMemoryLogbooks = [];
+  }
+
+  cleanAndMigrateLocalStorage();
+  hydrateUsersFromIDB();
   hydrateAppsFromIDB();
 
   initFirebase();
@@ -242,7 +409,7 @@ export const StorageService = {
   updateAdConfig: async (config: AdConfig): Promise<void> => {
     if (!isCoordinator()) throw new Error('Hanya Penyelaras boleh mengemaskini iklan.');
     if (db) await setDoc(doc(db, 'settings', 'ad_config'), sanitizeForFirebase(config));
-    localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(config));
+    safeSaveLocalStorage(STORAGE_KEYS.AD_CONFIG, config);
     notifyListeners();
   },
 
@@ -268,17 +435,21 @@ export const StorageService = {
         last_login_at: new Date().toISOString(),
         last_activity_at: new Date().toISOString()
       } as unknown as User;
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      safeSaveLocalStorage(STORAGE_KEYS.SESSION, user);
       
-      await StorageService.logActivity(
-        user.id || 'coordinator-id',
-        user.username,
-        user.role,
-        user.name,
-        'login',
-        'Telah log masuk ke dalam sistem.',
-        'Logged into the system.'
-      );
+      try {
+        await StorageService.logActivity(
+          user.id || 'coordinator-id',
+          user.username,
+          user.role,
+          user.name,
+          'login',
+          'Telah log masuk ke dalam sistem.',
+          'Logged into the system.'
+        );
+      } catch (e) {
+        console.warn('Failed to log coordinator login:', e);
+      }
       
       return user;
     }
@@ -290,23 +461,31 @@ export const StorageService = {
       
       user.last_login_at = new Date().toISOString();
       user.last_activity_at = new Date().toISOString();
-      users[userIdx] = user;
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      inMemoryUsers[userIdx] = user;
+      safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
+      safeSaveLocalStorage(STORAGE_KEYS.SESSION, stripHeavyFields(user));
       
       if (db) {
-        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+        try {
+          await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(stripHeavyFields(user)), { merge: true });
+        } catch (e) {
+          console.warn('Firebase login sync notice:', e);
+        }
       }
       
-      await StorageService.logActivity(
-        user.id,
-        user.username,
-        user.role,
-        user.name,
-        'login',
-        'Telah log masuk ke dalam sistem.',
-        'Logged into the system.'
-      );
+      try {
+        await StorageService.logActivity(
+          user.id,
+          user.username,
+          user.role,
+          user.name,
+          'login',
+          'Telah log masuk ke dalam sistem.',
+          'Logged into the system.'
+        );
+      } catch (e) {
+        console.warn('Failed to log user login:', e);
+      }
       
       notifyListeners();
       return user;
@@ -317,35 +496,77 @@ export const StorageService = {
   logout: () => localStorage.removeItem(STORAGE_KEYS.SESSION),
   getCurrentUser,
 
-  getUsers: (): User[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]'),
+  getUsers: (): User[] => {
+    if (inMemoryUsers && inMemoryUsers.length > 0) {
+      return inMemoryUsers;
+    }
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+      inMemoryUsers = data;
+      return inMemoryUsers;
+    } catch {
+      return [];
+    }
+  },
   
   createUser: async (user: Omit<User, 'id'>): Promise<User> => {
     const users = StorageService.getUsers();
     if (users.some(u => u.username === user.username)) throw new Error('Username sudah wujud');
-    const newUser = { ...user, id: generateId(), is_approved: user.role === UserRole.STUDENT };
+    const newUser = { ...user, id: generateId(), is_approved: user.role === UserRole.STUDENT } as User;
     
-    users.push(newUser as User);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    if (newUser.profile_image && newUser.profile_image !== 'idb_stored') {
+      if (newUser.profile_image.length > 5000) {
+        await IDBDocStorage.saveDocument(`${newUser.id}_profile_image`, newUser.profile_image);
+      }
+    }
+
+    inMemoryUsers.push(newUser);
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
     notifyListeners();
 
-    if (db) await setDoc(doc(db, 'users', newUser.id), sanitizeForFirebase(newUser));
+    if (db) {
+      try {
+        const firebaseUser = stripHeavyFields(newUser);
+        await setDoc(doc(db, 'users', newUser.id), sanitizeForFirebase(firebaseUser));
+      } catch (e) {
+        console.warn('Firebase create user sync notice:', e);
+      }
+    }
     return newUser as User;
   },
 
   updateUser: async (updatedUser: User): Promise<User> => {
     updatedUser.last_activity_at = new Date().toISOString();
-    const users = StorageService.getUsers();
-    const idx = users.findIndex(u => u.id === updatedUser.id);
-    if (idx !== -1) {
-        users[idx] = updatedUser;
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        notifyListeners();
+
+    if (updatedUser.profile_image && updatedUser.profile_image !== 'idb_stored') {
+      if (updatedUser.profile_image.length > 5000) {
+        await IDBDocStorage.saveDocument(`${updatedUser.id}_profile_image`, updatedUser.profile_image);
+      }
+    } else if (!updatedUser.profile_image) {
+      await IDBDocStorage.deleteDocument(`${updatedUser.id}_profile_image`);
     }
-    if (db) await setDoc(doc(db, 'users', updatedUser.id), sanitizeForFirebase(updatedUser), { merge: true });
+
+    const idx = inMemoryUsers.findIndex(u => u.id === updatedUser.id);
+    if (idx !== -1) {
+      inMemoryUsers[idx] = updatedUser;
+    } else {
+      inMemoryUsers.push(updatedUser);
+    }
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
+    notifyListeners();
+
+    if (db) {
+      try {
+        const firebaseUser = stripHeavyFields(updatedUser);
+        await setDoc(doc(db, 'users', updatedUser.id), sanitizeForFirebase(firebaseUser), { merge: true });
+      } catch (e) {
+        console.warn('Firebase user sync notice:', e);
+      }
+    }
     
     const curSession = getCurrentUser();
     if (curSession && curSession.id === updatedUser.id) {
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(updatedUser));
+      safeSaveLocalStorage(STORAGE_KEYS.SESSION, stripHeavyFields(updatedUser));
     }
 
     // Identify update type for elegant logging
@@ -361,24 +582,35 @@ export const StorageService = {
       msgEn = 'Updated lecturer information.';
     }
 
-    await StorageService.logActivity(
-      updatedUser.id,
-      updatedUser.username,
-      updatedUser.role,
-      updatedUser.name,
-      actType,
-      msgMs,
-      msgEn
-    );
+    try {
+      await StorageService.logActivity(
+        updatedUser.id,
+        updatedUser.username,
+        updatedUser.role,
+        updatedUser.name,
+        actType,
+        msgMs,
+        msgEn
+      );
+    } catch (e) {
+      console.warn('Failed to log update user activity:', e);
+    }
 
     return updatedUser;
   },
 
   deleteUser: async (id: string): Promise<void> => {
-    const users = StorageService.getUsers().filter(u => u.id !== id);
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    inMemoryUsers = inMemoryUsers.filter(u => u.id !== id);
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
+    await IDBDocStorage.deleteDocument(`${id}_profile_image`);
     notifyListeners();
-    if (db) await deleteDoc(doc(db, 'users', id));
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'users', id));
+      } catch (e) {
+        console.warn('Firebase delete user notice:', e);
+      }
+    }
   },
 
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
@@ -398,7 +630,7 @@ export const StorageService = {
 
     const companies = StorageService.getCompanies();
     companies.push(newCompany);
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+    safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, companies);
     notifyListeners();
 
     if (db) await setDoc(doc(db, 'companies', newCompany.id), sanitizeForFirebase(newCompany));
@@ -409,22 +641,26 @@ export const StorageService = {
       const uIdx = users.findIndex(u => u.id === user.id);
       if (uIdx !== -1) {
         users[uIdx] = user;
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
       }
-      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user));
+      safeSaveLocalStorage(STORAGE_KEYS.SESSION, stripHeavyFields(user));
       if (db) {
-        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(user), { merge: true });
+        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(stripHeavyFields(user)), { merge: true });
       }
       
-      await StorageService.logActivity(
-        user.id,
-        user.username,
-        user.role,
-        user.name,
-        'company_create',
-        `Telah mencadangkan / menambah syarikat baharu: ${newCompany.company_name}.`,
-        `Proposed / added a new company: ${newCompany.company_name}.`
-      );
+      try {
+        await StorageService.logActivity(
+          user.id,
+          user.username,
+          user.role,
+          user.name,
+          'company_create',
+          `Telah mencadangkan / menambah syarikat baharu: ${newCompany.company_name}.`,
+          `Proposed / added a new company: ${newCompany.company_name}.`
+        );
+      } catch (e) {
+        console.warn('Failed to log company creation activity:', e);
+      }
     }
 
     return newCompany;
@@ -445,7 +681,7 @@ export const StorageService = {
     }));
 
     const updatedTotal = [...existing, ...newItems];
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updatedTotal));
+    safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, updatedTotal);
     notifyListeners();
 
     if (db) {
@@ -468,7 +704,7 @@ export const StorageService = {
       updated_at: timestamp
     }));
     
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updatedCompanies));
+    safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, updatedCompanies);
     notifyListeners();
 
     if (db) {
@@ -493,7 +729,7 @@ export const StorageService = {
     const idx = companies.findIndex(c => c.id === updatedCompany.id);
     if (idx !== -1) {
         companies[idx] = updatedCompany;
-        localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+        safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, companies);
         notifyListeners();
     }
     if (db) await setDoc(doc(db, 'companies', updatedCompany.id), sanitizeForFirebase(updatedCompany), { merge: true });
@@ -502,7 +738,7 @@ export const StorageService = {
 
   deleteCompany: async (id: string): Promise<void> => {
     const companies = StorageService.getCompanies().filter(c => c.id !== id);
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(companies));
+    safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, companies);
     notifyListeners();
     if (db) await deleteDoc(doc(db, 'companies', id));
   },
@@ -808,15 +1044,19 @@ export const StorageService = {
 
     // 5. Log activity
     if (performedBy) {
-      await StorageService.logActivity(
-        performedBy.id,
-        performedBy.username,
-        performedBy.role,
-        performedBy.name,
-        'placement_set_by_coordinator',
-        `Menetapkan syarikat penempatan rasmi "${company.company_name}" untuk pelajar ${student.name} (${student.matric_no})${deletedCount > 0 ? ` dan memadam ${deletedCount} pilihan lain` : ''}.`,
-        `Assigned official placement "${company.company_name}" for student ${student.name} (${student.matric_no})${deletedCount > 0 ? ` and deleted ${deletedCount} other choices` : ''}.`
-      );
+      try {
+        await StorageService.logActivity(
+          performedBy.id,
+          performedBy.username,
+          performedBy.role,
+          performedBy.name,
+          'placement_set_by_coordinator',
+          `Menetapkan syarikat penempatan rasmi "${company.company_name}" untuk pelajar ${student.name} (${student.matric_no})${deletedCount > 0 ? ` dan memadam ${deletedCount} pilihan lain` : ''}.`,
+          `Assigned official placement "${company.company_name}" for student ${student.name} (${student.matric_no})${deletedCount > 0 ? ` and deleted ${deletedCount} other choices` : ''}.`
+        );
+      } catch (e) {
+        console.warn('Failed to log placement activity:', e);
+      }
     }
 
     return { placementApp: finalApp, deletedCount };
@@ -863,8 +1103,8 @@ export const StorageService = {
       timestamp: new Date().toISOString()
     };
     activities.unshift(newActivity);
-    const trimmed = activities.slice(0, 200);
-    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(trimmed));
+    const trimmed = activities.slice(0, 40);
+    safeSaveLocalStorage(STORAGE_KEYS.ACTIVITIES, trimmed);
     notifyListeners();
     if (db) {
       try {
@@ -890,7 +1130,8 @@ export const StorageService = {
       id: generateId()
     };
     notifications.unshift(newNotif);
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    const trimmed = notifications.slice(0, 40);
+    safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, trimmed);
     notifyListeners();
     if (db) {
       try {
@@ -907,7 +1148,7 @@ export const StorageService = {
     const idx = notifications.findIndex(n => n.id === id);
     if (idx !== -1) {
       notifications[idx].is_read = true;
-      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+      safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
       notifyListeners();
       if (db) {
         await setDoc(doc(db, 'notifications', id), { is_read: true }, { merge: true });
@@ -927,7 +1168,7 @@ export const StorageService = {
       return n;
     });
     if (updated) {
-      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updatedNotifications));
+      safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, updatedNotifications);
       notifyListeners();
       if (db) {
         const batch = writeBatch(db);
@@ -944,25 +1185,310 @@ export const StorageService = {
 
   deleteNotification: async (id: string): Promise<void> => {
     const notifications = StorageService.getNotifications().filter(n => n.id !== id);
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    safeSaveLocalStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
     notifyListeners();
     if (db) await deleteDoc(doc(db, 'notifications', id));
+  },
+
+  // ==================== DAILY & WEEKLY LOGBOOK MODULE ====================
+  getWeeklyLogbooks: (): WeeklyLogbook[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.LOGBOOKS);
+      if (raw) {
+        const parsed = JSON.parse(raw) as WeeklyLogbook[];
+        if (Array.isArray(parsed)) {
+          inMemoryLogbooks = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+    return inMemoryLogbooks;
+  },
+
+  getStudentLogbooks: (studentIdOrMatric: string): WeeklyLogbook[] => {
+    const all = StorageService.getWeeklyLogbooks();
+    return all.filter(l => l.studentId === studentIdOrMatric || l.studentMatric === studentIdOrMatric)
+              .sort((a, b) => a.weekNumber - b.weekNumber);
+  },
+
+  getTrainerLogbooks: (trainerId: string, companyName?: string): WeeklyLogbook[] => {
+    const all = StorageService.getWeeklyLogbooks();
+    const cleanComp = (companyName || '').trim().toLowerCase();
+    return all.filter(l => {
+      if (l.verifiedByTrainerId === trainerId) return true;
+      if (cleanComp && l.companyName && l.companyName.trim().toLowerCase() === cleanComp) return true;
+      return false;
+    }).sort((a, b) => b.weekNumber - a.weekNumber);
+  },
+
+  getLogbookById: (id: string): WeeklyLogbook | undefined => {
+    const all = StorageService.getWeeklyLogbooks();
+    return all.find(l => l.id === id);
+  },
+
+  saveWeeklyLogbook: async (logbookData: Partial<WeeklyLogbook> & { studentId: string; weekNumber: number }): Promise<WeeklyLogbook> => {
+    const all = StorageService.getWeeklyLogbooks();
+    const existingIndex = all.findIndex(l => 
+      (logbookData.id && l.id === logbookData.id) || 
+      (l.studentId === logbookData.studentId && l.weekNumber === logbookData.weekNumber)
+    );
+
+    const now = new Date().toISOString();
+    let savedLogbook: WeeklyLogbook;
+
+    if (existingIndex !== -1) {
+      const existing = all[existingIndex];
+      savedLogbook = {
+        ...existing,
+        ...logbookData,
+        id: existing.id,
+        updatedAt: now
+      };
+      all[existingIndex] = savedLogbook;
+    } else {
+      savedLogbook = {
+        ...logbookData,
+        id: logbookData.id || generateId(),
+        studentId: logbookData.studentId,
+        studentName: logbookData.studentName || '',
+        studentMatric: logbookData.studentMatric || '',
+        studentProgram: logbookData.studentProgram || '',
+        companyName: logbookData.companyName || '',
+        companyAddress: logbookData.companyAddress || '',
+        weekNumber: logbookData.weekNumber,
+        startDate: logbookData.startDate || new Date().toISOString().split('T')[0],
+        endDate: logbookData.endDate || new Date().toISOString().split('T')[0],
+        totalHours: logbookData.totalHours || 40,
+        entries: logbookData.entries || [],
+        weeklySummary: logbookData.weeklySummary || '',
+        status: logbookData.status || 'draft',
+        createdAt: now,
+        updatedAt: now
+      };
+      all.push(savedLogbook);
+    }
+
+    inMemoryLogbooks = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'weekly_logbooks', savedLogbook.id), sanitizeForFirebase(savedLogbook));
+      } catch (err) {
+        console.error('Failed to sync logbook to Firebase:', err);
+      }
+    }
+
+    return savedLogbook;
+  },
+
+  submitWeeklyLogbook: async (id: string, trainerDetails?: { name?: string; email?: string; position?: string; company?: string; trainerId?: string }): Promise<WeeklyLogbook> => {
+    const all = StorageService.getWeeklyLogbooks();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const updated: WeeklyLogbook = {
+      ...target,
+      status: 'submitted',
+      submittedAt: now,
+      updatedAt: now,
+      trainerName: trainerDetails?.name || target.trainerName,
+      trainerEmail: trainerDetails?.email || target.trainerEmail,
+      trainerPosition: trainerDetails?.position || target.trainerPosition,
+      trainerCompany: trainerDetails?.company || target.companyName,
+      verifiedByTrainerId: trainerDetails?.trainerId || target.verifiedByTrainerId
+    };
+
+    const newAll = all.map(l => l.id === id ? updated : l);
+    inMemoryLogbooks = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'weekly_logbooks', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.error('Cloud sync error for logbook submit:', e);
+      }
+    }
+
+    // Send notification to Coordinator & Industry Trainer
+    try {
+      await StorageService.createNotification({
+        recipient_id: trainerDetails?.trainerId || 'coordinator',
+        recipient_role: UserRole.TRAINER,
+        sender_name: updated.studentName,
+        sender_matric: updated.studentMatric,
+        title_ms: `Logbook Mingguan Dihantar - Minggu ${updated.weekNumber}`,
+        title_en: `Weekly Logbook Submitted - Week ${updated.weekNumber}`,
+        message_ms: `Pelajar ${updated.studentName} (${updated.studentMatric}) telah menghantar logbook Minggu ${updated.weekNumber} bagi penempatan di ${updated.companyName} untuk pengesahan jurulatih industri.`,
+        message_en: `Student ${updated.studentName} (${updated.studentMatric}) submitted Week ${updated.weekNumber} logbook at ${updated.companyName} for trainer verification.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      await StorageService.logActivity(
+        currentUser.id,
+        currentUser.username,
+        currentUser.role,
+        currentUser.name,
+        'LOGBOOK_SUBMIT',
+        `Menghantar Log Latihan Harian Minggu ${updated.weekNumber} untuk pengesahan jurulatih industri.`,
+        `Submitted Daily Training Log for Week ${updated.weekNumber} for industry coach verification.`
+      );
+    }
+
+    return updated;
+  },
+
+  verifyWeeklyLogbook: async (id: string, verification: {
+    trainerName: string;
+    trainerPosition: string;
+    trainerCompany?: string;
+    trainerComments: string;
+    trainerRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+    verifiedByTrainerId?: string;
+    trainerEmail?: string;
+    trainerPhone?: string;
+  }): Promise<WeeklyLogbook> => {
+    const all = StorageService.getWeeklyLogbooks();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log tidak dijumpai.');
+
+    const now = new Date().toISOString();
+    const updated: WeeklyLogbook = {
+      ...target,
+      status: 'verified',
+      verifiedAt: now,
+      updatedAt: now,
+      trainerName: verification.trainerName,
+      trainerPosition: verification.trainerPosition,
+      trainerCompany: verification.trainerCompany || target.companyName,
+      trainerComments: verification.trainerComments,
+      trainerRating: verification.trainerRating || 'cemerlang',
+      verifiedByTrainerId: verification.verifiedByTrainerId,
+      trainerEmail: verification.trainerEmail || target.trainerEmail,
+      trainerPhone: verification.trainerPhone || target.trainerPhone,
+      revisionNotes: undefined
+    };
+
+    const newAll = all.map(l => l.id === id ? updated : l);
+    inMemoryLogbooks = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'weekly_logbooks', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.error('Cloud sync error for logbook verify:', e);
+      }
+    }
+
+    // Send notification to the student
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: verification.trainerName,
+        title_ms: `Logbook Minggu ${updated.weekNumber} Telah Disahkan!`,
+        title_en: `Week ${updated.weekNumber} Logbook Verified!`,
+        message_ms: `Tahniah! Jurulatih Industri (${verification.trainerName}) telah mengesahkan logbook harian anda bagi Minggu ${updated.weekNumber}. Ulasan: "${verification.trainerComments || 'Disahkan dengan jayanya'}"`,
+        message_en: `Congratulations! Industry Coach (${verification.trainerName}) verified your Week ${updated.weekNumber} logbook. Feedback: "${verification.trainerComments || 'Verified successfully'}"`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      await StorageService.logActivity(
+        currentUser.id,
+        currentUser.username,
+        currentUser.role,
+        currentUser.name,
+        'LOGBOOK_VERIFIED',
+        `Mengesahkan Logbook Latihan Harian Minggu ${updated.weekNumber} bagi pelajar ${updated.studentName} (${updated.studentMatric}).`,
+        `Verified Week ${updated.weekNumber} Daily Training Log for student ${updated.studentName} (${updated.studentMatric}).`
+      );
+    }
+
+    return updated;
+  },
+
+  requestRevisionWeeklyLogbook: async (id: string, revisionNotes: string, trainerName: string): Promise<WeeklyLogbook> => {
+    const all = StorageService.getWeeklyLogbooks();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log tidak dijumpai.');
+
+    const now = new Date().toISOString();
+    const updated: WeeklyLogbook = {
+      ...target,
+      status: 'revision',
+      revisionNotes,
+      updatedAt: now
+    };
+
+    const newAll = all.map(l => l.id === id ? updated : l);
+    inMemoryLogbooks = [...newAll];
+    safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, newAll);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'weekly_logbooks', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.error('Cloud sync error for logbook revision request:', e);
+      }
+    }
+
+    // Send notification to student
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: trainerName,
+        title_ms: `Pembetulan Logbook Diperlukan - Minggu ${updated.weekNumber}`,
+        title_en: `Logbook Revision Needed - Week ${updated.weekNumber}`,
+        message_ms: `Jurulatih Industri (${trainerName}) meminta pembetulan bagi logbook Minggu ${updated.weekNumber}. Catatan: "${revisionNotes}"`,
+        message_en: `Industry Coach (${trainerName}) requested revisions for Week ${updated.weekNumber} logbook. Notes: "${revisionNotes}"`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    return updated;
+  },
+
+  deleteWeeklyLogbook: async (id: string): Promise<void> => {
+    const all = StorageService.getWeeklyLogbooks().filter(l => l.id !== id);
+    inMemoryLogbooks = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, all);
+    notifyListeners();
+    if (db) await deleteDoc(doc(db, 'weekly_logbooks', id));
   },
 
   getFullSystemBackup: () => ({
     users: StorageService.getUsers(),
     companies: StorageService.getCompanies(),
     applications: StorageService.getApplications(),
+    logbooks: StorageService.getWeeklyLogbooks(),
     adConfig: StorageService.getAdConfig(),
     timestamp: new Date().toISOString()
   }),
 
   restoreFullSystem: (data: any) => {
     if (!hasSystemAccess()) throw new Error('Akses Ditolak.');
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(data.users || []));
-    localStorage.setItem(STORAGE_KEYS.COMPANIES, JSON.stringify(data.companies || []));
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(data.applications || []));
-    if (data.adConfig) localStorage.setItem(STORAGE_KEYS.AD_CONFIG, JSON.stringify(data.adConfig));
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, data.users || []);
+    safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, data.companies || []);
+    safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, data.applications || []);
+    if (data.logbooks) safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, data.logbooks || []);
+    if (data.adConfig) safeSaveLocalStorage(STORAGE_KEYS.AD_CONFIG, data.adConfig);
     notifyListeners();
   }
 };

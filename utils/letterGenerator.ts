@@ -814,7 +814,7 @@ export const generatePlacementConfirmationLetter = (
       <style>
         @page {
           size: A4 portrait;
-          margin: 8mm 12mm 8mm 12mm;
+          margin: 8mm 14mm 8mm 14mm;
         }
 
         * {
@@ -825,8 +825,8 @@ export const generatePlacementConfirmationLetter = (
 
         body {
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 8.5pt;
-          line-height: 1.25;
+          font-size: 9.5pt;
+          line-height: 1.32;
           color: #111;
           margin: 0;
           padding: 0;
@@ -862,7 +862,7 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .action-info strong {
-          font-size: 12px;
+          font-size: 13px;
           letter-spacing: 0.3px;
           color: #f8fafc;
         }
@@ -882,10 +882,10 @@ export const generatePlacementConfirmationLetter = (
           background: linear-gradient(135deg, #059669, #0d9488);
           color: white;
           border: none;
-          padding: 7px 16px;
+          padding: 8px 18px;
           border-radius: 6px;
           font-weight: bold;
-          font-size: 11px;
+          font-size: 12px;
           cursor: pointer;
           box-shadow: 0 2px 6px rgba(0,0,0,0.2);
           transition: all 0.2s;
@@ -900,9 +900,9 @@ export const generatePlacementConfirmationLetter = (
           background: #334155;
           color: white;
           border: 1px solid #475569;
-          padding: 7px 12px;
+          padding: 8px 14px;
           border-radius: 6px;
-          font-size: 11px;
+          font-size: 12px;
           cursor: pointer;
           transition: all 0.2s;
         }
@@ -917,7 +917,7 @@ export const generatePlacementConfirmationLetter = (
           max-height: 297mm;
           background: white;
           margin: 55px auto 20px auto;
-          padding: 10mm 14mm 10mm 14mm;
+          padding: 10mm 15mm 10mm 15mm;
           box-shadow: 0 8px 24px rgba(0,0,0,0.3);
           position: relative;
           display: flex;
@@ -932,23 +932,87 @@ export const generatePlacementConfirmationLetter = (
           flex-direction: column;
         }
 
-        /* HEADER */
-        .header-table {
+        /* LETTERHEAD MATCHING FPTTLETTERHEAD */
+        .official-letterhead {
           width: 100%;
           border-collapse: collapse;
           margin-bottom: 2px;
         }
 
-        .logo {
-          height: 48px;
-          object-fit: contain;
+        .official-letterhead td {
+          vertical-align: middle;
+          padding: 0;
         }
 
-        .divider-line {
+        .logo-img {
+          height: 52px;
+          object-fit: contain;
+          display: block;
+        }
+
+        .v-divider {
+          width: 3.5px;
+          height: 48px;
+          background-color: #cbd5e1;
+          border-radius: 1px;
+          margin: 0 auto;
+        }
+
+        .addr-cell-content {
+          display: flex;
+          align-items: flex-start;
+          gap: 7px;
+          padding: 0 8px;
+        }
+
+        .addr-icon {
+          width: 15px;
+          height: 15px;
+          margin-top: 1px;
+          flex-shrink: 0;
+          color: #111;
+        }
+
+        .addr-text {
+          font-size: 8pt;
+          line-height: 1.25;
+          color: #111;
+        }
+
+        .addr-title {
+          font-weight: 800;
+          font-size: 8.5pt;
+          color: #000;
+        }
+
+        .contact-cell-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2.5px;
+          font-size: 8pt;
+          line-height: 1.25;
+          color: #111;
+          padding-left: 8px;
+        }
+
+        .contact-row {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+
+        .contact-icon {
+          width: 13px;
+          height: 13px;
+          flex-shrink: 0;
+          color: #111;
+        }
+
+        .header-solid-line {
           width: 100%;
-          height: 1px;
-          background-color: #1a1a1a;
-          margin: 2px 0 4px 0;
+          height: 2px;
+          background-color: #000;
+          margin: 5px 0 6px 0;
         }
 
         .faculty-header {
@@ -957,14 +1021,14 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .faculty-title {
-          font-size: 8.5pt;
+          font-size: 9pt;
           font-weight: bold;
           letter-spacing: 0.2px;
           color: #000;
         }
 
         .faculty-contacts {
-          font-size: 7.5pt;
+          font-size: 8pt;
           color: #222;
           margin-top: 1px;
         }
@@ -975,7 +1039,7 @@ export const generatePlacementConfirmationLetter = (
           justify-content: space-between;
           align-items: flex-start;
           margin-bottom: 6px;
-          font-size: 8pt;
+          font-size: 9pt;
           line-height: 1.25;
         }
 
@@ -986,13 +1050,13 @@ export const generatePlacementConfirmationLetter = (
         .ref-col-right {
           text-align: right;
           font-weight: bold;
-          font-size: 8pt;
+          font-size: 9pt;
         }
 
         /* STUDENT INFO */
         .student-info-block {
           margin-bottom: 6px;
-          font-size: 8.5pt;
+          font-size: 9pt;
           line-height: 1.25;
         }
 
@@ -1007,7 +1071,7 @@ export const generatePlacementConfirmationLetter = (
 
         /* TITLE */
         .letter-title {
-          font-size: 8.5pt;
+          font-size: 9.5pt;
           font-weight: bold;
           text-align: left;
           color: #000;
@@ -1017,7 +1081,7 @@ export const generatePlacementConfirmationLetter = (
 
         .intro-p {
           margin: 0 0 5px 0;
-          font-size: 8.5pt;
+          font-size: 9.2pt;
           color: #111;
         }
 
@@ -1026,7 +1090,7 @@ export const generatePlacementConfirmationLetter = (
           width: 100%;
           border-collapse: collapse;
           margin-bottom: 6px;
-          font-size: 8.5pt;
+          font-size: 9.2pt;
           line-height: 1.25;
         }
 
@@ -1041,7 +1105,7 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .dt-sep {
-          width: 20px;
+          width: 18px;
           text-align: center;
         }
 
@@ -1054,7 +1118,7 @@ export const generatePlacementConfirmationLetter = (
           display: flex;
           gap: 6px;
           margin-bottom: 5px;
-          font-size: 8pt;
+          font-size: 8.8pt;
           line-height: 1.28;
           text-align: justify;
         }
@@ -1074,7 +1138,7 @@ export const generatePlacementConfirmationLetter = (
           width: 100%;
           border-collapse: collapse;
           margin-top: 3px;
-          font-size: 7.8pt;
+          font-size: 8.5pt;
           line-height: 1.22;
         }
 
@@ -1098,7 +1162,7 @@ export const generatePlacementConfirmationLetter = (
           width: 100%;
           border-collapse: collapse;
           margin-top: 3px;
-          font-size: 7.8pt;
+          font-size: 8.8pt;
           line-height: 1.22;
         }
 
@@ -1108,7 +1172,7 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .p-label {
-          width: 65px;
+          width: 60px;
         }
 
         .p-sep {
@@ -1123,12 +1187,13 @@ export const generatePlacementConfirmationLetter = (
         /* SIGN OFF */
         .signoff-section {
           margin-top: 5px;
-          font-size: 8pt;
+          font-size: 8.8pt;
           line-height: 1.22;
         }
 
         .signatory-name {
           font-weight: bold;
+          font-size: 9.2pt;
           color: #000;
         }
 
@@ -1138,15 +1203,15 @@ export const generatePlacementConfirmationLetter = (
 
         .comp-gen-note {
           font-style: italic;
-          font-size: 7.2pt;
+          font-size: 7.8pt;
           color: #444;
-          margin-top: 4px;
+          margin-top: 3px;
         }
 
         /* FOOTER DECORATION */
         .page-footer {
-          margin-top: 6px;
-          padding-top: 4px;
+          margin-top: 5px;
+          padding-top: 3px;
         }
 
         .footer-bar {
@@ -1154,7 +1219,7 @@ export const generatePlacementConfirmationLetter = (
           height: 5px;
           background: linear-gradient(to right, #002b66 0%, #004b99 75%, #0066cc 100%);
           border-radius: 1px;
-          margin-bottom: 4px;
+          margin-bottom: 3px;
         }
 
         .footer-bottom {
@@ -1164,7 +1229,7 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .footer-text {
-          font-size: 7pt;
+          font-size: 7.5pt;
           font-weight: bold;
           letter-spacing: 0.8px;
           color: #003366;
@@ -1172,7 +1237,7 @@ export const generatePlacementConfirmationLetter = (
         }
 
         .cert-box {
-          font-size: 6pt;
+          font-size: 6.5pt;
           color: #444;
           text-align: right;
         }
@@ -1196,12 +1261,15 @@ export const generatePlacementConfirmationLetter = (
             padding: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            max-height: 280mm !important;
+            max-height: 281mm !important;
             min-height: auto !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
           }
         }
       </style>
@@ -1225,26 +1293,70 @@ export const generatePlacementConfirmationLetter = (
       <!-- SINGLE PAGE LETTER -->
       <div class="letter-page">
         <div class="page-content-wrap">
-          <table class="header-table">
+          <!-- EXACT REPLICA OF FPTTLETTERHEAD.PNG -->
+          <table class="official-letterhead">
             <tr>
-              <td style="width: 25%; vertical-align: middle;">
-                <img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" class="logo" alt="UTeM Logo">
+              <!-- UTeM Logo with Arabic & Latin Typography -->
+              <td style="width: 25%; text-align: left;">
+                <img src="https://www.utem.edu.my/templates/yootheme/cache/5b/LogoUTeM-5b80a51b.png" class="logo-img" alt="UTeM Official Logo">
               </td>
-              <td style="width: 45%; vertical-align: middle; text-align: left; padding-left: 10px; font-size: 7.5pt; line-height: 1.25;">
-                <div style="font-size: 8pt; font-weight: bold; color: #111;">Universiti Teknikal Malaysia Melaka</div>
-                <div>Hang Tuah Jaya,</div>
-                <div>76100 Durian Tunggal,</div>
-                <div>Melaka, Malaysia.</div>
+
+              <!-- Divider 1 -->
+              <td style="width: 18px; text-align: center;">
+                <div class="v-divider"></div>
               </td>
-              <td style="width: 30%; vertical-align: middle; text-align: right; font-size: 7.5pt; line-height: 1.35; color: #222;">
-                <div>📞 +606 270 1000</div>
-                <div>📠 +606 270 1022</div>
-                <div>🌐 www.utem.edu.my</div>
+
+              <!-- Address Column with Location Pin Icon -->
+              <td style="width: 44%; text-align: left;">
+                <div class="addr-cell-content">
+                  <svg class="addr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <div class="addr-text">
+                    <div class="addr-title">Universiti Teknikal Malaysia Melaka</div>
+                    <div>Hang Tuah Jaya,</div>
+                    <div>76100 Durian Tunggal,</div>
+                    <div>Melaka, Malaysia.</div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Divider 2 -->
+              <td style="width: 18px; text-align: center;">
+                <div class="v-divider"></div>
+              </td>
+
+              <!-- Contact Numbers & Web with Icons -->
+              <td style="width: 28%; text-align: left;">
+                <div class="contact-cell-content">
+                  <div class="contact-row">
+                    <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                    <span>+606 270 1000</span>
+                  </div>
+                  <div class="contact-row">
+                    <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect width="20" height="16" x="2" y="4" rx="2"/>
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                    </svg>
+                    <span>+606 270 1022</span>
+                  </div>
+                  <div class="contact-row">
+                    <svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                      <path d="M2 12h20"/>
+                    </svg>
+                    <span>www.utem.edu.my</span>
+                  </div>
+                </div>
               </td>
             </tr>
           </table>
 
-          <div class="divider-line"></div>
+          <div class="header-solid-line"></div>
 
           <div class="faculty-header">
             <div class="faculty-title">FACULTY OF TECHNOLOGY MANAGEMENT AND TECHNOPRENEURSHIP</div>
@@ -1327,14 +1439,14 @@ export const generatePlacementConfirmationLetter = (
           <div class="clause-block">
             <div class="clause-num">3.</div>
             <div class="clause-content">
-              Students are required to fill up <strong>'Work-Based Learning Information Card'</strong> (available in the Daily Logbook) and send it to the Faculty Work-Based Learning Coordinator (PLIF) within <strong>one week</strong> after reporting for training. In the case that you have changed your residential / industry address (under the instruction of the organisation only) during the training, please inform the PLIF as soon as possible by filling in the form <strong>'Change of Address during Work-Based Learning'</strong>.
+              Students are required to fill up <strong>'Work-Based Learning Information Card'</strong> (available in the Daily Logbook) and send it to the Faculty Work-Based Learning Coordinator (PWBLF) within <strong>one week</strong> after reporting for training. In the case that you have changed your residential / industry address (under the instruction of the organisation only) during the training, please inform the PWBLF as soon as possible by filling in the form <strong>'Change of Address during Work-Based Learning'</strong>.
             </div>
           </div>
 
           <div class="clause-block">
             <div class="clause-num">4.</div>
             <div class="clause-content">
-              Should there be any queries and issues pertaining to the Work-Based Learning programme, please do not hesitate to contact PLIF as follows :
+              Should there be any queries and issues pertaining to the Work-Based Learning programme, please do not hesitate to contact PWBLF as follows :
               
               <table class="plif-table">
                 <tr><td class="p-label">Name</td><td class="p-sep">:</td><td class="p-val"><strong>DR. MOHD GUZAIRY BIN ABD GHANI</strong></td></tr>

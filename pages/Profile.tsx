@@ -133,7 +133,43 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, profile_image: reader.result as string });
+        const rawBase64 = reader.result as string;
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const maxDim = 360;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+              if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              }
+            } else {
+              if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressed = canvas.toDataURL('image/jpeg', 0.8);
+              setFormData(prev => ({ ...prev, profile_image: compressed }));
+              return;
+            }
+          } catch (e) {
+            console.warn('Canvas compression fallback:', e);
+          }
+          setFormData(prev => ({ ...prev, profile_image: rawBase64 }));
+        };
+        img.onerror = () => {
+          setFormData(prev => ({ ...prev, profile_image: rawBase64 }));
+        };
+        img.src = rawBase64;
       };
       reader.readAsDataURL(file);
     }
