@@ -13,6 +13,9 @@ export interface WeeklyAssessmentConfig {
   taskHighlights: string[];
   areas: WeeklyAssessmentArea[];
   maxMarks: number; // 12
+  startDate?: string;
+  endDate?: string;
+  milestone?: string;
 }
 
 export interface RubricCriterionLevel {
@@ -437,8 +440,533 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
       ],
       maxMarks: 12
     }
+  ],
+
+  // Course 5: BTMU 4084(i) Final Year Project II (PSM II) - 20 Minggu Bermula 28 September 2026
+  'BTMU 4084(i)': [
+    {
+      week: 1,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-09-28',
+      endDate: '2026-10-02',
+      milestone: 'Fasa 1: Pengesahan Skop Masalah Industri',
+      cloStatement: 'CLO 1: Formulate research objectives addressing industrial operational problems (PLO4, C4)',
+      taskTitle: 'MINGGU 1 (28 Sep - 02 Okt 2026): Penyelarasan Skop Masalah Industri & Penetapan Objektif Bersama JI',
+      taskHighlights: [
+        'Penyelarasan isu dan skop penyelidikan sebenar bersama Jurulatih Industri di premis syarikat',
+        'Analisis awal proses operasi, sistem kerja dan data baseline sedia ada organisasi',
+        'Penyusunan jadual perbatuan (milestone) 20 minggu PSM II yang dipersetujui JI dan TPF'
+      ],
+      areas: [
+        { id: 1, title: 'Kefahaman dan ketepatan penetapan isu operasi sebenar industri' },
+        { id: 2, title: 'Hubung jalin objektif penyelidikan dengan keperluan penambahbaikan firma' },
+        { id: 3, title: 'Komitmen perancangan jadual kerja penyelidikan 20 minggu (Gantt Chart)' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 2,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-10-05',
+      endDate: '2026-10-09',
+      milestone: 'Fasa 1: Sorotan Literatur Lanjutan',
+      cloStatement: 'CLO 1: Synthesize relevant literature for industrial solutions (PLO4, C4)',
+      taskTitle: 'MINGGU 2 (05 Okt - 09 Okt 2026): Sorotan Literatur Lanjutan & Penentuan Jurang Kajian Kontekstual',
+      taskHighlights: [
+        'Penerokaan artikel jurnal berwasit terkini berkaitan isu penyelesaian di firma penempatan',
+        'Penentuan jurang kajian (research gap) antara amalan teori akademik dan amalan industri',
+        'Penyusunan sintesis literatur Bab 2 serta pemetaan amalan terbaik (best practices)'
+      ],
+      areas: [
+        { id: 1, title: 'Kualiti dan kerelevanan sumber rujukan akademik yang diteroka' },
+        { id: 2, title: 'Keupayaan mengenal pasti jurang praktikal operasi organisasi' },
+        { id: 3, title: 'Sintesis teori dan perkaitannya dengan amalan di tempat kerja' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 3,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-10-12',
+      endDate: '2026-10-16',
+      milestone: 'Fasa 1: Kerangka Konseptual',
+      cloStatement: 'CLO 1: Synthesize relevant literature for industrial solutions (PLO4, C4)',
+      taskTitle: 'MINGGU 3 (12 Okt - 16 Okt 2026): Pembinaan Kerangka Konseptual & Model Pembolehubah Kajian',
+      taskHighlights: [
+        'Membangunkan kerangka konseptual penyelidikan berdasarkan sorotan literatur dan cabaran firma',
+        'Mengenal pasti pembolehubah bersandar, pembolehubah bebas dan faktor kekangan industri',
+        'Sesi konsultasi kerangka konseptual bersama Jurulatih Industri dan Penyelia Fakulti'
+      ],
+      areas: [
+        { id: 1, title: 'Keteguhan kerangka konseptual yang menghubungkan masalah firma' },
+        { id: 2, title: 'Definisi operasi pembolehubah yang jelas dan boleh diukur secara saintifik' },
+        { id: 3, title: 'Penerimaan dan pengesahan awal konsep model oleh Jurulatih Industri' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 4,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-10-19',
+      endDate: '2026-10-23',
+      milestone: 'Fasa 2: Reka Bentuk Metodologi Lapangan',
+      cloStatement: 'CLO 2: Design rigorous research methodology suitable for industry setting (PLO7, C5)',
+      taskTitle: 'MINGGU 4 (19 Okt - 23 Okt 2026): Reka Bentuk Penyelidikan & Perancangan Pensampelan Lapangan',
+      taskHighlights: [
+        'Menetapkan reka bentuk penyelidikan (kuantitatif / kualitatif / kaedah campuran) di industri',
+        'Menentukan populasi, saiz sampel dan teknik pensampelan yang sesuai dengan operasi firma',
+        'Penyediaan protokol etika penyelidikan, persetujuan termaklum dan kerahsiaan data organisasi'
+      ],
+      areas: [
+        { id: 1, title: 'Kesesuaian reka bentuk kajian dengan persekitaran operasi firma' },
+        { id: 2, title: 'Ketepatan kaedah pensampelan dan justifikasi saiz sampel' },
+        { id: 3, title: 'Pematuhan prosedur integriti dan kerahsiaan data syarikat' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 5,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-10-26',
+      endDate: '2026-10-30',
+      milestone: 'Fasa 2: Pembangunan Instrumen & Semakan JI',
+      cloStatement: 'CLO 2: Design rigorous research methodology suitable for industry setting (PLO7, C5)',
+      taskTitle: 'MINGGU 5 (26 Okt - 30 Okt 2026): Pembangunan Draf Instrumen Kajian & Semakan Kesahan Kandungan',
+      taskHighlights: [
+        'Membina draf instrumen (borang soal selidik / protokol temubual / senarai semak audit proses)',
+        'Semakan kesahan muka dan kandungan bersama Jurulatih Industri dan pakar teknikal firma',
+        'Penambahbaikan item instrumen mengikut terminologi standard industri'
+      ],
+      areas: [
+        { id: 1, title: 'Kualiti pembinaan item instrumen penyelidikan' },
+        { id: 2, title: 'Kesesuaian bahasa dan terminologi yang diguna pakai di firma' },
+        { id: 3, title: 'Maklum balas dan pengesahan kesahan kandungan oleh Jurulatih Industri' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 6,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-11-02',
+      endDate: '2026-11-06',
+      milestone: 'Fasa 2: Kajian Rintis (Pilot Test)',
+      cloStatement: 'CLO 2: Execute pilot study and reliability testing (PLO7, C5)',
+      taskTitle: 'MINGGU 6 (02 Nov - 06 Nov 2026): Pelaksanaan Kajian Rintis (Pilot Study) & Pengujian Kebolehpercayaan',
+      taskHighlights: [
+        'Mengedarkan instrumen kepada sampel rintis dalam organisasi penempatan',
+        'Menjalankan ujian kebolehpercayaan (Cronbach Alpha / semakan tematik pakar)',
+        'Menyempurnakan draf Bab 1, 2 dan 3 untuk semakan rasmi Milestone 1'
+      ],
+      areas: [
+        { id: 1, title: 'Pelaksanaan ujian rintis secara beretika di premis industri' },
+        { id: 2, title: 'Ketepatan analisis kebolehpercayaan instrumen kajian' },
+        { id: 3, title: 'Kesiapsiagaan manuskrip Bab 1-3 untuk semakan kemajuan' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 7,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-11-09',
+      endDate: '2026-11-13',
+      milestone: 'Milestone 1: Penilaian Kemajuan Fasa Pertama',
+      cloStatement: 'CLO 3: Evaluate research progress and demonstrate professional conduct (PLO8, A2)',
+      taskTitle: 'MINGGU 7 (09 Nov - 13 Nov 2026): Penilaian Kemajuan Fasa 1 Bersama JI & TPF (Milestone 1)',
+      taskHighlights: [
+        'Pembentangan kemajuan metodologi dan instrumen kepada Jurulatih Industri',
+        'Penyelarasan cadangan pembetulan dan penambahbaikan instrumen daripada JI dan TPF',
+        'Penyediaan pelan tindakan pengumpulan data sebenar di premis syarikat'
+      ],
+      areas: [
+        { id: 1, title: 'Kejelasan pembentangan kemajuan metodologi kepada JI' },
+        { id: 2, title: 'Ketangkasan membuat pembetulan berdasarkan maklum balas penilai' },
+        { id: 3, title: 'Disiplin dan komitmen perantisan sepanjang 6 minggu pertama' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 8,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-11-16',
+      endDate: '2026-11-20',
+      milestone: 'Fasa 3: Pengumpulan Data Lapangan (Primer)',
+      cloStatement: 'CLO 2: Collect empirical data adhering to industry confidentiality (PLO8, P4)',
+      taskTitle: 'MINGGU 8 (16 Nov - 20 Nov 2026): Pengumpulan Data Sebenar Fasa 1 (Data Primer / Lapangan)',
+      taskHighlights: [
+        'Mengedarkan soal selidik / menjalankan sesi temubual pekerja dan pengurusan firma',
+        'Memantau kadar maklum balas (response rate) dan menyemak kelengkapan data',
+        'Menyimpan log audit pengumpulan data secara selamat dan berintegriti'
+      ],
+      areas: [
+        { id: 1, title: 'Pengurusan pengumpulan data di lapangan industri secara berhemah' },
+        { id: 2, title: 'Kadar respon dan usaha mengatasi kekangan kutipan data' },
+        { id: 3, title: 'Penyimpanan rekod data secara selamat dan berintegriti' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 9,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-11-23',
+      endDate: '2026-11-27',
+      milestone: 'Fasa 3: Pengumpulan Data Sekunder & Operasi',
+      cloStatement: 'CLO 2: Collect empirical data adhering to industry confidentiality (PLO8, P4)',
+      taskTitle: 'MINGGU 9 (23 Nov - 27 Nov 2026): Pengumpulan Data Sebenar Fasa 2 (Data Sekunder & Metrik Operasi)',
+      taskHighlights: [
+        'Mengekstrak data sekunder operasi firma (rekod jualan, kecekapan barisan, log kecacatan produk)',
+        'Mengesahkan ketulenan dan kesahihan data sekunder bersama ketua bahagian berkaitan',
+        'Memadankan data primer soal selidik dengan metrik operasi sebenar organisasi'
+      ],
+      areas: [
+        { id: 1, title: 'Ketelitian mengekstrak data sekunder operasi organisasi' },
+        { id: 2, title: 'Kerjasama profesional dengan warga kerja firma semasa kutipan data' },
+        { id: 3, title: 'Keselarasan antara data primer lapangan dan rekod operasi firma' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 10,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-11-30',
+      endDate: '2026-12-04',
+      milestone: 'Fasa 4: Pembersihan & Penyaringan Data',
+      cloStatement: 'CLO 3: Prepare clean data sets for scientific analysis (PLO7, C4)',
+      taskTitle: 'MINGGU 10 (30 Nov - 04 Dis 2026): Pembersihan, Penyaringan & Pengkodan Data (Data Wrangling)',
+      taskHighlights: [
+        'Pemeriksaan data hilang (missing data), nilai ekstrem (outliers) dan andaian normaliti',
+        'Pengkodan transkrip temubual dan penetapan tema awal (analisis tematik kualitatif)',
+        'Penyediaan pangkalan data bersih (clean dataset) untuk analisis inferensi/statistik lanjutan'
+      ],
+      areas: [
+        { id: 1, title: 'Kemahiran teknikal pembersihan dan saringan data mentah' },
+        { id: 2, title: 'Ketepatan pengkodan pembolehubah penyelidikan' },
+        { id: 3, title: 'Dokumentasi langkah saringan data secara telus dan boleh diulang semak' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 11,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-12-07',
+      endDate: '2026-12-11',
+      milestone: 'Milestone 2: Analisis Deskriptif & Semakan Pertengahan',
+      cloStatement: 'CLO 3: Analyze baseline descriptive statistics and operational trends (PLO4, C4)',
+      taskTitle: 'MINGGU 11 (07 Dis - 11 Dis 2026): Analisis Data Deskriptif & Penilaian Kemajuan Pertengahan (Milestone 2)',
+      taskHighlights: [
+        'Menjana profil demografi responden dan taburan statistik deskriptif pembolehubah',
+        'Menganalisis corak asas prestasi operasi syarikat dan trend cabaran utama',
+        'Semakan buku log dan sesi konsultasi pertengahan semester bersama Jurulatih Industri'
+      ],
+      areas: [
+        { id: 1, title: 'Kedalaman analisis deskriptif terhadap senario operasi firma' },
+        { id: 2, title: 'Kualiti visualisasi carta, jadual dan grafik data awal' },
+        { id: 3, title: 'Prestasi dan komitmen kerja separuh jalan (Minggu 1 - 10)' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 12,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-12-14',
+      endDate: '2026-12-18',
+      milestone: 'Fasa 4: Analisis Inferensi & Ujian Hipotesis',
+      cloStatement: 'CLO 3: Perform inferential statistics / thematic modeling (PLO4, C5)',
+      taskTitle: 'MINGGU 12 (14 Dis - 18 Dis 2026): Analisis Data Lanjutan (Ujian Inferensi / Pemodelan Tematik)',
+      taskHighlights: [
+        'Melaksanakan ujian hipotesis (regresi berganda, korelasi, ANOVA) atau pemodelan tematik',
+        'Menilai tahap signifikasi statistik dan saiz kesan terhadap isu produktiviti firma',
+        'Mengesahkan ketepatan dapatan analisis statistik bersama penyelia teknikal industri'
+      ],
+      areas: [
+        { id: 1, title: 'Aplikasi alat analisis data saintifik yang betul dan mantap' },
+        { id: 2, title: 'Ketepatan tafsiran statistik/tematik berlandaskan objektif kajian' },
+        { id: 3, title: 'Perbincangan intelek dapatan analisis bersama Jurulatih Industri' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 13,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-12-21',
+      endDate: '2026-12-25',
+      milestone: 'Fasa 5: Penterjemahan Dapatan ke Punca Utama',
+      cloStatement: 'CLO 3: Interpret analytical findings relative to research objectives (PLO4, C5)',
+      taskTitle: 'MINGGU 13 (21 Dis - 25 Dis 2026): Penterjemahan Dapatan Analisis ke Masalah Punca Utama (Root Cause)',
+      taskHighlights: [
+        'Menghubungkaitkan dapatan data dengan punca sebenar masalah operasi organisasi',
+        'Mengaplikasikan kaedah Fishbone Diagram atau 5-Why Analysis berasaskan data empirikal',
+        'Membentangkan sintesis dapatan awal kepada pasukan pengurusan firma'
+      ],
+      areas: [
+        { id: 1, title: 'Keupayaan menterjemah angka data kepada punca operasi nyata' },
+        { id: 2, title: 'Logik analitikal dalam mengenal pasti punca masalah utama firma' },
+        { id: 3, title: 'Ketrampilan berkongsi maklumat dan meyakinkan penyelia industri' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 14,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2026-12-28',
+      endDate: '2027-01-01',
+      milestone: 'Fasa 5: Penggubalan Model Solusi Inovatif',
+      cloStatement: 'CLO 3: Formulate actionable industrial solutions based on evidence (PLO8, C5)',
+      taskTitle: 'MINGGU 14 (28 Dis 2026 - 01 Jan 2027): Penggubalan Model Solusi Inovatif & Pelan Tindakan Industri',
+      taskHighlights: [
+        'Merangka model penyelesaian / inovasi teknopreneur berasaskan bukti saintifik kajian',
+        'Menyediakan draf prosedur operasi standard (SOP) baharu atau prototaip cadangan penambahbaikan',
+        'Menganalisis impak kos dan faedah (cost-benefit analysis) bagi pelaksanaan di syarikat'
+      ],
+      areas: [
+        { id: 1, title: 'Kreativiti dan kebolehlaksanaan model solusi yang dicadangkan' },
+        { id: 2, title: 'Nilai tambah ekonomi/operasi yang bakal dinikmati oleh organisasi' },
+        { id: 3, title: 'Kelengkapan pelan tindakan pelaksanaan penambahbaikan' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 15,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2027-01-04',
+      endDate: '2027-01-08',
+      milestone: 'Fasa 5: Pengujian / Simulasi Lapangan',
+      cloStatement: 'CLO 2: Test and validate recommended solution within organization (PLO7, P5)',
+      taskTitle: 'MINGGU 15 (04 Jan - 08 Jan 2027): Pengujian / Simulasi Kebolehlaksanaan Solusi di Premis Firma',
+      taskHighlights: [
+        'Menjalankan ujian simulasi / percubaan terhad model penambahbaikan di premis firma',
+        'Mengumpul maklum balas daripada pengendali operasi dan penyelia industri',
+        'Membuat pelarasan akhir kepada cadangan penyelesaian agar berdaya maju sepenuhnya'
+      ],
+      areas: [
+        { id: 1, title: 'Pelaksanaan sesi pengujian / simulasi di persekitaran kerja sebenar' },
+        { id: 2, title: 'Kepekaan terhadap maklum balas pekerja dan kekangan praktikal operasi' },
+        { id: 3, title: 'Kualiti penambahbaikan solusi selepas sesi percubaan lapangan' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 16,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2027-01-11',
+      endDate: '2027-01-15',
+      milestone: 'Fasa 6: Penulisan Manuskrip Bab 4 & 5',
+      cloStatement: 'CLO 1: Document empirical findings and synthesize implications (PLO4, PLO8, C4, C5)',
+      taskTitle: 'MINGGU 16 (11 Jan - 15 Jan 2027): Penulisan Penuh Bab 4 (Analisis & Dapatan) & Bab 5 (Perbincangan)',
+      taskHighlights: [
+        'Menulis laporan komprehensif Bab 4 dan Bab 5 mengikut format tesis ilmiah UTeM',
+        'Menghuraikan implikasi teori dan praktikal cadangan penambahbaikan kepada industri',
+        'Mengemukakan draf laporan lengkap Bab 1-5 kepada Jurulatih Industri untuk semakan'
+      ],
+      areas: [
+        { id: 1, title: 'Kualiti penulisan laporan teknikal dan kedalaman perbincangan dapatan' },
+        { id: 2, title: 'Kejelasan persembahan data, graf dan jadual sokongan' },
+        { id: 3, title: 'Kekukuhan justifikasi cadangan penyelesaian untuk organisasi' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 17,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2027-01-18',
+      endDate: '2027-01-22',
+      milestone: 'Fasa 6: Semakan Format Tesis & Integriti',
+      cloStatement: 'CLO 1: Assemble complete thesis conforming to UTeM formatting standard (PLO8, C4)',
+      taskTitle: 'MINGGU 17 (18 Jan - 22 Jan 2027): Semakan Manuskrip Tesis Penuh, Format APA & Integriti Akademik',
+      taskHighlights: [
+        'Menyemak pematuhan format Buku Panduan PSM UTeM dan format rujukan APA edisi terkini',
+        'Menjalankan semakan Turnitin (indeks keserupaan plagiarisme mesti <= 20%)',
+        'Menyediakan abstrak dwi-bahasa (Bahasa Melayu dan Bahasa Inggeris)'
+      ],
+      areas: [
+        { id: 1, title: 'Kepatuhan format tesis, rujukan dan susun atur dokumen universiti' },
+        { id: 2, title: 'Integriti akademik dan peratusan indeks keserupaan plagiarisme' },
+        { id: 3, title: 'Kualiti penulisan abstrak teknikal dan tatabahasa' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 18,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2027-01-25',
+      endDate: '2027-01-29',
+      milestone: 'Fasa 7: Penyediaan Slaid Kolokium & Pra-Viva',
+      cloStatement: 'CLO 4: Prepare professional research presentation for stakeholders (PLO9, C3C)',
+      taskTitle: 'MINGGU 18 (25 Jan - 29 Jan 2027): Penyediaan Slaid Pembentangan Kolokium & Latihan Pra-Viva Bersama JI',
+      taskHighlights: [
+        'Merekabentuk slaid pembentangan seminar bertaraf profesional eksekutif korporat',
+        'Menghasilkan poster ringkasan penyelidikan infografik yang padat dan informatif',
+        'Sesi raptai pembentangan (mock viva) di hadapan Jurulatih Industri dan pasukan kerja'
+      ],
+      areas: [
+        { id: 1, title: 'Kualiti reka bentuk slaid dan kejelasan infografik data kajian' },
+        { id: 2, title: 'Kelancaran pengucapan awam dan artikulasi hujah penyelidikan' },
+        { id: 3, title: 'Respons terhadap sesi soal jawab latihan bersama Jurulatih Industri' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 19,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2027-02-01',
+      endDate: '2027-02-05',
+      milestone: 'Milestone 3: Pembentangan Seminar / Viva PSM II',
+      cloStatement: 'CLO 4: Present and defend final research project before evaluation panel (PLO9, A5, C3C)',
+      taskTitle: 'MINGGU 19 (01 Feb - 05 Feb 2027): Sesi Seminar Kolokium / Pembentangan Viva PSM II Bersama Panel JI & TPF',
+      taskHighlights: [
+        'Membentangkan hasil projek penyelidikan PSM II kepada panel penilai (JI & TPF)',
+        'Mempertahankan dapatan, metodologi dan solusi dalam sesi soal jawab viva akademik',
+        'Menerima rubrik penilaian pembentangan seminar rasmi (JI 15% + TPF 15%)'
+      ],
+      areas: [
+        { id: 1, title: 'Penguasaan keseluruhan projek dan kejelasan pembentangan viva' },
+        { id: 2, title: 'Pertahanan hujah secara matang, kritis dan berfakta kajian' },
+        { id: 3, title: 'Ketrampilan profesional, etika, kepimpinan dan penampilan diri' }
+      ],
+      maxMarks: 12
+    },
+    {
+      week: 20,
+      courseCode: 'BTMU 4084(i)',
+      courseName: 'FINAL YEAR PROJECT II (PSM II)',
+      startDate: '2027-02-08',
+      endDate: '2027-02-12',
+      milestone: 'Milestone 4: Pengesahan & Serahan Akhir Tesis',
+      cloStatement: 'CLO 1, 2, 3, 4: Finalize archival research report and portfolio (PLO4, PLO7, PLO8, PLO9)',
+      taskTitle: 'MINGGU 20 (08 Feb - 12 Feb 2027): Pembetulan Akhir Manuskrip, Pengesahan Markah Akhir & Penyerahan Portfolio',
+      taskHighlights: [
+        'Menyelesaikan pembetulan tesis yang disyorkan oleh panel penilai seminar',
+        'Mendapatkan pengesahan dan tandatangan rasmi Jurulatih Industri (JI) & Penyelia Fakulti (TPF)',
+        'Menyerahkan naskhah akhir tesis dan portfolio lengkap PSM II kepada pihak firma dan universiti'
+      ],
+      areas: [
+        { id: 1, title: 'Kesempurnaan pembetulan manuskrip mengikut teguran panel penilai' },
+        { id: 2, title: 'Kelengkapan borang pengesahan, dokumen portfolio dan serahan rasmi' },
+        { id: 3, title: 'Prestasi keseluruhan, integriti dan sumbangan bernilai tinggi kepada firma sepanjang 20 minggu' }
+      ],
+      maxMarks: 12
+    }
   ]
 };
+
+// Alias for BTMU 4084 (without '(i)')
+UTEM_WEEKLY_ASSESSMENTS['BTMU 4084'] = UTEM_WEEKLY_ASSESSMENTS['BTMU 4084(i)'];
+
+// =========================================================================
+// WBL OFFICIAL COURSE SEQUENCE (5-WEEK MODULES & 20-WEEK PSM2)
+// =========================================================================
+
+export interface WblCourseSequenceItem {
+  order: number;
+  courseCode: string;
+  courseName: string;
+  shortName: string;
+  creditHours: number;
+  durationWeeks: number;
+  startDate: string;
+  endDate: string;
+  badge: string;
+  evaluatorRatio: string;
+  jiWeightPercent: number;
+  tpfWeightPercent: number;
+  description: string;
+}
+
+export const WBL_COURSE_SEQUENCE: WblCourseSequenceItem[] = [
+  {
+    order: 1,
+    courseCode: 'BTMU 2103(i)',
+    courseName: 'OPERATIONS MANAGEMENT (PENGURUSAN OPERASI)',
+    shortName: 'Pengurusan Operasi',
+    creditHours: 3,
+    durationWeeks: 5,
+    startDate: '2026-09-28',
+    endDate: '2026-10-30',
+    badge: 'Modul 1 (Minggu 1 - 5)',
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiWeightPercent: 60,
+    tpfWeightPercent: 40,
+    description: 'Bermula 28 September 2026 (Minggu 1 - 5): Tata atur kilang, perancangan kapasiti, lean manufacturing (7 Muda & JIT), kawalan kualiti & pembentangan akhir.'
+  },
+  {
+    order: 2,
+    courseCode: 'BTMT 3273(i)',
+    courseName: 'DIGITAL ENTREPRENEURSHIP (KEUSAHAWANAN DIGITAL)',
+    shortName: 'Keusahawanan Digital',
+    creditHours: 3,
+    durationWeeks: 5,
+    startDate: '2026-11-02',
+    endDate: '2026-12-04',
+    badge: 'Modul 2 (Minggu 6 - 10 / M1-5)',
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiWeightPercent: 60,
+    tpfWeightPercent: 40,
+    description: 'Bermula 02 November 2026 (Minggu 6 - 10): Ekosistem digital, Digital Business Model Canvas (BMC), pemasaran media sosial, operasi e-pasaran & laporan projek.'
+  },
+  {
+    order: 3,
+    courseCode: 'BTMT 3283(i)',
+    courseName: 'BUSINESS ANALYTICS (ANALITIK PERNIAGAAN)',
+    shortName: 'Analitik Perniagaan',
+    creditHours: 3,
+    durationWeeks: 5,
+    startDate: '2026-12-07',
+    endDate: '2027-01-08',
+    badge: 'Modul 3 (Minggu 11 - 15 / M1-5)',
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiWeightPercent: 60,
+    tpfWeightPercent: 40,
+    description: 'Bermula 07 Disember 2026 (Minggu 11 - 15): Pengekstrakan data, analisis penerokaan (EDA), pemodelan ramalan, papan pemuka Power BI & laporan kajian analitik.'
+  },
+  {
+    order: 4,
+    courseCode: 'BTMT 2113(i)',
+    courseName: 'BRAND MANAGEMENT (PENGURUSAN PENJENAMAAN)',
+    shortName: 'Pengurusan Penjenamaan',
+    creditHours: 3,
+    durationWeeks: 5,
+    startDate: '2027-01-11',
+    endDate: '2027-02-12',
+    badge: 'Modul 4 (Minggu 16 - 20 / M1-5)',
+    evaluatorRatio: 'JI: 60% | TPF: 40%',
+    jiWeightPercent: 60,
+    tpfWeightPercent: 40,
+    description: 'Bermula 11 Januari 2027 (Minggu 16 - 20): Elemen jenama, ekuiti jenama, penjenamaan era digital, komunikasi pemasaran bersepadu (IMC) & serahan portfolio.'
+  },
+  {
+    order: 5,
+    courseCode: 'BTMU 4084(i)',
+    courseName: 'FINAL YEAR PROJECT II (PROJEK SARJANA MUDA II / PSM II)',
+    shortName: 'PSM II (20 Minggu)',
+    creditHours: 4,
+    durationWeeks: 20,
+    startDate: '2026-09-28',
+    endDate: '2027-02-12',
+    badge: 'Sepanjang Semester (20 Minggu)',
+    evaluatorRatio: 'JI: 40% | TPF: 60%',
+    jiWeightPercent: 40,
+    tpfWeightPercent: 60,
+    description: 'Bermula 28 September 2026 selama 20 minggu: Skop masalah industri, sorotan literatur, metodologi lapangan, analisis data, solusi penambahbaikan, pembentangan viva & tesis akhir.'
+  }
+];
 
 // =========================================================================
 // 2. OFFICIAL COMPREHENSIVE COURSE PORTFOLIOS & RUBRICS (ATTACHMENT P. 39 - 87)

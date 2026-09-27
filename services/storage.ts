@@ -1,5 +1,5 @@
 
-import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus } from '../types';
+import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus, CourseAnnouncement, CourseAnnouncementReadReceipt, WBLMessage, WBLConversation } from '../types';
 import { COORDINATOR_ACCOUNT, DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
@@ -15,7 +15,10 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'wbl_notifications',
   LOGBOOKS: 'wbl_weekly_logbooks',
   COURSE_ASSIGNMENTS: 'wbl_course_lecturer_assignments',
-  EVALUATIONS: 'wbl_student_evaluations'
+  EVALUATIONS: 'wbl_student_evaluations',
+  COURSE_ANNOUNCEMENTS: 'wbl_course_announcements',
+  WBL_CONVERSATIONS: 'wbl_conversations',
+  WBL_MESSAGES: 'wbl_messages'
 };
 
 const firebaseConfig = {
@@ -35,6 +38,9 @@ let inMemoryApplications: Application[] = [];
 let inMemoryLogbooks: WeeklyLogbook[] = [];
 let inMemoryCourseAssignments: CourseLecturerAssignment[] = [];
 let inMemoryEvaluations: StudentEvaluation[] = [];
+let inMemoryAnnouncements: CourseAnnouncement[] = [];
+let inMemoryConversations: WBLConversation[] = [];
+let inMemoryMessages: WBLMessage[] = [];
 
 const stripHeavyFields = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -287,6 +293,9 @@ const setupRealtimeListeners = () => {
   syncCollection('activities', STORAGE_KEYS.ACTIVITIES);
   syncCollection('notifications', STORAGE_KEYS.NOTIFICATIONS);
   syncCollection('weekly_logbooks', STORAGE_KEYS.LOGBOOKS);
+  syncCollection('course_announcements', STORAGE_KEYS.COURSE_ANNOUNCEMENTS);
+  syncCollection('wbl_conversations', STORAGE_KEYS.WBL_CONVERSATIONS);
+  syncCollection('wbl_messages', STORAGE_KEYS.WBL_MESSAGES);
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
@@ -2201,6 +2210,16 @@ export const StorageService = {
     return all.filter(e => e.studentId === studentIdOrMatric || e.studentMatric === studentIdOrMatric);
   },
 
+  getStudentWeeklyEvaluations: (studentIdOrMatric: string, courseCode?: string): StudentEvaluation[] => {
+    const all = StorageService.getEvaluations();
+    return all.filter(e => {
+      const isStudentMatch = e.studentId === studentIdOrMatric || e.studentMatric === studentIdOrMatric;
+      const isCourseMatch = !courseCode || e.courseCode === courseCode;
+      const isWeekly = e.evaluationType === 'weekly' || (e.weekNumber !== undefined && e.weekNumber !== null);
+      return isStudentMatch && isCourseMatch && isWeekly;
+    });
+  },
+
   getLecturerEvaluations: (lecturerId: string, courseCode?: string): StudentEvaluation[] => {
     const all = StorageService.getEvaluations();
     return all.filter(e => {
@@ -2222,9 +2241,19 @@ export const StorageService = {
 
   saveEvaluation: async (evalData: Partial<StudentEvaluation> & { studentId: string; courseCode: string }): Promise<StudentEvaluation> => {
     const all = StorageService.getEvaluations();
-    const existingIdx = all.findIndex(e => 
-      (evalData.id && e.id === evalData.id) || (e.studentId === evalData.studentId && e.courseCode === evalData.courseCode)
-    );
+    const isWeekly = evalData.evaluationType === 'weekly' || (evalData.weekNumber !== undefined && evalData.weekNumber !== null);
+    
+    const existingIdx = all.findIndex(e => {
+      if (evalData.id && e.id === evalData.id) return true;
+      if (e.studentId === evalData.studentId && e.courseCode === evalData.courseCode) {
+        if (isWeekly) {
+          return e.weekNumber === evalData.weekNumber;
+        } else {
+          return !e.weekNumber || e.evaluationType === 'comprehensive';
+        }
+      }
+      return false;
+    });
 
     const now = new Date().toISOString();
     const scores = evalData.scores || {
@@ -2233,11 +2262,30 @@ export const StorageService = {
       logbookQuality: 8, reflectionQuality: 8
     };
 
-    const technicalSubtotal = (scores.taskKnowledge || 0) + (scores.workQuality || 0) + (scores.problemSolving || 0) + (scores.toolCompetency || 0);
-    const softSkillsSubtotal = (scores.punctuality || 0) + (scores.communication || 0) + (scores.workEthics || 0) + (scores.adaptability || 0);
-    const logbookSubtotal = (scores.logbookQuality || 0) + (scores.reflectionQuality || 0);
-    const totalScore = technicalSubtotal + softSkillsSubtotal + logbookSubtotal;
-    const grade = calculateUTeMGrade(totalScore).grade;
+    let technicalSubtotal = (scores.taskKnowledge || 0) + (scores.workQuality || 0) + (scores.problemSolving || 0) + (scores.toolCompetency || 0);
+    let softSkillsSubtotal = (scores.punctuality || 0) + (scores.communication || 0) + (scores.workEthics || 0) + (scores.adaptability || 0);
+    let logbookSubtotal = (scores.logbookQuality || 0) + (scores.reflectionQuality || 0);
+    let totalScore = technicalSubtotal + softSkillsSubtotal + logbookSubtotal;
+    let grade = calculateUTeMGrade(totalScore).grade;
+
+    // If weekly evaluation with weeklyScores (3 areas, max 12 marks)
+    if (isWeekly && evalData.weeklyScores) {
+      const a1 = Math.max(0, Math.min(4, Number(evalData.weeklyScores.area1) || 0));
+      const a2 = Math.max(0, Math.min(4, Number(evalData.weeklyScores.area2) || 0));
+      const a3 = Math.max(0, Math.min(4, Number(evalData.weeklyScores.area3) || 0));
+      const weeklySum = a1 + a2 + a3;
+      evalData.weeklyScores = {
+        area1: a1,
+        area2: a2,
+        area3: a3,
+        total: weeklySum
+      };
+      totalScore = Math.round((weeklySum / 12) * 100);
+      grade = calculateUTeMGrade(totalScore).grade;
+      technicalSubtotal = a1;
+      softSkillsSubtotal = a2;
+      logbookSubtotal = a3;
+    }
 
     let saved: StudentEvaluation;
 
@@ -2245,6 +2293,7 @@ export const StorageService = {
       saved = {
         ...all[existingIdx],
         ...evalData,
+        evaluationType: isWeekly ? 'weekly' : (evalData.evaluationType || 'comprehensive'),
         scores,
         technicalSubtotal,
         softSkillsSubtotal,
@@ -2265,6 +2314,13 @@ export const StorageService = {
         companyAddress: evalData.companyAddress || '',
         courseCode: evalData.courseCode,
         courseName: evalData.courseName || evalData.courseCode,
+        evaluationType: isWeekly ? 'weekly' : (evalData.evaluationType || 'comprehensive'),
+        weekNumber: evalData.weekNumber,
+        startDate: evalData.startDate,
+        endDate: evalData.endDate,
+        weeklyTaskTitle: evalData.weeklyTaskTitle,
+        weeklyDeliverableNotes: evalData.weeklyDeliverableNotes,
+        weeklyScores: evalData.weeklyScores,
         lecturerId: evalData.lecturerId || '',
         lecturerName: evalData.lecturerName || '',
         lecturerStaffId: evalData.lecturerStaffId || '',
@@ -2487,6 +2543,713 @@ export const StorageService = {
     safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, all);
     notifyListeners();
     if (db) await deleteDoc(doc(db, 'student_evaluations', id));
+  },
+
+  // ==================== COURSE ANNOUNCEMENTS MODULE ====================
+  getCourseAnnouncements: (courseCode?: string): CourseAnnouncement[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.COURSE_ANNOUNCEMENTS);
+      let list: CourseAnnouncement[] = [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          list = parsed;
+        }
+      }
+      
+      // If empty, generate realistic seed announcements
+      if (list.length === 0) {
+        const now = new Date();
+        const d1 = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+        const d2 = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
+        const d3 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const defaultAnnouncements: CourseAnnouncement[] = [
+          {
+            id: 'ann_btmt3273_1',
+            courseCode: 'BTMT 3273(i)',
+            courseName: 'Keusahawanan Digital',
+            lecturerId: 'coordinator',
+            lecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            lecturerStaffId: 'FPTT0145',
+            lecturerEmail: 'guzairy@utem.edu.my',
+            title: 'Peringatan Penghantaran Laporan Tugasan & Penilaian Industri Minggu ke-5',
+            content: 'Salam sejahtera kepada semua pelajar WBL Kursus BTMT 3273(i). Sukacita diingatkan bahawa penilaian kemahiran teknikal oleh Jurulatih Industri bagi Tugasan Minggu 1-5 perlu diselesaikan selewat-lewatnya pada minggu hadapan. Sila pastikan buku log mingguan telah disahkan oleh jurulatih sebelum sesi semakan penyelia universiti.',
+            priority: 'important',
+            category: 'assessment',
+            semester: 'Semester 7',
+            readReceipts: [
+              {
+                studentId: 'student_1',
+                studentName: 'Muhammad Faris bin Rosli',
+                studentMatric: 'B032110045',
+                studentEmail: 'b032110045@student.utem.edu.my',
+                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                readAt: new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString()
+              },
+              {
+                studentId: 'student_2',
+                studentName: 'Nur Aina Farhana binti Zulkifli',
+                studentMatric: 'B032110078',
+                studentEmail: 'b032110078@student.utem.edu.my',
+                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                readAt: new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString()
+              }
+            ],
+            createdAt: d1,
+            updatedAt: d1
+          },
+          {
+            id: 'ann_btmt3283_1',
+            courseCode: 'BTMT 3283(i)',
+            courseName: 'Pemasaran Digital & E-Dagang',
+            lecturerId: 'coordinator',
+            lecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            lecturerStaffId: 'FPTT0145',
+            lecturerEmail: 'guzairy@utem.edu.my',
+            title: 'Sesi Taklimat Rubrik Penilaian WBL Bersama Jurulatih Industri',
+            content: 'Taklimat penyelarasan rubrik 4-tahap UTeM bagi kursus BTMT 3283(i) akan diadakan secara dalam talian pada hari Jumaat, jam 3:00 petang. Semua pelajar dan jurulatih industri dijemput menyertai pautan Webex yang disediakan.',
+            priority: 'normal',
+            category: 'rubric',
+            semester: 'Semester 7',
+            readReceipts: [
+              {
+                studentId: 'student_1',
+                studentName: 'Muhammad Faris bin Rosli',
+                studentMatric: 'B032110045',
+                studentEmail: 'b032110045@student.utem.edu.my',
+                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                readAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
+              }
+            ],
+            createdAt: d2,
+            updatedAt: d2
+          },
+          {
+            id: 'ann_btmi3113_1',
+            courseCode: 'BTMI 3113(i)',
+            courseName: 'Teknologi Pembuatan & Automasi',
+            lecturerId: 'lec_rahayu',
+            lecturerName: 'Dr. Siti Rahayu binti Ahmad',
+            lecturerStaffId: 'FPTT0208',
+            lecturerEmail: 'rahayu@utem.edu.my',
+            title: 'Pengesahan Kehadiran & Pematuhan SOP Keselamatan Industri WBL',
+            content: 'PERHATIAN SEGERA: Semua pelajar yang menjalani penempatan industri diwajibkan mematuhi peraturan keselamatan bengkel dan memakai PPE lengkap setiap masa. Sebarang insiden atau cuti kecemasan hendaklah dimaklumkan kepada Penyelia Fakulti dan Jurulatih Industri dalam tempoh 24 jam.',
+            priority: 'urgent',
+            category: 'reminder',
+            semester: 'Semester 7',
+            readReceipts: [
+              {
+                studentId: 'student_2',
+                studentName: 'Nur Aina Farhana binti Zulkifli',
+                studentMatric: 'B032110078',
+                studentEmail: 'b032110078@student.utem.edu.my',
+                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                readAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString()
+              },
+              {
+                studentId: 'student_3',
+                studentName: 'Ahmad Daniel bin Yusof',
+                studentMatric: 'B032110112',
+                studentEmail: 'b032110112@student.utem.edu.my',
+                studentProgram: 'SARJANA MUDA PENGURUSAN TEKNOLOGI (BTPM)',
+                readAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString()
+              }
+            ],
+            createdAt: d3,
+            updatedAt: d3
+          }
+        ];
+        list = defaultAnnouncements;
+        safeSaveLocalStorage(STORAGE_KEYS.COURSE_ANNOUNCEMENTS, list);
+      }
+
+      inMemoryAnnouncements = list;
+      if (courseCode && courseCode !== 'all') {
+        return list.filter(a => a.courseCode === courseCode);
+      }
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+      return inMemoryAnnouncements;
+    }
+  },
+
+  getCourseAnnouncementById: (id: string): CourseAnnouncement | undefined => {
+    const all = StorageService.getCourseAnnouncements();
+    return all.find(a => a.id === id);
+  },
+
+  saveCourseAnnouncement: async (announcementData: Omit<CourseAnnouncement, 'id' | 'createdAt' | 'readReceipts'> & { id?: string; readReceipts?: CourseAnnouncementReadReceipt[] }): Promise<CourseAnnouncement> => {
+    const all = StorageService.getCourseAnnouncements();
+    const now = new Date().toISOString();
+    const id = announcementData.id || `ann_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const existing = all.find(a => a.id === id);
+
+    const announcement: CourseAnnouncement = {
+      id,
+      courseCode: announcementData.courseCode,
+      courseName: announcementData.courseName,
+      lecturerId: announcementData.lecturerId,
+      lecturerName: announcementData.lecturerName,
+      lecturerStaffId: announcementData.lecturerStaffId,
+      lecturerEmail: announcementData.lecturerEmail,
+      title: announcementData.title,
+      content: announcementData.content,
+      priority: announcementData.priority || 'normal',
+      category: announcementData.category || 'general',
+      semester: announcementData.semester || 'Semester 7',
+      targetStudentIds: announcementData.targetStudentIds || [],
+      readReceipts: existing?.readReceipts || announcementData.readReceipts || [],
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
+
+    let updatedList: CourseAnnouncement[];
+    if (existing) {
+      updatedList = all.map(a => a.id === id ? announcement : a);
+    } else {
+      updatedList = [announcement, ...all];
+    }
+
+    inMemoryAnnouncements = updatedList;
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ANNOUNCEMENTS, updatedList);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'course_announcements', id), sanitizeForFirebase(announcement), { merge: true });
+      } catch (e) {
+        console.warn('Firebase announcement notice:', e);
+      }
+    }
+
+    // Notify enrolled students in this course
+    try {
+      const assignments = StorageService.getCourseAssignments();
+      const course = assignments.find(ca => ca.courseCode === announcement.courseCode);
+      const enrolledStudentIds = course?.assignedStudentIds || [];
+      const users = StorageService.getUsers();
+
+      let recipientStudentIds: string[] = [];
+      if (enrolledStudentIds.length > 0) {
+        recipientStudentIds = enrolledStudentIds;
+      } else {
+        recipientStudentIds = users.filter(u => u.role === UserRole.STUDENT).map(u => u.id);
+      }
+
+      for (const sId of recipientStudentIds) {
+        const studentUser = users.find(u => u.id === sId || u.matric_no === sId);
+        if (studentUser) {
+          StorageService.createNotification({
+            recipient_id: studentUser.id,
+            recipient_role: UserRole.STUDENT,
+            sender_name: announcement.lecturerName,
+            title_ms: `[${announcement.courseCode}] Pengumuman Baharu: ${announcement.title}`,
+            title_en: `[${announcement.courseCode}] New Announcement: ${announcement.title}`,
+            message_ms: `${announcement.lecturerName} telah menerbitkan pengumuman bagi kursus ${announcement.courseCode}: "${announcement.title}". Sila buka untuk membaca maklumat penuh.`,
+            message_en: `${announcement.lecturerName} published a new announcement for ${announcement.courseCode}.`,
+            is_read: false,
+            created_at: now
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('Error broadcasting announcement notifications:', e);
+    }
+
+    const cur = getCurrentUser();
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'COURSE_ANNOUNCEMENT_POSTED',
+        `Menerbitkan pengumuman kursus "${announcement.title}" bagi kursus ${announcement.courseCode}.`,
+        `Posted course announcement for ${announcement.courseCode}.`
+      );
+    }
+
+    return announcement;
+  },
+
+  deleteCourseAnnouncement: async (id: string): Promise<void> => {
+    const all = StorageService.getCourseAnnouncements().filter(a => a.id !== id);
+    inMemoryAnnouncements = all;
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ANNOUNCEMENTS, all);
+    notifyListeners();
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'course_announcements', id));
+      } catch {}
+    }
+  },
+
+  markAnnouncementAsRead: async (announcementId: string, studentUser: { id: string; name: string; matric_no?: string; email?: string; program?: string }): Promise<void> => {
+    const all = StorageService.getCourseAnnouncements();
+    const idx = all.findIndex(a => a.id === announcementId);
+    if (idx === -1) return;
+
+    const current = all[idx];
+    const existingReceipt = (current.readReceipts || []).find(r => 
+      r.studentId === studentUser.id || 
+      (studentUser.matric_no && r.studentMatric === studentUser.matric_no)
+    );
+
+    if (existingReceipt) return; // Already marked as read
+
+    const now = new Date().toISOString();
+    const newReceipt: CourseAnnouncementReadReceipt = {
+      studentId: studentUser.id,
+      studentName: studentUser.name,
+      studentMatric: studentUser.matric_no || studentUser.id,
+      studentEmail: studentUser.email,
+      studentProgram: studentUser.program,
+      readAt: now
+    };
+
+    const updated: CourseAnnouncement = {
+      ...current,
+      readReceipts: [...(current.readReceipts || []), newReceipt],
+      updatedAt: now
+    };
+
+    all[idx] = updated;
+    inMemoryAnnouncements = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ANNOUNCEMENTS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'course_announcements', announcementId), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase read receipt notice:', e);
+      }
+    }
+  },
+
+  sendAnnouncementReminder: async (announcementId: string, studentUser: { id: string; name: string; matric_no?: string }): Promise<void> => {
+    const announcement = StorageService.getCourseAnnouncementById(announcementId);
+    if (!announcement) return;
+
+    const now = new Date().toISOString();
+    const cur = getCurrentUser();
+    const senderName = cur?.name || announcement.lecturerName || 'Pensyarah Kursus';
+
+    await StorageService.createNotification({
+      recipient_id: studentUser.id,
+      recipient_role: UserRole.STUDENT,
+      sender_name: senderName,
+      title_ms: `🔔 Peringatan Baca Pengumuman: ${announcement.courseCode}`,
+      title_en: `🔔 Announcement Reminder: ${announcement.courseCode}`,
+      message_ms: `Salam ${studentUser.name}, anda belum membaca pengumuman penting bagi kursus ${announcement.courseCode}: "${announcement.title}". Sila semak di portal WBL sekarang.`,
+      message_en: `Reminder: Please read the announcement for ${announcement.courseCode}: "${announcement.title}".`,
+      is_read: false,
+      created_at: now
+    });
+  },
+
+  sendBulkAnnouncementReminders: async (announcementId: string, unreadStudents: { id: string; name: string; matric_no?: string }[]): Promise<number> => {
+    let sentCount = 0;
+    for (const s of unreadStudents) {
+      try {
+        await StorageService.sendAnnouncementReminder(announcementId, s);
+        sentCount++;
+      } catch {}
+    }
+    return sentCount;
+  },
+
+  // ==================== WBL MESSAGING MODULE ====================
+  getWBLConversations: (userId?: string): WBLConversation[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.WBL_CONVERSATIONS);
+      let list: WBLConversation[] = [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          list = parsed;
+        }
+      }
+
+      // If empty, generate seed conversations
+      if (list.length === 0) {
+        const now = new Date();
+        const d1 = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+        const d2 = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+        const d3 = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+        const d4 = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+
+        const seedConvs: WBLConversation[] = [
+          {
+            id: 'conv_trio_faris',
+            type: 'student_trio',
+            title: 'Perbincangan Prestasi WBL - Muhammad Faris (CTRM)',
+            participantIds: ['trainer_kamarul', 'coordinator', 'supervisor_guzairy'],
+            participantRoles: {
+              'trainer_kamarul': UserRole.TRAINER,
+              'coordinator': UserRole.COORDINATOR,
+              'supervisor_guzairy': UserRole.SUPERVISOR
+            },
+            participantNames: {
+              'trainer_kamarul': 'En. Kamarul Zaman bin Harun',
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani'
+            },
+            participantCompanies: {
+              'trainer_kamarul': 'CTRM Aerostructures Sdn Bhd',
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'FPTT UTeM'
+            },
+            relatedStudentId: 'student_1',
+            relatedStudentName: 'Muhammad Faris bin Rosli',
+            relatedStudentMatric: 'B032110045',
+            relatedCourseCode: 'BTMT 3273(i)',
+            lastMessageSnippet: 'Terima kasih banyak En. Kamarul atas bimbingan rapi pihak CTRM. Penyelarasan rubrik telah dikemaskini.',
+            lastMessageAt: d1,
+            lastSenderName: 'Penyelaras WBL FPTT',
+            createdAt: d3,
+            updatedAt: d1
+          },
+          {
+            id: 'conv_direct_infineon',
+            type: 'direct',
+            title: 'Pn. Norhafizah (Infineon) & Dr. Mohd Guzairy',
+            participantIds: ['trainer_norhafizah', 'coordinator'],
+            participantRoles: {
+              'trainer_norhafizah': UserRole.TRAINER,
+              'coordinator': UserRole.LECTURER
+            },
+            participantNames: {
+              'trainer_norhafizah': 'Pn. Norhafizah binti Othman',
+              'coordinator': 'Dr. Mohd Guzairy bin Abd Ghani'
+            },
+            participantCompanies: {
+              'trainer_norhafizah': 'Infineon Technologies (Malaysia) Sdn Bhd',
+              'coordinator': 'FPTT UTeM'
+            },
+            relatedStudentName: 'Nur Aina Farhana binti Zulkifli',
+            relatedCourseCode: 'BTMT 3283(i)',
+            lastMessageSnippet: 'Markah rubrik 88% telah saya sahkan dalam sistem dan slip rasmi telah dijana.',
+            lastMessageAt: d2,
+            lastSenderName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            createdAt: d4,
+            updatedAt: d2
+          },
+          {
+            id: 'conv_group_course_btmt3273',
+            type: 'course_group',
+            title: 'Penyelarasan Kursus [BTMT 3273(i)] - Pensyarah & Penyelaras',
+            participantIds: ['coordinator', 'supervisor_guzairy', 'lec_rahayu'],
+            participantRoles: {
+              'coordinator': UserRole.COORDINATOR,
+              'supervisor_guzairy': UserRole.LECTURER,
+              'lec_rahayu': UserRole.LECTURER
+            },
+            participantNames: {
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani',
+              'lec_rahayu': 'Dr. Siti Rahayu binti Ahmad'
+            },
+            relatedCourseCode: 'BTMT 3273(i)',
+            lastMessageSnippet: 'Peringatan mesra untuk semak penilaian industri pelajar cohort semester 7 sebelum mesyuarat fakulti.',
+            lastMessageAt: d3,
+            lastSenderName: 'Penyelaras WBL FPTT',
+            createdAt: d4,
+            updatedAt: d3
+          },
+          {
+            id: 'conv_trio_aina',
+            type: 'student_trio',
+            title: 'Penyeliaan Industri - Nur Aina Farhana (Infineon)',
+            participantIds: ['trainer_norhafizah', 'coordinator', 'supervisor_guzairy'],
+            participantRoles: {
+              'trainer_norhafizah': UserRole.TRAINER,
+              'coordinator': UserRole.COORDINATOR,
+              'supervisor_guzairy': UserRole.SUPERVISOR
+            },
+            participantNames: {
+              'trainer_norhafizah': 'Pn. Norhafizah binti Othman',
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani'
+            },
+            participantCompanies: {
+              'trainer_norhafizah': 'Infineon Technologies (Malaysia) Sdn Bhd',
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'FPTT UTeM'
+            },
+            relatedStudentId: 'student_2',
+            relatedStudentName: 'Nur Aina Farhana binti Zulkifli',
+            relatedStudentMatric: 'B032110078',
+            relatedCourseCode: 'BTMT 3283(i)',
+            lastMessageSnippet: 'Jadual lawatan penyeliaan industri kedua telah ditetapkan pada hari Khamis minggu hadapan.',
+            lastMessageAt: d4,
+            lastSenderName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            createdAt: d4,
+            updatedAt: d4
+          }
+        ];
+        list = seedConvs;
+        safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, list);
+      }
+
+      inMemoryConversations = list;
+      if (userId) {
+        const cur = StorageService.getCurrentUser();
+        const isCoord = cur?.role === UserRole.COORDINATOR || cur?.is_jkwbl || (cur as any)?.is_admin;
+        return list.filter(c => isCoord || c.participantIds.includes(userId) || (c.participantNames && Object.keys(c.participantNames).includes(userId)));
+      }
+      return list.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+    } catch {
+      return inMemoryConversations;
+    }
+  },
+
+  getWBLConversationById: (id: string): WBLConversation | undefined => {
+    const all = StorageService.getWBLConversations();
+    return all.find(c => c.id === id);
+  },
+
+  createWBLConversation: async (data: Omit<WBLConversation, 'id' | 'createdAt' | 'updatedAt'>): Promise<WBLConversation> => {
+    const all = StorageService.getWBLConversations();
+    const now = new Date().toISOString();
+    const id = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+    const newConv: WBLConversation = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const updated = [newConv, ...all];
+    inMemoryConversations = updated;
+    safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, updated);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'wbl_conversations', id), sanitizeForFirebase(newConv), { merge: true });
+      } catch (e) {
+        console.warn('Firebase conversation save notice:', e);
+      }
+    }
+
+    return newConv;
+  },
+
+  getWBLMessages: (conversationId: string): WBLMessage[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+      let all: WBLMessage[] = [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          all = parsed;
+        }
+      }
+
+      // If empty, generate seed messages for default conversations
+      if (all.length === 0) {
+        const now = new Date();
+        const t1 = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+        const t2 = new Date(now.getTime() - 90 * 60 * 1000).toISOString();
+        const t3 = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+
+        all = [
+          {
+            id: 'msg_1',
+            conversationId: 'conv_trio_faris',
+            senderId: 'supervisor_guzairy',
+            senderName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            senderRole: UserRole.SUPERVISOR,
+            senderCompany: 'FPTT UTeM',
+            content: 'Salam En. Kamarul Zaman, bagaimana perkembangan latihan industri Faris pada minggu ini? Adakah penguasaan kemahiran teknikal beliau mencapai tahap yang diharapkan oleh pihak CTRM?',
+            createdAt: t1,
+            readBy: [{ userId: 'supervisor_guzairy', readAt: t1 }, { userId: 'trainer_kamarul', readAt: t2 }]
+          },
+          {
+            id: 'msg_2',
+            conversationId: 'conv_trio_faris',
+            senderId: 'trainer_kamarul',
+            senderName: 'En. Kamarul Zaman bin Harun',
+            senderRole: UserRole.TRAINER,
+            senderCompany: 'CTRM Aerostructures Sdn Bhd',
+            content: 'Salam Dr. Guzairy & En. Razak. Prestasi Faris amat cemerlang. Beliau sangat berdisiplin dan cepat mempelajari proses pembuatan komposit aeroangkasa. Saya akan masukkan penilaian rubrik minggu ke-5 esok.',
+            createdAt: t2,
+            readBy: [{ userId: 'trainer_kamarul', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
+          },
+          {
+            id: 'msg_3',
+            conversationId: 'conv_trio_faris',
+            senderId: 'coordinator',
+            senderName: 'Penyelaras WBL FPTT',
+            senderRole: UserRole.COORDINATOR,
+            content: 'Terima kasih banyak En. Kamarul atas bimbingan rapi pihak CTRM. Penyelarasan rubrik telah dikemaskini. Pihak universiti amat menghargai sokongan industri tuan.',
+            createdAt: t3,
+            readBy: [{ userId: 'coordinator', readAt: t3 }]
+          },
+          {
+            id: 'msg_4',
+            conversationId: 'conv_direct_infineon',
+            senderId: 'trainer_norhafizah',
+            senderName: 'Pn. Norhafizah binti Othman',
+            senderRole: UserRole.TRAINER,
+            senderCompany: 'Infineon Technologies (Malaysia) Sdn Bhd',
+            content: 'Salam Dr. Guzairy, saya telah menyemak draf penilaian akhir WBL bagi pelajar Nur Aina Farhana. Markah rubrik telah dihantar ke dalam sistem, mohon Dr. semak dan buat pengesahan ya.',
+            createdAt: t1,
+            readBy: [{ userId: 'trainer_norhafizah', readAt: t1 }, { userId: 'coordinator', readAt: t2 }]
+          },
+          {
+            id: 'msg_5',
+            conversationId: 'conv_direct_infineon',
+            senderId: 'coordinator',
+            senderName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            senderRole: UserRole.LECTURER,
+            content: 'Terima kasih Pn. Norhafizah. Markah rubrik 88% telah saya sahkan dalam sistem dan slip rasmi telah dijana.',
+            createdAt: t2,
+            readBy: [{ userId: 'coordinator', readAt: t2 }]
+          }
+        ];
+        safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, all);
+      }
+
+      inMemoryMessages = all;
+      return all.filter(m => m.conversationId === conversationId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } catch {
+      return inMemoryMessages.filter(m => m.conversationId === conversationId);
+    }
+  },
+
+  sendWBLMessage: async (data: Omit<WBLMessage, 'id' | 'createdAt' | 'readBy'>): Promise<WBLMessage> => {
+    const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let all: WBLMessage[] = [];
+    if (raw) {
+      try {
+        all = JSON.parse(raw);
+      } catch {}
+    }
+    if (all.length === 0) all = inMemoryMessages;
+
+    const now = new Date().toISOString();
+    const id = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+    const newMsg: WBLMessage = {
+      ...data,
+      id,
+      createdAt: now,
+      readBy: [{ userId: data.senderId, readAt: now }]
+    };
+
+    all.push(newMsg);
+    inMemoryMessages = all;
+    safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, all);
+
+    // Update conversation snippet and timestamp
+    const convs = StorageService.getWBLConversations();
+    const convIdx = convs.findIndex(c => c.id === data.conversationId);
+    if (convIdx !== -1) {
+      const conv = convs[convIdx];
+      const updatedConv: WBLConversation = {
+        ...conv,
+        lastMessageSnippet: data.content.slice(0, 80) + (data.content.length > 80 ? '...' : ''),
+        lastMessageAt: now,
+        lastSenderName: data.senderName,
+        updatedAt: now
+      };
+      convs[convIdx] = updatedConv;
+      inMemoryConversations = [...convs];
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, convs);
+
+      // Notify other participants in the conversation
+      const otherParticipantIds = (conv.participantIds || []).filter(pId => pId !== data.senderId);
+      for (const recipientId of otherParticipantIds) {
+        StorageService.createNotification({
+          recipient_id: recipientId,
+          sender_name: data.senderName,
+          title_ms: `Mesej Baharu daripada ${data.senderName}`,
+          title_en: `New Message from ${data.senderName}`,
+          message_ms: `[${conv.title}] ${data.senderName}: "${data.content.slice(0, 60)}${data.content.length > 60 ? '...' : ''}"`,
+          message_en: `[${conv.title}] ${data.senderName}: "${data.content.slice(0, 60)}"`,
+          is_read: false,
+          created_at: now
+        }).catch(() => {});
+      }
+
+      if (db) {
+        try {
+          await setDoc(doc(db, 'wbl_conversations', conv.id), sanitizeForFirebase(updatedConv), { merge: true });
+        } catch {}
+      }
+    }
+
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'wbl_messages', id), sanitizeForFirebase(newMsg), { merge: true });
+      } catch (e) {
+        console.warn('Firebase message save notice:', e);
+      }
+    }
+
+    return newMsg;
+  },
+
+  markConversationAsRead: async (conversationId: string, userId: string): Promise<void> => {
+    const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let all: WBLMessage[] = [];
+    if (raw) {
+      try { all = JSON.parse(raw); } catch {}
+    }
+    if (all.length === 0) all = inMemoryMessages;
+
+    const now = new Date().toISOString();
+    let hasChanges = false;
+
+    const updated = all.map(m => {
+      if (m.conversationId === conversationId && m.senderId !== userId) {
+        const alreadyRead = (m.readBy || []).some(r => r.userId === userId);
+        if (!alreadyRead) {
+          hasChanges = true;
+          return {
+            ...m,
+            readBy: [...(m.readBy || []), { userId, readAt: now }]
+          };
+        }
+      }
+      return m;
+    });
+
+    if (hasChanges) {
+      inMemoryMessages = updated;
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, updated);
+      notifyListeners();
+    }
+  },
+
+  getUnreadWBLMessagesCount: (userId: string): number => {
+    try {
+      const convs = StorageService.getWBLConversations(userId);
+      const myConvIds = new Set(convs.map(c => c.id));
+      const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+      let all: WBLMessage[] = [];
+      if (raw) {
+        try { all = JSON.parse(raw); } catch {}
+      }
+      if (all.length === 0) all = inMemoryMessages;
+
+      let unread = 0;
+      all.forEach(m => {
+        if (myConvIds.has(m.conversationId) && m.senderId !== userId) {
+          const isRead = (m.readBy || []).some(r => r.userId === userId);
+          if (!isRead) unread++;
+        }
+      });
+      return unread;
+    } catch {
+      return 0;
+    }
   },
 
   getFullSystemBackup: () => ({

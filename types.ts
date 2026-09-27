@@ -252,44 +252,40 @@ export interface StudentEvaluation {
   companyAddress?: string;
   courseCode: string;
   courseName: string;
-  // Type: Weekly Task (Week 1-5) or Full Portfolio / Course Evaluation
   evaluationType?: EvaluationFormType;
-  weekNumber?: number; // 1, 2, 3, 4, 5
+  weekNumber?: number;
+  startDate?: string;
+  endDate?: string;
   weeklyTaskTitle?: string;
+  weeklyDeliverableNotes?: string;
   weeklyScores?: {
-    area1: number; // 1 - 4
-    area2: number; // 1 - 4
-    area3: number; // 1 - 4
-    total: number; // / 12
+    area1: number;
+    area2: number;
+    area3: number;
+    total: number;
   };
-  // Detailed Rubric scores mapping (criterion ID -> score 1 to 4)
   rubricScores?: Record<string, number>;
   jiWeightedScore?: number;
   tpfWeightedScore?: number;
-  // Pensyarah Kursus
   lecturerId: string;
   lecturerName: string;
   lecturerStaffId?: string;
   lecturerEmail?: string;
-  // Jurulatih Industri
   trainerId: string;
   trainerName: string;
   trainerPosition?: string;
   trainerCompany?: string;
   trainerEmail?: string;
   trainerPhone?: string;
-  // Markah mengikut rubrik
   scores: StudentEvaluationCriteriaScores;
-  technicalSubtotal: number;    // / 40
-  softSkillsSubtotal: number;   // / 40
-  logbookSubtotal: number;      // / 20
-  totalScore: number;           // / 100
-  grade: string;                // A+, A, A-, B+, etc.
-  // Ulasan Jurulatih Industri
+  technicalSubtotal: number;
+  softSkillsSubtotal: number;
+  logbookSubtotal: number;
+  totalScore: number;
+  grade: string;
   trainerComments: string;
   trainerRecommendation?: string;
   submittedAt?: string;
-  // Pengesahan Pensyarah Kursus
   status: EvaluationStatus;
   lecturerComments?: string;
   verifiedAt?: string;
@@ -298,5 +294,78 @@ export interface StudentEvaluation {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CourseAnnouncementReadReceipt {
+  studentId: string;
+  studentName: string;
+  studentMatric: string;
+  studentEmail?: string;
+  studentProgram?: string;
+  readAt: string;
+}
+
+export type AnnouncementPriority = 'normal' | 'important' | 'urgent';
+export type AnnouncementCategory = 'general' | 'assignment' | 'assessment' | 'rubric' | 'reminder';
+
+export interface CourseAnnouncement {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  lecturerId: string;
+  lecturerName: string;
+  lecturerStaffId?: string;
+  lecturerEmail?: string;
+  title: string;
+  content: string;
+  priority: AnnouncementPriority;
+  category: AnnouncementCategory;
+  semester?: string;
+  targetStudentIds?: string[]; // If empty, cohort-wide for enrolled students
+  readReceipts: CourseAnnouncementReadReceipt[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type ConversationType = 'direct' | 'student_trio' | 'course_group';
+
+export interface WBLMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  senderAvatar?: string;
+  senderStaffId?: string;
+  senderCompany?: string;
+  recipientId?: string;
+  content: string;
+  attachmentUrl?: string;
+  createdAt: string;
+  readBy: {
+    userId: string;
+    readAt: string;
+  }[];
+}
+
+export interface WBLConversation {
+  id: string;
+  type: ConversationType;
+  title: string;
+  participantIds: string[];
+  participantRoles: Record<string, UserRole>;
+  participantNames: Record<string, string>;
+  participantCompanies?: Record<string, string>;
+  participantAvatars?: Record<string, string>;
+  relatedStudentId?: string;
+  relatedStudentName?: string;
+  relatedStudentMatric?: string;
+  relatedCourseCode?: string;
+  lastMessageSnippet?: string;
+  lastMessageAt?: string;
+  lastSenderName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 

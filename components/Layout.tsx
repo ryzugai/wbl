@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { User, UserRole, Notification, CourseLecturerAssignment } from '../types';
-import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight, GraduationCap, UserPlus, ClipboardCheck } from 'lucide-react';
+import { LogOut, Home, Building2, Users, FileText, Upload, FileSpreadsheet, UserCog, Book, Database, Wifi, WifiOff, Menu, X, ShieldCheck, BarChart3, Languages, Map, BookCopy, UsersRound, UserCheck, Activity, Bell, Check, Trash, BookOpen, CheckCircle2, Award, ChevronDown, ChevronRight, GraduationCap, UserPlus, ClipboardCheck, MessageSquare, Megaphone } from 'lucide-react';
 import { getRoleLabels } from '../constants';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -23,9 +23,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const currentYear = new Date().getFullYear();
 
-  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'courseEnrollment';
+  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'courseEnrollment' || currentView === 'courseAnnouncements';
   const [isEvaluationSubmenuOpen, setIsEvaluationSubmenuOpen] = useState(isEvaluationView);
   const [pendingEvalCount, setPendingEvalCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const isCourseMonitoringView = currentView === 'lecturerCourseMonitoring';
   const [isLecturerCourseSubmenuOpen, setIsLecturerCourseSubmenuOpen] = useState(true);
@@ -54,12 +55,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
       try {
         setApplications(StorageService.getApplications());
         setEvaluations(StorageService.getEvaluations());
+        setUnreadMessageCount(StorageService.getUnreadWBLMessagesCount(currentUser.id));
       } catch {}
     };
     loadAppData();
     const unsub = StorageService.subscribe(loadAppData);
     return () => unsub();
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     const loadAssignments = () => {
@@ -507,6 +509,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                       <span>{t(language, 'evaluationSubmenuRubrics')}</span>
                     </div>
                   </button>
+
+                  {/* Submenu 6: Pengumuman Kursus */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('courseAnnouncements')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      currentView === 'courseAnnouncements'
+                        ? 'bg-blue-50 text-blue-700 font-black'
+                        : 'text-slate-600 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'courseAnnouncements' ? 'bg-blue-600' : 'bg-slate-300'}`} />
+                      <span>{language === 'ms' ? 'Pengumuman Kursus' : 'Course Announcements'}</span>
+                    </div>
+                    <span className="text-[10px] text-amber-500 font-black">
+                      📢
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
@@ -853,6 +874,46 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
             <NavItem view="supervised" label={t(language, 'supervisedTab')} icon={UsersRound} />
           )}
 
+          {/* Pusat Mesej WBL (Jurulatih Industri, Penyelia Fakulti & Penyelaras) */}
+          {(isTrainer || isLecturer || hasSystemAccess || isSupervisor) && (
+            <div className="py-0.5">
+              <button
+                type="button"
+                onClick={() => handleNavigate('wblMessaging')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
+                  currentView === 'wblMessaging'
+                    ? 'bg-indigo-600 text-white font-black shadow-md'
+                    : 'text-slate-700 hover:bg-indigo-50/80 hover:text-indigo-900 font-bold'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <MessageSquare size={18} className={currentView === 'wblMessaging' ? 'text-amber-300' : 'text-indigo-600'} />
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs leading-tight font-black">
+                      {language === 'ms' ? 'Pusat Mesej WBL' : 'WBL Messages'}
+                    </span>
+                    <span className={`text-[10px] font-medium leading-none mt-0.5 ${
+                      currentView === 'wblMessaging' ? 'text-indigo-200' : 'text-slate-400'
+                    }`}>
+                      {language === 'ms' ? 'Jurulatih • Penyelia • Penyelaras' : 'Trainer • Supervisor • Coord'}
+                    </span>
+                  </div>
+                </div>
+                {unreadMessageCount > 0 ? (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-xs">
+                    {unreadMessageCount}
+                  </span>
+                ) : (
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                    currentView === 'wblMessaging' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    3 Pihak
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           {(hasSystemAccess || currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.SUPERVISOR) && (
             <NavItem view="students" label={t(language, 'students')} icon={Users} />
           )}
@@ -948,13 +1009,36 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
               </span>
             </div>
 
-            {/* Notification Bell Icon */}
-            <div className="relative self-end sm:self-auto">
-              <button 
-                onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all relative border border-slate-200 bg-slate-50 flex items-center justify-center"
-                title={language === 'ms' ? 'Notifikasi' : 'Notifications'}
-              >
+            {/* Quick Actions (Messaging + Notification) */}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {/* WBL Messaging Quick Icon */}
+              {(isTrainer || isLecturer || hasSystemAccess || isSupervisor) && (
+                <button
+                  type="button"
+                  onClick={() => handleNavigate('wblMessaging')}
+                  className={`p-2 rounded-lg transition-all relative border flex items-center justify-center ${
+                    currentView === 'wblMessaging'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-indigo-600'
+                  }`}
+                  title={language === 'ms' ? 'Pusat Mesej WBL' : 'WBL Messages'}
+                >
+                  <MessageSquare size={18} />
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                      {unreadMessageCount}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Notification Bell Icon */}
+              <div className="relative">
+                <button 
+                  onClick={() => setIsNotifOpen(!isNotifOpen)}
+                  className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all relative border border-slate-200 bg-slate-50 flex items-center justify-center"
+                  title={language === 'ms' ? 'Notifikasi' : 'Notifications'}
+                >
                 <Bell size={18} className={unreadCount > 0 ? "animate-swing origin-top" : ""} />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
@@ -1041,6 +1125,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
               )}
             </div>
           </div>
+        </div>
 
           <div className="flex-1">
             {children}

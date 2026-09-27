@@ -22,6 +22,7 @@ import { PosterFlipbook } from './pages/PosterFlipbook';
 import { UserActivities } from './pages/UserActivities';
 import { DailyLogbook } from './pages/DailyLogbook';
 import { StudentEvaluationPage } from './pages/StudentEvaluationPage';
+import { WBLMessaging } from './pages/WBLMessaging';
 import { Toaster, toast } from 'react-hot-toast';
 import { Language } from './translations';
 
@@ -310,7 +311,7 @@ function App() {
             />
         )}
 
-        {(currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'lecturerCourseMonitoring' || currentView === 'courseEnrollment') && (
+        {(currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'lecturerCourseMonitoring' || currentView === 'courseEnrollment' || currentView === 'courseAnnouncements') && (
             <StudentEvaluationPage
                 currentUser={currentUser}
                 applications={applications}
@@ -320,8 +321,19 @@ function App() {
                   currentView === 'evaluationSettings' ? 'settings' :
                   currentView === 'evaluationRubrics' ? 'rubrics' :
                   currentView === 'lecturerCourseMonitoring' ? 'courseMonitoring' :
-                  currentView === 'courseEnrollment' ? 'enrollment' : 'evaluations'
+                  currentView === 'courseEnrollment' ? 'enrollment' :
+                  currentView === 'courseAnnouncements' ? 'announcements' : 'evaluations'
                 }
+                onNavigate={setCurrentView}
+            />
+        )}
+
+        {currentView === 'wblMessaging' && (
+            <WBLMessaging
+                currentUser={currentUser}
+                users={users}
+                applications={applications}
+                language={language}
                 onNavigate={setCurrentView}
             />
         )}

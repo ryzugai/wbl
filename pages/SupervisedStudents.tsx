@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, Application, UserRole } from '../types';
-import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock, BookOpen, Award } from 'lucide-react';
+import { UsersRound, Eye, Building2, CheckCircle2, Search, GraduationCap, Printer, ShieldCheck, FileCheck, Target, RefreshCcw, Infinity, Clock, BookOpen, Award, MessageSquare } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { DocumentViewer } from '../components/DocumentViewer';
 import { Language, t } from '../translations';
@@ -344,6 +344,15 @@ export const SupervisedStudents: React.FC<SupervisedStudentsProps> = ({ currentU
                        >
                          <Award size={12} />
                          <span>{language === 'ms' ? 'Penilaian Pelajar' : 'Evaluation'}</span>
+                       </button>
+
+                       <button
+                         onClick={() => onNavigate('wblMessaging')}
+                         className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-xs"
+                         title="Buka Pusat Permesejan WBL untuk berhubung dengan Jurulatih Industri"
+                       >
+                         <MessageSquare size={12} />
+                         <span>{language === 'ms' ? 'Mesej Jurulatih' : 'Chat Trainer'}</span>
                        </button>
                      </>
                    )}

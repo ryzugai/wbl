@@ -1053,3 +1053,208 @@ export const generateCourseRubricPrint = (
   printWindow.document.write(html);
   printWindow.document.close();
 };
+
+export const generateWeeklyStudentAssessmentPrint = (
+  evaluation: StudentEvaluation,
+  weekConfig?: any,
+  language: 'ms' | 'en' = 'ms'
+) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert(language === 'ms' 
+      ? "Tetingkap pop-up telah disekat. Sila benarkan pop-up pada pelayar web anda." 
+      : "Pop-up blocked. Please allow pop-ups for this site.");
+    return;
+  }
+
+  const wScores = evaluation.weeklyScores || {
+    area1: Math.round((evaluation.scores?.taskKnowledge || 8) / 2.5),
+    area2: Math.round((evaluation.scores?.workQuality || 8) / 2.5),
+    area3: Math.round((evaluation.scores?.problemSolving || 8) / 2.5),
+    total: 10
+  };
+
+  const weekNum = evaluation.weekNumber || 1;
+  const total = wScores.total || (wScores.area1 + wScores.area2 + wScores.area3);
+  const percent = Math.round((total / 12) * 100);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="ms">
+    <head>
+      <meta charset="UTF-8">
+      <title>Borang Pentaksiran Hasil Kerja Mingguan - Minggu ${weekNum} - ${evaluation.studentName}</title>
+      <style>
+        @page { size: A4 portrait; margin: 12mm 15mm; }
+        body { font-family: 'Times New Roman', Times, serif; font-size: 9.5pt; color: #0f172a; margin: 0; padding: 15px; }
+        .no-print { background: #1e3a8a; color: white; padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 11px; margin-bottom: 15px; border-radius: 6px; }
+        .btn-print { background: #f59e0b; color: #111827; border: none; padding: 6px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+        .title-box { text-align: center; flex: 1; }
+        .univ { font-size: 11pt; font-weight: bold; color: #1e3a8a; margin: 0; text-transform: uppercase; }
+        .faculty { font-size: 9pt; font-weight: bold; color: #334155; margin: 2px 0 0; }
+        .doc-title { font-size: 11pt; font-weight: bold; color: #0f172a; margin: 4px 0 0; text-transform: uppercase; }
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; font-size: 8.5pt; }
+        .meta-card { border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; background: #f8fafc; }
+        .task-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px; margin-bottom: 14px; }
+        table.rubric-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8.5pt; }
+        table.rubric-table th, table.rubric-table td { border: 1px solid #cbd5e1; padding: 6px 8px; }
+        table.rubric-table th { background: #1e3a8a; color: white; }
+        .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 25px; }
+        .sign-box { border-top: 1px solid #64748b; padding-top: 8px; font-size: 8.5pt; }
+        @media print { .no-print { display: none !important; } body { padding: 0; } }
+      </style>
+    </head>
+    <body>
+      <div class="no-print">
+        <span>Pratonton Cetakan Borang Pentaksiran Mingguan • UTeM FPTT WBL</span>
+        <button class="btn-print" onclick="window.print()">Cetak / Simpan PDF</button>
+      </div>
+
+      <div class="header">
+        <div class="title-box">
+          <div class="univ">UNIVERSITI TEKNIKAL MALAYSIA MELAKA (UTeM)</div>
+          <div class="faculty">FAKULTI PENGURUSAN TEKNOLOGI DAN TEKNOUSAHAWANAN (FPTT)</div>
+          <div class="doc-title">BORANG PENTAKSIRAN HASIL KERJA MINGGUAN OLEH JURULATIH INDUSTRI (JI)</div>
+          <div style="font-size: 8.5pt; color: #475569; margin-top: 2px;">
+            PROGRAM SARJANA MUDA 2u2i WORK-BASED LEARNING (WBL)
+          </div>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-card">
+          <div style="font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 4px; color: #1e3a8a;">
+            MAKLUMAT PELAJAR & PENEMPATAN
+          </div>
+          <div><strong>Nama Pelajar:</strong> ${evaluation.studentName}</div>
+          <div><strong>No. Matrik:</strong> ${evaluation.studentMatric}</div>
+          <div><strong>Program:</strong> ${evaluation.studentProgram || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)'}</div>
+          <div><strong>Syarikat Penempatan:</strong> ${evaluation.companyName}</div>
+        </div>
+        <div class="meta-card">
+          <div style="font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 4px; color: #1e3a8a;">
+            MAKLUMAT KURSUS & MINGGU PENTAKSIRAN
+          </div>
+          <div><strong>Kursus:</strong> ${evaluation.courseCode} - ${evaluation.courseName}</div>
+          <div><strong>Minggu Pentaksiran:</strong> <span style="background: #fef08a; padding: 1px 6px; border-radius: 4px; font-weight: bold;">Minggu ${weekNum}</span></div>
+          <div><strong>Tempoh Tarikh:</strong> ${evaluation.startDate || weekConfig?.startDate || '-'} hingga ${evaluation.endDate || weekConfig?.endDate || '-'}</div>
+          <div><strong>Jurulatih Penilai (JI):</strong> ${evaluation.trainerName} (${evaluation.trainerPosition || 'Jurulatih Industri'})</div>
+        </div>
+      </div>
+
+      <div class="task-box">
+        <div style="font-weight: bold; color: #1e40af; font-size: 9.5pt;">
+          ${evaluation.weeklyTaskTitle || weekConfig?.taskTitle || `Tugasan Pembelajaran Minggu ${weekNum}`}
+        </div>
+        ${weekConfig?.cloStatement ? `<div style="font-size: 8pt; color: #3b82f6; margin-top: 2px; font-weight: 600;">${weekConfig.cloStatement}</div>` : ''}
+        ${weekConfig?.taskHighlights ? `
+          <ul style="margin: 6px 0 0 16px; padding: 0; font-size: 8pt; color: #334155;">
+            ${weekConfig.taskHighlights.map((h: string) => `<li>${h}</li>`).join('')}
+          </ul>
+        ` : ''}
+      </div>
+
+      <table class="rubric-table">
+        <thead>
+          <tr>
+            <th style="width: 50px; text-align: center;">No.</th>
+            <th>Bidang Pentaksiran Mingguan (Assessment Areas)</th>
+            <th style="width: 140px; text-align: center;">Rubrik Prestasi</th>
+            <th style="width: 90px; text-align: center;">Skor (Maks: 4)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align: center; font-weight: bold;">1</td>
+            <td>
+              <strong>${weekConfig?.areas?.[0]?.title || 'Penguasaan konsep dan metodologi kerja industri'}</strong>
+            </td>
+            <td style="text-align: center; font-size: 8pt;">
+              ${wScores.area1 === 4 ? '<span style="color: #065f46; font-weight: bold;">Cemerlang (Skor 4)</span>' : 
+                wScores.area1 === 3 ? '<span style="color: #1e40af; font-weight: bold;">Baik (Skor 3)</span>' :
+                wScores.area1 === 2 ? '<span style="color: #92400e; font-weight: bold;">Sederhana (Skor 2)</span>' :
+                '<span style="color: #991b1b; font-weight: bold;">Lemah (Skor 1)</span>'}
+            </td>
+            <td style="text-align: center; font-weight: bold; font-size: 11pt;">${wScores.area1} / 4</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: bold;">2</td>
+            <td>
+              <strong>${weekConfig?.areas?.[1]?.title || 'Kualiti hasil kerja, ketepatan analisis dan pematuhan SOP'}</strong>
+            </td>
+            <td style="text-align: center; font-size: 8pt;">
+              ${wScores.area2 === 4 ? '<span style="color: #065f46; font-weight: bold;">Cemerlang (Skor 4)</span>' : 
+                wScores.area2 === 3 ? '<span style="color: #1e40af; font-weight: bold;">Baik (Skor 3)</span>' :
+                wScores.area2 === 2 ? '<span style="color: #92400e; font-weight: bold;">Sederhana (Skor 2)</span>' :
+                '<span style="color: #991b1b; font-weight: bold;">Lemah (Skor 1)</span>'}
+            </td>
+            <td style="text-align: center; font-weight: bold; font-size: 11pt;">${wScores.area2} / 4</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: bold;">3</td>
+            <td>
+              <strong>${weekConfig?.areas?.[2]?.title || 'Etika profesionalisme, inisiatif kendiri dan buku log'}</strong>
+            </td>
+            <td style="text-align: center; font-size: 8pt;">
+              ${wScores.area3 === 4 ? '<span style="color: #065f46; font-weight: bold;">Cemerlang (Skor 4)</span>' : 
+                wScores.area3 === 3 ? '<span style="color: #1e40af; font-weight: bold;">Baik (Skor 3)</span>' :
+                wScores.area3 === 2 ? '<span style="color: #92400e; font-weight: bold;">Sederhana (Skor 2)</span>' :
+                '<span style="color: #991b1b; font-weight: bold;">Lemah (Skor 1)</span>'}
+            </td>
+            <td style="text-align: center; font-weight: bold; font-size: 11pt;">${wScores.area3} / 4</td>
+          </tr>
+          <tr style="background: #f8fafc; font-weight: bold;">
+            <td colspan="3" style="text-align: right; padding-right: 12px; font-size: 9pt;">
+              JUMLAH MARKAH MINGGUAN (MAKSIMUM: 12 MARKAH):
+            </td>
+            <td style="text-align: center; font-size: 12pt; color: #1e3a8a; background: #e0f2fe;">
+              ${total} / 12 (${percent}%)
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="border: 1px solid #cbd5e1; border-radius: 4px; padding: 10px; margin-bottom: 12px; background: #fafafa;">
+        <div style="font-weight: bold; color: #1e3a8a; margin-bottom: 4px; font-size: 8.5pt;">
+          ULASAN & BIMBINGAN JURULATIH INDUSTRI (JI):
+        </div>
+        <div style="font-style: italic; color: #334155; font-size: 9pt; min-height: 40px;">
+          "${evaluation.trainerComments || 'Pelajar menunjukkan komitmen yang baik dalam melaksanakan tugasan mingguan di premis industri, menepati masa dan proaktif dalam penyelesaian tugasan.'}"
+        </div>
+        ${evaluation.trainerRecommendation ? `
+          <div style="font-size: 8.5pt; color: #065f46; margin-top: 6px; font-weight: 600;">
+            Cadangan / Syor: ${evaluation.trainerRecommendation}
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="sign-grid">
+        <div class="sign-box">
+          <div><strong>Tandatangan Jurulatih Industri:</strong></div>
+          <div style="height: 35px;"></div>
+          <div>Nama: <strong>${evaluation.trainerName}</strong></div>
+          <div>Jawatan: ${evaluation.trainerPosition || 'Jurulatih Industri'}</div>
+          <div>Tarikh: ${evaluation.submittedAt ? new Date(evaluation.submittedAt).toLocaleDateString('ms-MY') : new Date().toLocaleDateString('ms-MY')}</div>
+        </div>
+        <div class="sign-box">
+          <div><strong>Pengesahan Pensyarah Fakulti (TPF):</strong></div>
+          <div style="height: 35px;"></div>
+          <div>Nama: <strong>${evaluation.lecturerName || 'Pensyarah Kursus FPTT'}</strong></div>
+          <div>Fakulti: FPTT, Universiti Teknikal Malaysia Melaka</div>
+          <div>Status: <span style="color: #065f46; font-weight: bold;">${evaluation.status === 'verified_by_lecturer' ? 'Disahkan' : 'Dalam Tindakan'}</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 25px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 7.5pt; color: #64748b; display: flex; justify-content: space-between;">
+        <div>Borang Rasmi Pentaksiran Hasil Kerja Mingguan • FPTT UTeM</div>
+        <div>Dicetak melalui Sistem Pengurusan WBL FPTT • ${new Date().toLocaleString('ms-MY')}</div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+};

@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Application, UserRole, StudentEvaluation, CourseLecturerAssignment, EvaluationStatus } from '../types';
+import { User, Application, UserRole, StudentEvaluation, CourseLecturerAssignment, EvaluationStatus, WeeklyLogbook } from '../types';
 import { StorageService } from '../services/storage';
 import { DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
-import { generateEvaluationPrint, generateCourseGradeSummaryPrint, generateCourseRubricPrint, CourseStudentGradeRecord } from '../utils/evaluationGenerator';
+import { 
+  generateEvaluationPrint, 
+  generateCourseGradeSummaryPrint, 
+  generateCourseRubricPrint, 
+  generateWeeklyStudentAssessmentPrint,
+  CourseStudentGradeRecord 
+} from '../utils/evaluationGenerator';
 import { 
   UTEM_PORTFOLIO_SCHEMES, 
   UTEM_WEEKLY_ASSESSMENTS, 
+  WBL_COURSE_SEQUENCE,
+  WblCourseSequenceItem,
   CoursePortfolioScheme, 
   WeeklyAssessmentConfig,
   RubricCriterion
@@ -15,8 +23,10 @@ import {
   Trash2, Edit3, UserCheck, ShieldCheck, Building2, Star, Search, Filter, 
   GraduationCap, BookOpen, Settings, UserCog, Check, Info, ChevronRight, HelpCircle,
   UserPlus, UserMinus, CheckSquare, Bell, ArrowRight, Eye, RefreshCw, BarChart2,
-  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck, Sliders, ChevronDown, Users
+  Mail, Phone, MapPin, ExternalLink, Layers, CheckCheck, Sliders, ChevronDown, Users,
+  Megaphone, MessageSquare, CalendarCheck, Sparkles
 } from 'lucide-react';
+import { CourseAnnouncementsSection } from '../components/CourseAnnouncementsSection';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
 
@@ -25,7 +35,7 @@ interface StudentEvaluationPageProps {
   applications: Application[];
   users: User[];
   language: Language;
-  initialTab?: 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment';
+  initialTab?: 'weeklyAssessment' | 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment' | 'announcements';
   onNavigate?: (view: string) => void;
 }
 
@@ -43,8 +53,23 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   const isLecturer = currentUser.role === UserRole.LECTURER || currentUser.role === UserRole.SUPERVISOR;
   const isCoordinator = currentUser.role === UserRole.COORDINATOR || currentUser.is_jkwbl === true || (currentUser as any).is_admin === true;
 
-  // Active Tab: 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment'
-  const [activeTab, setActiveTab] = useState<'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment'>(initialTab);
+  // Active Tab: 'weeklyAssessment' | 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment' | 'announcements'
+  const [activeTab, setActiveTab] = useState<'weeklyAssessment' | 'evaluations' | 'settings' | 'rubrics' | 'courseMonitoring' | 'enrollment' | 'announcements'>(
+    initialTab || (isTrainer ? 'weeklyAssessment' : 'evaluations')
+  );
+
+  // Weekly Assessment States (Industry Coach Weekly Evaluation for 4x 5-week modules & 20-week PSM2 starting 28 Sept 2026)
+  const [selectedWeeklyCourseCode, setSelectedWeeklyCourseCode] = useState<string>('BTMU 2103(i)');
+  const [selectedWeeklyStudentMatric, setSelectedWeeklyStudentMatric] = useState<string>('');
+  const [isWeeklyModalOpen, setIsWeeklyModalOpen] = useState(false);
+  const [evaluatingWeekConfig, setEvaluatingWeekConfig] = useState<WeeklyAssessmentConfig | null>(null);
+  const [evaluatingExistingEval, setEvaluatingExistingEval] = useState<StudentEvaluation | null>(null);
+  const [weeklyAreaScores, setWeeklyAreaScores] = useState<{ area1: number; area2: number; area3: number }>({ area1: 3, area2: 3, area3: 3 });
+  const [weeklyTrainerComments, setWeeklyTrainerComments] = useState<string>('');
+  const [weeklyTrainerRecommendation, setWeeklyTrainerRecommendation] = useState<string>('');
+  const [weeklyDeliverableNotes, setWeeklyDeliverableNotes] = useState<string>('');
+  const [studentWeeklyLogbook, setStudentWeeklyLogbook] = useState<WeeklyLogbook | null>(null);
+  const [isViewingLogbookModalOpen, setIsViewingLogbookModalOpen] = useState(false);
 
   // Official UTeM Rubrics View State (matching lampiran)
   const [selectedRubricCourseCode, setSelectedRubricCourseCode] = useState<string>('BTMT 3273(i)');
@@ -70,6 +95,11 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     if (initialTab) {
       setActiveTab(initialTab);
     }
+    const evalTab = sessionStorage.getItem('selectedEvaluationTab');
+    if (evalTab) {
+      setActiveTab(evalTab as any);
+      sessionStorage.removeItem('selectedEvaluationTab');
+    }
     const navCourse = sessionStorage.getItem('selectedMonitoringCourseCode');
     if (navCourse) {
       setSelectedMonitoringCourseCode(navCourse);
@@ -92,6 +122,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       } else if (view === 'evaluation') {
         setSelectedCourseFilter(courseCode || 'all');
         setActiveTab('evaluations');
+      } else if (view === 'weekly') {
+        setSelectedWeeklyCourseCode(courseCode || 'BTMU 2103(i)');
+        setActiveTab('weeklyAssessment');
       }
     };
     window.addEventListener('wblCourseSelected', handleCourseSelected);
@@ -223,6 +256,232 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     const revision = filteredEvaluations.filter(e => e.status === 'revision_requested').length;
     return { total, pendingVerification, verified, draft, revision };
   }, [filteredEvaluations]);
+
+  // List of active students for Weekly Assessment
+  const activeWeeklyStudents = useMemo(() => {
+    if (isStudent) {
+      return [{
+        studentId: currentUser.id,
+        studentName: currentUser.name,
+        studentMatric: currentUser.matric_no || 'B062110045',
+        studentProgram: currentUser.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+        companyName: currentUser.company_affiliation || 'PETRONAS Digital Sdn Bhd',
+        companyDistrict: 'Kuala Lumpur',
+        companyState: 'W.P. Kuala Lumpur'
+      }];
+    }
+    const apps = myCompanyStudents.length > 0 ? myCompanyStudents : applications.filter(a => a.student_name);
+    if (apps.length > 0) {
+      return apps.map(app => {
+        const u = users.find(user => user.matric_no === app.student_id || user.username === app.created_by);
+        return {
+          studentId: u?.id || app.student_id || 'student',
+          studentName: app.student_name || u?.name || 'Pelajar WBL',
+          studentMatric: app.student_id || app.studentMatric || u?.matric_no || 'B062110045',
+          studentProgram: app.student_program || u?.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+          companyName: app.company_name || currentUser.company_affiliation || 'Syarikat Penempatan Industri',
+          companyDistrict: app.company_district || '',
+          companyState: app.company_state || ''
+        };
+      });
+    }
+    const stUsers = users.filter(u => u.role === UserRole.STUDENT);
+    return stUsers.map(u => ({
+      studentId: u.id,
+      studentName: u.name,
+      studentMatric: u.matric_no || 'B062110045',
+      studentProgram: u.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+      companyName: u.company_affiliation || currentUser.company_affiliation || 'PETRONAS Digital Sdn Bhd',
+      companyDistrict: 'Kuala Lumpur',
+      companyState: 'W.P. Kuala Lumpur'
+    }));
+  }, [isStudent, currentUser, myCompanyStudents, applications, users]);
+
+  useEffect(() => {
+    if (!selectedWeeklyStudentMatric && activeWeeklyStudents.length > 0) {
+      setSelectedWeeklyStudentMatric(activeWeeklyStudents[0].studentMatric);
+    }
+  }, [activeWeeklyStudents, selectedWeeklyStudentMatric]);
+
+  const currentSelectedStudent = useMemo(() => {
+    return activeWeeklyStudents.find(s => s.studentMatric === selectedWeeklyStudentMatric) || activeWeeklyStudents[0];
+  }, [activeWeeklyStudents, selectedWeeklyStudentMatric]);
+
+  const studentWeeklyEvalsMap = useMemo(() => {
+    if (!currentSelectedStudent) return new Map<number, StudentEvaluation>();
+    const map = new Map<number, StudentEvaluation>();
+    evaluations.forEach(e => {
+      const matchStudent = e.studentMatric === currentSelectedStudent.studentMatric || e.studentId === currentSelectedStudent.studentId;
+      const matchCourse = e.courseCode === selectedWeeklyCourseCode;
+      const isWeekly = e.evaluationType === 'weekly' || (e.weekNumber !== undefined && e.weekNumber !== null);
+      if (matchStudent && matchCourse && isWeekly && e.weekNumber) {
+        map.set(e.weekNumber, e);
+      }
+    });
+    return map;
+  }, [evaluations, currentSelectedStudent, selectedWeeklyCourseCode]);
+
+  const currentWeeklyConfigs = useMemo(() => {
+    return UTEM_WEEKLY_ASSESSMENTS[selectedWeeklyCourseCode] || [];
+  }, [selectedWeeklyCourseCode]);
+
+  const activeCourseSequenceItem = useMemo(() => {
+    return WBL_COURSE_SEQUENCE.find(c => c.courseCode === selectedWeeklyCourseCode) || WBL_COURSE_SEQUENCE[0];
+  }, [selectedWeeklyCourseCode]);
+
+  // Open Weekly Assessment Form Modal
+  const handleOpenWeeklyModal = (weekConfig: WeeklyAssessmentConfig) => {
+    const existing = studentWeeklyEvalsMap.get(weekConfig.week);
+    setEvaluatingWeekConfig(weekConfig);
+    setEvaluatingExistingEval(existing || null);
+
+    if (existing && existing.weeklyScores) {
+      setWeeklyAreaScores({
+        area1: existing.weeklyScores.area1 ?? 3,
+        area2: existing.weeklyScores.area2 ?? 3,
+        area3: existing.weeklyScores.area3 ?? 3
+      });
+      setWeeklyTrainerComments(existing.trainerComments || '');
+      setWeeklyTrainerRecommendation(existing.trainerRecommendation || '');
+      setWeeklyDeliverableNotes(existing.weeklyDeliverableNotes || '');
+    } else {
+      setWeeklyAreaScores({ area1: 3, area2: 3, area3: 3 });
+      setWeeklyTrainerComments(
+        `Pelajar telah menyempurnakan tugasan Minggu ${weekConfig.week} dengan baik dan mematuhi standard industri. Hasil kerja dinilai memenuhi CLO yang ditetapkan.`
+      );
+      setWeeklyTrainerRecommendation('Meneruskan ketekalan kerja industri dan melengkapkan catatan refleksi.');
+      setWeeklyDeliverableNotes('');
+    }
+
+    if (currentSelectedStudent) {
+      const allLogs = StorageService.getWeeklyLogbooks();
+      const matchLog = allLogs.find(l => 
+        (l.studentMatric === currentSelectedStudent.studentMatric || l.studentId === currentSelectedStudent.studentId) &&
+        l.weekNumber === weekConfig.week
+      );
+      setStudentWeeklyLogbook(matchLog || null);
+    }
+
+    setIsWeeklyModalOpen(true);
+  };
+
+  // Save Weekly Assessment
+  const handleSaveWeeklyEvaluation = async (submitNow: boolean = false) => {
+    if (!evaluatingWeekConfig || !currentSelectedStudent) return;
+    setIsSaving(true);
+    try {
+      const assignment = courseAssignments.find(ca => ca.courseCode === selectedWeeklyCourseCode);
+      const weeklySum = weeklyAreaScores.area1 + weeklyAreaScores.area2 + weeklyAreaScores.area3;
+      const totalScore = Math.round((weeklySum / 12) * 100);
+      const gradeObj = calculateUTeMGrade(totalScore);
+
+      const evalData: Partial<StudentEvaluation> & { studentId: string; courseCode: string } = {
+        id: evaluatingExistingEval?.id,
+        studentId: currentSelectedStudent.studentId,
+        studentName: currentSelectedStudent.studentName,
+        studentMatric: currentSelectedStudent.studentMatric,
+        studentProgram: currentSelectedStudent.studentProgram,
+        companyName: currentSelectedStudent.companyName,
+        courseCode: selectedWeeklyCourseCode,
+        courseName: evaluatingWeekConfig.courseName,
+        evaluationType: 'weekly',
+        weekNumber: evaluatingWeekConfig.week,
+        startDate: evaluatingWeekConfig.startDate,
+        endDate: evaluatingWeekConfig.endDate,
+        weeklyTaskTitle: evaluatingWeekConfig.taskTitle,
+        weeklyDeliverableNotes,
+        weeklyScores: {
+          area1: weeklyAreaScores.area1,
+          area2: weeklyAreaScores.area2,
+          area3: weeklyAreaScores.area3,
+          total: weeklySum
+        },
+        trainerId: currentUser.id,
+        trainerName: currentUser.name,
+        trainerPosition: currentUser.company_position || currentUser.company_affiliation || 'Jurulatih Industri',
+        trainerCompany: currentUser.company_affiliation || currentSelectedStudent.companyName,
+        trainerEmail: currentUser.email,
+        trainerPhone: currentUser.phone,
+        lecturerId: assignment?.lecturerId || facultyLecturers[0]?.id || '',
+        lecturerName: assignment?.lecturerName || facultyLecturers[0]?.name || 'Pensyarah Kursus FPTT',
+        lecturerStaffId: assignment?.lecturerStaffId,
+        lecturerEmail: assignment?.lecturerEmail,
+        scores: {
+          taskKnowledge: Math.round(weeklyAreaScores.area1 * 2.5),
+          workQuality: Math.round(weeklyAreaScores.area2 * 2.5),
+          problemSolving: Math.round(weeklyAreaScores.area3 * 2.5),
+          toolCompetency: 8,
+          punctuality: 9,
+          communication: 8,
+          workEthics: 9,
+          adaptability: 8,
+          logbookQuality: 8,
+          reflectionQuality: 8
+        },
+        technicalSubtotal: weeklyAreaScores.area1,
+        softSkillsSubtotal: weeklyAreaScores.area2,
+        logbookSubtotal: weeklyAreaScores.area3,
+        totalScore,
+        grade: gradeObj.grade,
+        trainerComments: weeklyTrainerComments,
+        trainerRecommendation: weeklyTrainerRecommendation,
+        status: submitNow ? 'submitted_by_trainer' : 'draft',
+        submittedAt: submitNow ? new Date().toISOString() : evaluatingExistingEval?.submittedAt
+      };
+
+      await StorageService.saveEvaluation(evalData);
+      toast.success(
+        submitNow 
+          ? `Markah Minggu ${evaluatingWeekConfig.week} berjaya dihantar dan disahkan!` 
+          : `Draf penilaian Minggu ${evaluatingWeekConfig.week} berjaya disimpan.`
+      );
+      setIsWeeklyModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      toast.error(`Gagal menyimpan penilaian: ${err.message || 'Ralat'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Print weekly assessment sheet
+  const handlePrintWeeklyEvaluation = (existingEval: StudentEvaluation | undefined, weekConfig: WeeklyAssessmentConfig) => {
+    if (!currentSelectedStudent) return;
+    const evalObj: StudentEvaluation = existingEval || {
+      id: `temp_${weekConfig.week}`,
+      studentId: currentSelectedStudent.studentId,
+      studentName: currentSelectedStudent.studentName,
+      studentMatric: currentSelectedStudent.studentMatric,
+      studentProgram: currentSelectedStudent.studentProgram,
+      companyName: currentSelectedStudent.companyName,
+      courseCode: selectedWeeklyCourseCode,
+      courseName: weekConfig.courseName,
+      evaluationType: 'weekly',
+      weekNumber: weekConfig.week,
+      startDate: weekConfig.startDate,
+      endDate: weekConfig.endDate,
+      weeklyTaskTitle: weekConfig.taskTitle,
+      weeklyScores: { area1: 3, area2: 3, area3: 3, total: 9 },
+      trainerId: currentUser.id,
+      trainerName: currentUser.name,
+      trainerPosition: currentUser.company_position || 'Jurulatih Industri',
+      trainerCompany: currentSelectedStudent.companyName,
+      lecturerId: '',
+      lecturerName: 'Pensyarah Kursus FPTT',
+      scores: {
+        taskKnowledge: 8, workQuality: 8, problemSolving: 8, toolCompetency: 8,
+        punctuality: 8, communication: 8, workEthics: 8, adaptability: 8,
+        logbookQuality: 8, reflectionQuality: 8
+      },
+      technicalSubtotal: 3, softSkillsSubtotal: 3, logbookSubtotal: 3,
+      totalScore: 75, grade: 'B+',
+      trainerComments: 'Pelajar menunjukkan komitmen baik.',
+      status: 'submitted_by_trainer',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    generateWeeklyStudentAssessmentPrint(evalObj, weekConfig, language);
+  };
 
   // Handle open Evaluation Form (new or edit)
   const handleOpenForm = (existing?: StudentEvaluation, presetStudent?: any, presetCourseCode?: string) => {
@@ -701,6 +960,25 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
 
       {/* Navigation Tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        {/* Tab 0: Pentaksiran Hasil Kerja Mingguan (4 Modul 5 Minggu & 20 Minggu PSM2) */}
+        <button
+          onClick={() => {
+            setActiveTab('weeklyAssessment');
+            if (onNavigate) onNavigate('weeklyAssessment');
+          }}
+          className={`px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+            activeTab === 'weeklyAssessment'
+              ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 text-white shadow-md font-black ring-2 ring-blue-400/30'
+              : 'text-slate-700 hover:bg-blue-50 hover:text-blue-800'
+          }`}
+        >
+          <CalendarCheck size={15} className={activeTab === 'weeklyAssessment' ? 'text-amber-300' : 'text-blue-600'} />
+          <span>{language === 'ms' ? 'Pentaksiran Kerja Mingguan' : 'Weekly Work Assessment'}</span>
+          <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full shadow-xs">
+            5 Mgg & 20 Mgg PSM2
+          </span>
+        </button>
+
         {/* Tab 1: Senarai Penilaian */}
         <button
           onClick={() => {
@@ -807,11 +1085,576 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
           <BookOpen size={14} />
           <span>{language === 'ms' ? 'Rubrik & Skala Gred UTeM' : 'Rubrics & Grading Scale'}</span>
         </button>
+
+        {/* Tab 6: Pengumuman Kursus (Bagi Semua Kursus & Penjejakan Pembacaan) */}
+        <button
+          onClick={() => {
+            setActiveTab('announcements');
+            if (onNavigate) onNavigate('courseAnnouncements');
+          }}
+          className={`px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+            activeTab === 'announcements'
+              ? 'bg-indigo-600 text-white shadow-sm font-black'
+              : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+          }`}
+        >
+          <Megaphone size={14} />
+          <span>{language === 'ms' ? 'Pengumuman Kursus' : 'Course Announcements'}</span>
+          <span className="text-[10px] bg-amber-400 text-slate-900 font-black px-1.5 py-0.2 rounded-full shadow-xs">
+            📢 Baru
+          </span>
+        </button>
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: SENARAI PENILAIAN PELAJAR (EVALUATION QUEUE & LIST)                */}
+      {/* TAB 0: PENTAKSIRAN KERJA MINGGUAN JURULATIH INDUSTRI (JI)                 */}
+      {/* 4 MODUL (5 MINGGU) & PSM II (20 MINGGU BERMULA 28 SEPTEMBER 2026)          */}
       {/* ========================================================================= */}
+      {activeTab === 'weeklyAssessment' && (
+        <div className="space-y-6">
+          {/* Top Header Card */}
+          <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl shadow-md border border-indigo-900/50">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="bg-amber-400 text-slate-950 font-black text-xs px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                    <CalendarCheck size={14} />
+                    <span>Pentaksiran Mingguan Mengikut Minggu</span>
+                  </span>
+                  <span className="bg-white/10 text-indigo-200 text-xs px-3 py-1 rounded-lg border border-white/15">
+                    FPTT 2u2i Work-Based Learning
+                  </span>
+                  <span className="bg-emerald-500/20 text-emerald-300 text-xs px-3 py-1 rounded-lg border border-emerald-500/30 font-semibold">
+                    Tarikh Mula: 28 September 2026
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Pentaksiran Hasil Kerja Mingguan oleh Jurulatih Industri (JI)
+                </h3>
+                <p className="text-xs sm:text-sm text-indigo-200/90 max-w-4xl leading-relaxed">
+                  Jurulatih Industri menilai hasil kerja dan kompetensi mingguan pelajar mengikut sukatan rasmi UTeM selama 
+                  <strong> 5 minggu bermula Pengurusan Operasi (5 minggu) → Keusahawanan Digital (5 minggu) → Analitik Perniagaan (5 minggu) → Pengurusan Penjenamaan (5 minggu)</strong>, 
+                  manakala bagi <strong>Projek Sarjana Muda II (PSM2) dilaksanakan selama 20 minggu penuh bermula 28 September 2026</strong>.
+                </p>
+              </div>
+
+              {/* Action: Print summary / dossier */}
+              <div className="shrink-0 flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={() => {
+                    const scheme = UTEM_PORTFOLIO_SCHEMES[selectedWeeklyCourseCode];
+                    generateCourseRubricPrint(selectedWeeklyCourseCode, language);
+                  }}
+                  className="px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                >
+                  <BookOpen size={15} />
+                  <span>{language === 'ms' ? 'Skema Rubrik Kursus' : 'Course Rubric Scheme'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Course Modular Sequence Tabs (Requested Order) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <span className="flex items-center gap-1.5">
+                <Layers size={14} className="text-blue-600" />
+                <span>Pilih Kursus / Modul WBL Mengikut Turutan Rasmi:</span>
+              </span>
+              <span className="text-[11px] text-slate-500">
+                4 Modul @ 5 Minggu + PSM2 @ 20 Minggu
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {WBL_COURSE_SEQUENCE.map((c) => {
+                const isSelected = selectedWeeklyCourseCode === c.courseCode;
+                const totalWeeks = c.durationWeeks;
+                
+                // Count how many weeks have been evaluated for current student in this course
+                let evaluatedCount = 0;
+                if (currentSelectedStudent) {
+                  evaluations.forEach(e => {
+                    const matchSt = e.studentMatric === currentSelectedStudent.studentMatric || e.studentId === currentSelectedStudent.studentId;
+                    const matchCr = e.courseCode === c.courseCode;
+                    const isWk = e.evaluationType === 'weekly' || (e.weekNumber !== undefined && e.weekNumber !== null);
+                    if (matchSt && matchCr && isWk && e.weekNumber) {
+                      evaluatedCount++;
+                    }
+                  });
+                }
+
+                return (
+                  <button
+                    key={c.courseCode}
+                    onClick={() => setSelectedWeeklyCourseCode(c.courseCode)}
+                    className={`p-4 rounded-2xl text-left transition-all border relative flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-gradient-to-b from-blue-900 to-indigo-950 text-white border-blue-500 shadow-md ring-2 ring-blue-400/40'
+                        : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/80 shadow-xs'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                          isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {c.badge}
+                        </span>
+                        <span className={`text-[10px] font-mono font-bold ${
+                          isSelected ? 'text-indigo-200' : 'text-slate-500'
+                        }`}>
+                          {c.courseCode}
+                        </span>
+                      </div>
+
+                      <h4 className={`text-xs font-black line-clamp-2 leading-tight mb-1.5 ${
+                        isSelected ? 'text-white' : 'text-slate-900'
+                      }`}>
+                        {c.order}. {c.shortName}
+                      </h4>
+
+                      <div className={`text-[10px] space-y-0.5 ${
+                        isSelected ? 'text-indigo-200/80' : 'text-slate-500'
+                      }`}>
+                        <div>📅 {c.startDate} - {c.endDate}</div>
+                        <div>⚖️ Nisbah: {c.evaluatorRatio}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
+                      <span className={`font-semibold ${isSelected ? 'text-indigo-200' : 'text-slate-500'}`}>
+                        Kemajuan:
+                      </span>
+                      <span className={`font-black px-2 py-0.5 rounded-full ${
+                        evaluatedCount >= totalWeeks
+                          ? 'bg-emerald-500 text-white'
+                          : evaluatedCount > 0
+                          ? 'bg-amber-500 text-white'
+                          : isSelected
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {evaluatedCount} / {totalWeeks} Minggu
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Course & Student Selector Strip */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            {/* Active Course Info */}
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-black px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-lg">
+                  {activeCourseSequenceItem.courseCode}
+                </span>
+                <span className="text-xs bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-lg">
+                  {activeCourseSequenceItem.creditHours} Jam Kredit
+                </span>
+                <span className="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-lg">
+                  {activeCourseSequenceItem.badge}
+                </span>
+                <span className="text-xs bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded-lg">
+                  📅 {activeCourseSequenceItem.startDate} hingga {activeCourseSequenceItem.endDate}
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-slate-900">
+                {activeCourseSequenceItem.courseName}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-3xl">
+                {activeCourseSequenceItem.description}
+              </p>
+            </div>
+
+            {/* Student Selector */}
+            <div className="w-full lg:w-auto bg-slate-50 p-3.5 rounded-2xl border border-slate-200 shrink-0 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Users size={14} className="text-blue-600" />
+                  <span>Pelajar Yang Dinilai:</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-normal">
+                  ({activeWeeklyStudents.length} Pelajar)
+                </span>
+              </div>
+
+              {activeWeeklyStudents.length > 1 && !isStudent ? (
+                <select
+                  value={selectedWeeklyStudentMatric}
+                  onChange={(e) => setSelectedWeeklyStudentMatric(e.target.value)}
+                  className="w-full text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  {activeWeeklyStudents.map((st) => (
+                    <option key={st.studentMatric} value={st.studentMatric}>
+                      {st.studentName} ({st.studentMatric}) - {st.companyName}
+                    </option>
+                  ))}
+                </select>
+              ) : currentSelectedStudent ? (
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-xs shrink-0">
+                    {currentSelectedStudent.studentName.charAt(0)}
+                  </div>
+                  <div className="text-xs">
+                    <div className="font-bold text-slate-900 leading-tight">
+                      {currentSelectedStudent.studentName}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono">
+                      {currentSelectedStudent.studentMatric} • {currentSelectedStudent.companyName}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Cumulative Scorecard for Selected Student & Course */}
+          {currentSelectedStudent && (() => {
+            const totalWeeksInCourse = activeCourseSequenceItem.durationWeeks;
+            const weekConfigs = currentWeeklyConfigs;
+            let totalEvaluatedWeeks = 0;
+            let totalMarksAccumulated = 0;
+
+            weekConfigs.forEach((wc) => {
+              const ev = studentWeeklyEvalsMap.get(wc.week);
+              if (ev && ev.weeklyScores) {
+                totalEvaluatedWeeks++;
+                totalMarksAccumulated += (ev.weeklyScores.total || 0);
+              }
+            });
+
+            const maxPossible = totalWeeksInCourse * 12;
+            const averageScore = totalEvaluatedWeeks > 0 ? (totalMarksAccumulated / totalEvaluatedWeeks) : 0;
+            const overallPercent = totalEvaluatedWeeks > 0 ? Math.round((averageScore / 12) * 100) : 0;
+            const courseGrade = calculateUTeMGrade(overallPercent);
+
+            // Conversion to official JI component (e.g. 40% or 60%)
+            const jiComponentMax = activeCourseSequenceItem.jiWeightPercent;
+            const jiWeightedMark = totalEvaluatedWeeks > 0 
+              ? ((totalMarksAccumulated / (totalEvaluatedWeeks * 12)) * jiComponentMax).toFixed(1)
+              : '0.0';
+
+            return (
+              <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50 border border-blue-200/80 p-5 rounded-3xl shadow-xs">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-3 border-b border-blue-200/60">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black shrink-0 shadow-xs">
+                      {currentSelectedStudent.studentName.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                        Kad Kemajuan Pentaksiran Mingguan Pelajar
+                      </div>
+                      <h4 className="text-base font-black text-slate-900">
+                        {currentSelectedStudent.studentName} ({currentSelectedStudent.studentMatric})
+                      </h4>
+                      <div className="text-xs text-slate-600 font-medium">
+                        {currentSelectedStudent.companyName} • Jurulatih: <strong>{currentUser.name}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        // Print the first evaluated week or generate rubric
+                        const firstEval = studentWeeklyEvalsMap.get(1);
+                        if (firstEval && weekConfigs[0]) {
+                          generateWeeklyStudentAssessmentPrint(firstEval, weekConfigs[0], language);
+                        } else {
+                          generateCourseRubricPrint(selectedWeeklyCourseCode, language);
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
+                    >
+                      <Printer size={14} />
+                      <span>{language === 'ms' ? 'Cetak Borang Pentaksiran' : 'Print Assessment Sheet'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Summary Score Metric Blocks */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Block 1 */}
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">
+                      Status Penilaian
+                    </span>
+                    <div className="text-xl font-black text-slate-900 mt-0.5">
+                      {totalEvaluatedWeeks} / {totalWeeksInCourse} <span className="text-xs font-medium text-slate-500">Minggu</span>
+                    </div>
+                    <div className="text-[10px] font-semibold text-blue-600 mt-1">
+                      {Math.round((totalEvaluatedWeeks / totalWeeksInCourse) * 100)}% Selesai Dinilai
+                    </div>
+                  </div>
+
+                  {/* Block 2 */}
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">
+                      Purata Markah Mingguan
+                    </span>
+                    <div className="text-xl font-black text-blue-700 mt-0.5">
+                      {averageScore.toFixed(1)} <span className="text-xs font-medium text-slate-500">/ 12 Markah</span>
+                    </div>
+                    <div className="text-[10px] font-semibold text-slate-600 mt-1">
+                      Setara {overallPercent}% Purata
+                    </div>
+                  </div>
+
+                  {/* Block 3 */}
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">
+                      Anggaran Gred Akademik
+                    </span>
+                    <div className="text-xl font-black text-emerald-600 mt-0.5 flex items-center gap-2">
+                      <span>{totalEvaluatedWeeks > 0 ? courseGrade.grade : '-'}</span>
+                      {totalEvaluatedWeeks > 0 && (
+                        <span className="text-xs font-bold text-slate-600">({courseGrade.status})</span>
+                      )}
+                    </div>
+                    <div className="text-[10px] font-semibold text-emerald-700 mt-1">
+                      Skala UTeM: {courseGrade.pointer.toFixed(2)} Nilai Gred
+                    </div>
+                  </div>
+
+                  {/* Block 4 */}
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">
+                      Sumbangan Markah JI ({jiComponentMax}%)
+                    </span>
+                    <div className="text-xl font-black text-indigo-700 mt-0.5">
+                      {jiWeightedMark} <span className="text-xs font-medium text-slate-500">/ {jiComponentMax}%</span>
+                    </div>
+                    <div className="text-[10px] font-semibold text-indigo-600 mt-1">
+                      Komponen Rasmi Jurulatih
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Week-by-Week Interactive Timeline Cards */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-800 px-1">
+              <span className="flex items-center gap-2">
+                <CalendarCheck size={16} className="text-blue-600" />
+                <span className="text-sm">
+                  Senarai Tugasan Mingguan & Borang Penilaian ({currentWeeklyConfigs.length} Minggu):
+                </span>
+              </span>
+              <span className="text-xs text-slate-500 font-medium">
+                Setiap minggu dinilai atas 3 bidang (Maks: 12 Markah)
+              </span>
+            </div>
+
+            {currentWeeklyConfigs.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 text-slate-500 text-xs">
+                Tiada konfigurasi tugasan mingguan ditemui bagi kursus ini.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {currentWeeklyConfigs.map((w) => {
+                  const ev = studentWeeklyEvalsMap.get(w.week);
+                  const isEvaluated = Boolean(ev && ev.weeklyScores);
+                  const wTotal = ev?.weeklyScores?.total ?? 0;
+                  const wPercent = Math.round((wTotal / 12) * 100);
+                  const wGrade = calculateUTeMGrade(wPercent);
+
+                  return (
+                    <div
+                      key={w.week}
+                      className={`bg-white rounded-3xl border transition-all shadow-xs overflow-hidden ${
+                        isEvaluated
+                          ? 'border-emerald-200 hover:border-emerald-300'
+                          : 'border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {/* Week Card Header */}
+                      <div className={`p-4 sm:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b ${
+                        isEvaluated ? 'bg-emerald-50/40 border-emerald-100' : 'bg-slate-50/70 border-slate-100'
+                      }`}>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className={`font-black text-xs px-3 py-1 rounded-xl font-mono ${
+                            isEvaluated
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-blue-600 text-white shadow-xs'
+                          }`}>
+                            MINGGU {w.week}
+                          </span>
+
+                          {w.startDate && w.endDate && (
+                            <span className="text-xs font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                              📅 {w.startDate} - {w.endDate}
+                            </span>
+                          )}
+
+                          {w.milestone && (
+                            <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                              🎯 {w.milestone}
+                            </span>
+                          )}
+
+                          {isEvaluated ? (
+                            <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
+                              <CheckCircle2 size={13} className="text-emerald-600" />
+                              <span>Telah Dinilai: {wTotal} / 12 ({wPercent}%) — Gred {wGrade.grade}</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
+                              <Clock size={13} className="text-amber-600" />
+                              <span>Menunggu Penilaian Jurulatih</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 self-end md:self-auto">
+                          {isEvaluated && (
+                            <button
+                              onClick={() => handlePrintWeeklyEvaluation(ev, w)}
+                              className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+                              title="Cetak Borang Pentaksiran Minggu Ini"
+                            >
+                              <Printer size={13} />
+                              <span className="hidden sm:inline">Cetak</span>
+                            </button>
+                          )}
+
+                          {(isTrainer || isCoordinator) && (
+                            <button
+                              onClick={() => handleOpenWeeklyModal(w)}
+                              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm ${
+                                isEvaluated
+                                  ? 'bg-slate-800 hover:bg-slate-900 text-white'
+                                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+                              }`}
+                            >
+                              <Edit3 size={14} />
+                              <span>{isEvaluated ? 'Kemaskini Markah' : 'Nilai Minggu Ini'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Week Card Body */}
+                      <div className="p-5 space-y-4">
+                        {/* Task Title & CLO */}
+                        <div className="space-y-1">
+                          <h4 className="text-sm sm:text-base font-bold text-slate-900">
+                            {w.taskTitle}
+                          </h4>
+                          <div className="text-xs text-blue-700 font-semibold flex items-center gap-1.5">
+                            <Sparkles size={13} className="text-blue-500 shrink-0" />
+                            <span>{w.cloStatement}</span>
+                          </div>
+                        </div>
+
+                        {/* Key Task Highlights */}
+                        {w.taskHighlights && w.taskHighlights.length > 0 && (
+                          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 space-y-1.5">
+                            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                              Fokus Tugasan & Aktiviti Industri (Minggu {w.week}):
+                            </span>
+                            <ul className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-700">
+                              {w.taskHighlights.map((hl, hIdx) => (
+                                <li key={hIdx} className="flex items-start gap-1.5 bg-white p-2 rounded-xl border border-slate-200/60">
+                                  <span className="text-blue-600 font-bold">•</span>
+                                  <span>{hl}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 3 Assessment Areas with Rubric Scores */}
+                        <div className="space-y-2">
+                          <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                            3 Bidang Pentaksiran Prestasi (Skema 12 Markah):
+                          </span>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {w.areas.map((area, aIdx) => {
+                              const scoreVal = isEvaluated && ev?.weeklyScores 
+                                ? (aIdx === 0 ? ev.weeklyScores.area1 : aIdx === 1 ? ev.weeklyScores.area2 : ev.weeklyScores.area3)
+                                : null;
+
+                              return (
+                                <div
+                                  key={area.id}
+                                  className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                                    scoreVal !== null
+                                      ? 'bg-slate-50/80 border-slate-200'
+                                      : 'bg-white border-slate-200/80'
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                                      <span>Bidang {aIdx + 1}</span>
+                                      <span className="font-mono">Maks: 4 Markah</span>
+                                    </div>
+                                    <div className="text-xs font-bold text-slate-800 leading-snug">
+                                      {area.title}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between">
+                                    <span className="text-[11px] text-slate-500">Skor Dinilai:</span>
+                                    {scoreVal !== null ? (
+                                      <span className={`text-xs font-black px-2 py-0.5 rounded-md ${
+                                        scoreVal === 4 ? 'bg-emerald-100 text-emerald-800' :
+                                        scoreVal === 3 ? 'bg-blue-100 text-blue-800' :
+                                        scoreVal === 2 ? 'bg-amber-100 text-amber-800' :
+                                        'bg-rose-100 text-rose-800'
+                                      }`}>
+                                        {scoreVal} / 4 ({
+                                          scoreVal === 4 ? 'Cemerlang' :
+                                          scoreVal === 3 ? 'Baik' :
+                                          scoreVal === 2 ? 'Sederhana' : 'Lemah'
+                                        })
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-slate-400 font-medium italic">
+                                        Belum dinilai
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Trainer Feedback snippet if evaluated */}
+                        {isEvaluated && ev?.trainerComments && (
+                          <div className="bg-amber-50/60 border border-amber-200/70 p-3.5 rounded-2xl text-xs space-y-1">
+                            <span className="font-bold text-amber-900 block flex items-center gap-1.5">
+                              <Star size={13} className="text-amber-600 fill-amber-500" />
+                              <span>Ulasan & Maklum Balas Jurulatih Industri ({ev.trainerName}):</span>
+                            </span>
+                            <p className="text-slate-700 italic">
+                              "{ev.trainerComments}"
+                            </p>
+                            {ev.trainerRecommendation && (
+                              <div className="text-[11px] text-emerald-800 font-semibold pt-1">
+                                💡 Syor Bimbingan: {ev.trainerRecommendation}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {activeTab === 'evaluations' && (
         <div className="space-y-6">
           {/* Attention Banner if there are evaluations pending lecturer verification */}
@@ -1607,6 +2450,19 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
+                        onClick={() => {
+                          setSelectedMonitoringCourseCode(currentCourse.courseCode);
+                          setSelectedCourseFilter(currentCourse.courseCode);
+                          setActiveTab('announcements');
+                        }}
+                        className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Megaphone size={14} />
+                        <span>{language === 'ms' ? 'Pengumuman Kursus' : 'Course Announcements'}</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => handlePrintCourseLedger(currentCourse)}
                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                       >
@@ -1885,6 +2741,20 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                       >
                                         <Bell size={13} className="text-amber-600" />
                                         <span>{isSendingReminder === `${row.studentMatric}_${currentCourse.courseCode}` ? '...' : 'Peringatan'}</span>
+                                      </button>
+                                    )}
+
+                                    {(isLecturer || isCoordinator) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (onNavigate) onNavigate('wblMessaging');
+                                        }}
+                                        className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-2xs"
+                                        title={`Mesej Jurulatih Industri (${row.trainerName})`}
+                                      >
+                                        <MessageSquare size={13} />
+                                        <span>Mesej</span>
                                       </button>
                                     )}
 
@@ -2920,6 +3790,340 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 6: PENGUMUMAN KURSUS & STATUS PEMBACAAN PELAJAR                       */}
+      {/* ========================================================================= */}
+      {activeTab === 'announcements' && (
+        <CourseAnnouncementsSection
+          currentUser={currentUser}
+          courseCode={selectedMonitoringCourseCode !== 'all' ? selectedMonitoringCourseCode : (selectedCourseFilter !== 'all' ? selectedCourseFilter : 'all')}
+          assignedCourses={courseAssignments}
+          users={users}
+          language={language}
+          onRefresh={loadData}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 0: BORANG PENTAKSIRAN MINGGUAN JURULATIH INDUSTRI (12 MARKAH)       */}
+      {/* ========================================================================= */}
+      {isWeeklyModalOpen && evaluatingWeekConfig && currentSelectedStudent && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[94vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white flex justify-between items-start gap-4">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-black bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-lg shadow-xs">
+                    MINGGU {evaluatingWeekConfig.week}
+                  </span>
+                  <span className="text-xs bg-white/10 text-indigo-200 font-bold px-2.5 py-0.5 rounded-lg">
+                    {evaluatingWeekConfig.courseCode}
+                  </span>
+                  {evaluatingWeekConfig.startDate && evaluatingWeekConfig.endDate && (
+                    <span className="text-xs bg-emerald-500/20 text-emerald-300 font-medium px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                      📅 {evaluatingWeekConfig.startDate} hingga {evaluatingWeekConfig.endDate}
+                    </span>
+                  )}
+                </div>
+
+                <h3 className="text-lg sm:text-xl font-black text-white leading-tight">
+                  Borang Pentaksiran Hasil Kerja Mingguan Jurulatih Industri
+                </h3>
+
+                <p className="text-xs text-indigo-200/90 font-medium">
+                  Pelajar: <strong>{currentSelectedStudent.studentName}</strong> ({currentSelectedStudent.studentMatric}) • {currentSelectedStudent.companyName}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsWeeklyModalOpen(false)}
+                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold text-sm shrink-0 transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50">
+              {/* Syllabus & Task Focus Card */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span className="text-blue-600 uppercase tracking-wider font-bold">
+                    Sukatan Pentaksiran Rasmi UTeM Minggu {evaluatingWeekConfig.week}
+                  </span>
+                  <span className="font-mono text-slate-500">Skema 12 Markah</span>
+                </div>
+
+                <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug">
+                  {evaluatingWeekConfig.taskTitle}
+                </h4>
+
+                <div className="text-xs text-blue-700 font-semibold flex items-center gap-1.5 pt-0.5">
+                  <Sparkles size={14} className="text-blue-500 shrink-0" />
+                  <span>{evaluatingWeekConfig.cloStatement}</span>
+                </div>
+
+                {evaluatingWeekConfig.taskHighlights && evaluatingWeekConfig.taskHighlights.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                      Fokus Tugasan Mingguan di Industri:
+                    </span>
+                    <ul className="space-y-1 text-xs text-slate-700">
+                      {evaluatingWeekConfig.taskHighlights.map((hl, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="text-blue-600 font-bold">•</span>
+                          <span>{hl}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Student Logbook Linkage (if available) */}
+              {studentWeeklyLogbook ? (
+                <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-2xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                      <CheckCircle2 size={15} className="text-emerald-600" />
+                      <span>Rekod Buku Log Mingguan Pelajar (Minggu {evaluatingWeekConfig.week}) Telah Direkod</span>
+                    </span>
+                    <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md text-[10px]">
+                      {studentWeeklyLogbook.entries?.length || 0} Catatan Harian
+                    </span>
+                  </div>
+
+                  {studentWeeklyLogbook.weeklySummary && (
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 text-slate-700 italic">
+                      "Refleksi Pelajar: {studentWeeklyLogbook.weeklySummary}"
+                    </div>
+                  )}
+
+                  {studentWeeklyLogbook.entries && studentWeeklyLogbook.entries.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <span className="font-semibold text-slate-700 text-[11px] block">
+                        Ringkasan Tugasan Harian Yang Dilaksanakan Pelajar:
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                        {studentWeeklyLogbook.entries.map((ent, idx) => (
+                          <div key={idx} className="bg-white p-2 rounded-lg border border-slate-200/80 text-[11px]">
+                            <span className="font-bold text-blue-700">{ent.day} ({ent.date}):</span> {ent.tasks}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-amber-50/60 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                  <Info size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    Pelajar belum mengisi buku log digital bagi Minggu {evaluatingWeekConfig.week}. Jurulatih Industri boleh terus mengisi markah berdasarkan pemantauan fizikal, tugasan amali dan hasil kerja di lantai operasi firma.
+                  </div>
+                </div>
+              )}
+
+              {/* 3 Assessment Areas Rubric Scoring (12 Marks Max) */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
+                    <Award size={16} className="text-amber-500" />
+                    <span>Pentaksiran 3 Bidang Penilaian (Skala Rubrik 1 - 4):</span>
+                  </h4>
+                  <span className="text-xs text-blue-700 font-bold font-mono">
+                    Jumlah: {weeklyAreaScores.area1 + weeklyAreaScores.area2 + weeklyAreaScores.area3} / 12 Markah
+                  </span>
+                </div>
+
+                {evaluatingWeekConfig.areas.map((area, aIdx) => {
+                  const currentScore = aIdx === 0 ? weeklyAreaScores.area1 : aIdx === 1 ? weeklyAreaScores.area2 : weeklyAreaScores.area3;
+                  const setScore = (val: number) => {
+                    if (aIdx === 0) setWeeklyAreaScores(prev => ({ ...prev, area1: val }));
+                    else if (aIdx === 1) setWeeklyAreaScores(prev => ({ ...prev, area2: val }));
+                    else setWeeklyAreaScores(prev => ({ ...prev, area3: val }));
+                  };
+
+                  return (
+                    <div key={area.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
+                            Bidang {aIdx + 1} (Maks: 4 Markah)
+                          </span>
+                          <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                            {area.title}
+                          </h5>
+                        </div>
+
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-xl shrink-0 font-mono ${
+                          currentScore === 4 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                          currentScore === 3 ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                          currentScore === 2 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                          'bg-rose-100 text-rose-800 border border-rose-300'
+                        }`}>
+                          {currentScore} / 4 ({
+                            currentScore === 4 ? 'Cemerlang' :
+                            currentScore === 3 ? 'Baik' :
+                            currentScore === 2 ? 'Sederhana' : 'Lemah'
+                          })
+                        </span>
+                      </div>
+
+                      {/* 4 Rubric Bands Clickable Selector */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {[
+                          { score: 1, label: '1 - Lemah', desc: 'Tidak memuaskan / perlukan pemantauan rapi' },
+                          { score: 2, label: '2 - Sederhana', desc: 'Kurang memuaskan / penuhi syarat minimum' },
+                          { score: 3, label: '3 - Baik', desc: 'Memuaskan / penuhi standard firma' },
+                          { score: 4, label: '4 - Cemerlang', desc: 'Kualiti cemerlang / berdikari bertaraf profesional' },
+                        ].map((b) => (
+                          <button
+                            key={b.score}
+                            type="button"
+                            onClick={() => setScore(b.score)}
+                            className={`p-2.5 rounded-xl border text-left transition-all text-xs flex flex-col justify-between ${
+                              currentScore === b.score
+                                ? b.score === 4
+                                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm font-bold'
+                                  : b.score === 3
+                                  ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-bold'
+                                  : b.score === 2
+                                  ? 'bg-amber-500 text-white border-amber-600 shadow-sm font-bold'
+                                  : 'bg-rose-600 text-white border-rose-700 shadow-sm font-bold'
+                                : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
+                            }`}
+                          >
+                            <span className="font-black text-xs">{b.label}</span>
+                            <span className={`text-[10px] mt-0.5 line-clamp-2 leading-tight ${
+                              currentScore === b.score ? 'text-white/90' : 'text-slate-500'
+                            }`}>
+                              {b.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Score Calculation Banner */}
+                {(() => {
+                  const sum = weeklyAreaScores.area1 + weeklyAreaScores.area2 + weeklyAreaScores.area3;
+                  const pct = Math.round((sum / 12) * 100);
+                  const gr = calculateUTeMGrade(pct);
+
+                  return (
+                    <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xs">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-blue-200 block font-bold">
+                          Rumusan Markah Minggu {evaluatingWeekConfig.week}
+                        </span>
+                        <div className="text-lg font-black mt-0.5">
+                          {sum} / 12 Markah ({pct}%)
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-indigo-200 block uppercase font-bold">
+                          Gred Mingguan UTeM
+                        </span>
+                        <span className="text-xl font-black text-amber-300">
+                          {gr.grade} ({gr.status})
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Qualitative Feedback & Guidance */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <h4 className="font-bold text-slate-900 text-sm">
+                  Ulasan Kualitatif & Bimbingan Jurulatih Industri:
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Ulasan Prestasi & Pencapaian Minggu Ini:
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={weeklyTrainerComments}
+                    onChange={(e) => setWeeklyTrainerComments(e.target.value)}
+                    placeholder="Tulis ulasan penilaian prestasi tugasan, ketepatan masa, kualiti hasil kerja atau bimbingan khusus..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Cadangan Penambahbaikan Minggu Seterusnya:
+                  </label>
+                  <input
+                    type="text"
+                    value={weeklyTrainerRecommendation}
+                    onChange={(e) => setWeeklyTrainerRecommendation(e.target.value)}
+                    placeholder="cth: Tingkatkan ketelitian analisis data dan konsistensi catatan buku log..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Catatan Bukti / Evidens Hasil Kerja (Pilihan):
+                  </label>
+                  <input
+                    type="text"
+                    value={weeklyDeliverableNotes}
+                    onChange={(e) => setWeeklyDeliverableNotes(e.target.value)}
+                    placeholder="cth: Laporan fizikal telah disahkan; Slaid pembentangan modul telah disemak..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="text-xs font-bold text-slate-600">
+                Markah: <span className="text-blue-700 font-black">{weeklyAreaScores.area1 + weeklyAreaScores.area2 + weeklyAreaScores.area3} / 12</span> ({Math.round(((weeklyAreaScores.area1 + weeklyAreaScores.area2 + weeklyAreaScores.area3) / 12) * 100)}%)
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsWeeklyModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all"
+                >
+                  Batal
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleSaveWeeklyEvaluation(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Save size={14} />
+                  <span>Simpan Draf</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleSaveWeeklyEvaluation(true)}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <Check size={15} />
+                  <span>Hantar & Sahkan Markah Minggu Ini</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
