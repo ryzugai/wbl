@@ -251,6 +251,33 @@ const cleanAndMigrateLocalStorage = async () => {
       }
     }
   } catch {}
+
+  try {
+    const rawAssignments = localStorage.getItem(STORAGE_KEYS.COURSE_ASSIGNMENTS);
+    if (rawAssignments) {
+      const assignments: CourseLecturerAssignment[] = JSON.parse(rawAssignments);
+      const unique = new Map<string, CourseLecturerAssignment>();
+      let modified = false;
+      assignments.forEach(ca => {
+        const normKey = (ca.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+        if (!normKey) return;
+        if (!unique.has(normKey)) {
+          unique.set(normKey, ca);
+        } else {
+          modified = true;
+          const existing = unique.get(normKey)!;
+          if (new Date(ca.updatedAt || 0).getTime() > new Date(existing.updatedAt || 0).getTime()) {
+            unique.set(normKey, ca);
+          }
+        }
+      });
+      if (modified) {
+        const deduped = Array.from(unique.values());
+        safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, deduped);
+        inMemoryCourseAssignments = deduped;
+      }
+    }
+  } catch {}
 };
 
 const hydrateAppsFromIDB = async () => {
@@ -330,6 +357,29 @@ const setupRealtimeListeners = () => {
             };
           });
           safeSaveLocalStorage(storageKey, inMemoryApplications);
+        } else if (colName === 'course_assignments') {
+          const rawAssignments = data as CourseLecturerAssignment[];
+          const uniqueMap = new Map<string, CourseLecturerAssignment>();
+          rawAssignments.forEach(ca => {
+            const cleanKey = (ca.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+            if (!uniqueMap.has(cleanKey)) {
+              uniqueMap.set(cleanKey, ca);
+            } else {
+              const prev = uniqueMap.get(cleanKey)!;
+              if (new Date(ca.updatedAt || 0).getTime() >= new Date(prev.updatedAt || 0).getTime()) {
+                uniqueMap.set(cleanKey, ca);
+              }
+            }
+          });
+          const deduplicated = Array.from(uniqueMap.values());
+          inMemoryCourseAssignments = deduplicated;
+          safeSaveLocalStorage(storageKey, deduplicated);
+        } else if (colName === 'student_evaluations') {
+          inMemoryEvaluations = data as StudentEvaluation[];
+          safeSaveLocalStorage(storageKey, data);
+        } else if (colName === 'weekly_logbooks') {
+          inMemoryLogbooks = data as WeeklyLogbook[];
+          safeSaveLocalStorage(storageKey, data);
         } else {
           safeSaveLocalStorage(storageKey, data);
         }
@@ -348,6 +398,8 @@ const setupRealtimeListeners = () => {
   syncCollection('notifications', STORAGE_KEYS.NOTIFICATIONS);
   syncCollection('weekly_logbooks', STORAGE_KEYS.LOGBOOKS);
   syncCollection('course_announcements', STORAGE_KEYS.COURSE_ANNOUNCEMENTS);
+  syncCollection('course_assignments', STORAGE_KEYS.COURSE_ASSIGNMENTS);
+  syncCollection('student_evaluations', STORAGE_KEYS.EVALUATIONS);
   syncCollection('wbl_conversations', STORAGE_KEYS.WBL_CONVERSATIONS);
   syncCollection('wbl_messages', STORAGE_KEYS.WBL_MESSAGES);
   
@@ -504,6 +556,16 @@ export const StorageService = {
       if (a.id) {
         const payload = stripHeavyFields(a);
         batch.set(doc(db, 'applications', a.id), sanitizeForFirebase(payload));
+      }
+    });
+    StorageService.getCourseAssignments().forEach(ca => {
+      if (ca.id) {
+        batch.set(doc(db, 'course_assignments', ca.id), sanitizeForFirebase(ca));
+      }
+    });
+    StorageService.getEvaluations().forEach(ev => {
+      if (ev.id) {
+        batch.set(doc(db, 'student_evaluations', ev.id), sanitizeForFirebase(ev));
       }
     });
     await batch.commit();
@@ -692,6 +754,113 @@ export const StorageService = {
         console.warn('Firebase delete user notice:', e);
       }
     }
+  },
+
+  resetUserPassword: async (userId: string, newPassword: string): Promise<User> => {
+    const cur = getCurrentUser();
+    if (!hasSystemAccess()) throw new Error('Hanya Penyelaras WBL yang berkuasa menetapkan semula kata laluan pengguna.');
+    if (!newPassword || newPassword.trim().length < 4) {
+      throw new Error('Kata laluan baharu mestilah sekurang-kurangnya 4 aksara.');
+    }
+
+    const users = StorageService.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) throw new Error('Pengguna tidak ditemui.');
+
+    const targetUser = { ...users[idx], password: newPassword.trim(), is_active: true };
+    users[idx] = targetUser;
+    inMemoryUsers = [...users];
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'users', targetUser.id), sanitizeForFirebase(stripHeavyFields(targetUser)), { merge: true });
+      } catch (e) {
+        console.warn('Firebase password reset sync notice:', e);
+      }
+    }
+
+    const now = new Date().toISOString();
+    try {
+      await StorageService.createNotification({
+        recipient_id: targetUser.id,
+        recipient_role: targetUser.role,
+        sender_name: cur?.name || 'Penyelaras WBL',
+        title_ms: 'Kata Laluan Akaun Anda Telah Ditetapkan Semula',
+        title_en: 'Your Account Password Has Been Reset',
+        message_ms: `Penyelaras WBL (${cur?.name || 'Penyelaras'}) telah menetapkan semula kata laluan akaun anda (${targetUser.username}). Kata laluan baharu: ${newPassword.trim()}`,
+        message_en: `WBL Coordinator has reset your account password (${targetUser.username}). New password: ${newPassword.trim()}`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    if (cur) {
+      await StorageService.logActivity(
+        cur.id,
+        cur.username,
+        cur.role,
+        cur.name,
+        'user_password_reset',
+        `Penyelaras menetapkan semula kata laluan akaun untuk ${targetUser.name} (${targetUser.username} - ${targetUser.role}).`,
+        `Coordinator reset password for user ${targetUser.name} (${targetUser.username} - ${targetUser.role}).`
+      );
+    }
+
+    return targetUser;
+  },
+
+  requestPasswordReset: async (identifier: string, note?: string): Promise<void> => {
+    const cleanId = identifier.trim().toLowerCase();
+    const users = StorageService.getUsers();
+    const matched = users.find(u => 
+      u.username.toLowerCase() === cleanId || 
+      (u.email && u.email.toLowerCase() === cleanId) || 
+      (u.matric_no && u.matric_no.toLowerCase() === cleanId) ||
+      (u.ic_no && u.ic_no.replace(/[^0-9]/g, '') === cleanId.replace(/[^0-9]/g, ''))
+    );
+
+    const now = new Date().toISOString();
+    const reqName = matched ? matched.name : identifier;
+    const reqRole = matched ? matched.role : 'Pengguna';
+    const reqUsername = matched ? matched.username : identifier;
+
+    await StorageService.createNotification({
+      recipient_id: 'coordinator',
+      recipient_role: UserRole.COORDINATOR,
+      sender_name: reqName,
+      title_ms: `Permohonan Lupa Kata Laluan: ${reqName}`,
+      title_en: `Password Reset Request: ${reqName}`,
+      message_ms: `Pengguna ${reqName} (${reqUsername} • ${reqRole}) memohon bantuan penetapan semula kata laluan kerana terlupa. Catatan: ${note || 'Sila reset kata laluan ke akaun ini.'}`,
+      message_en: `User ${reqName} (${reqUsername} • ${reqRole}) requested password reset. Note: ${note || 'Forgot password.'}`,
+      is_read: false,
+      created_at: now
+    });
+  },
+
+  toggleUserActiveStatus: async (userId: string): Promise<User> => {
+    if (!hasSystemAccess()) throw new Error('Hanya Penyelaras WBL yang berkuasa mengubah status akaun.');
+    const users = StorageService.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) throw new Error('Pengguna tidak ditemui.');
+
+    const newStatus = users[idx].is_active === false;
+    const targetUser = { ...users[idx], is_active: newStatus };
+    users[idx] = targetUser;
+    inMemoryUsers = [...users];
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'users', targetUser.id), sanitizeForFirebase(stripHeavyFields(targetUser)), { merge: true });
+      } catch (e) {
+        console.warn('Firebase status toggle sync notice:', e);
+      }
+    }
+
+    return targetUser;
   },
 
   getCompanies: (): Company[] => JSON.parse(localStorage.getItem(STORAGE_KEYS.COMPANIES) || '[]'),
@@ -1850,24 +2019,23 @@ export const StorageService = {
 
   // ==================== COURSE LECTURER ASSIGNMENTS ====================
   getCourseAssignments: (): CourseLecturerAssignment[] => {
+    let rawList: CourseLecturerAssignment[] = [];
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.COURSE_ASSIGNMENTS);
       if (raw) {
         const parsed = JSON.parse(raw) as CourseLecturerAssignment[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          inMemoryCourseAssignments = parsed;
-          return parsed;
+          rawList = parsed;
         }
       }
     } catch {}
 
-    // Seed default course assignments from DEFAULT_WBL_COURSES
     const users = StorageService.getUsers();
     const studentUsers = users.filter(u => u.role === UserRole.STUDENT);
     const defaultStudentIds = studentUsers.map(s => s.id);
     if (defaultStudentIds.length === 0) defaultStudentIds.push('student_demo_1');
 
-    if (inMemoryCourseAssignments.length === 0) {
+    if (rawList.length === 0 && inMemoryCourseAssignments.length === 0) {
       const lecturers = users.filter(u => u.role === UserRole.LECTURER || u.role === UserRole.COORDINATOR || u.is_jkwbl);
       const defaultLecturer = lecturers[0] || {
         id: COORDINATOR_ACCOUNT.id,
@@ -1897,62 +2065,102 @@ export const StorageService = {
       return defaults;
     }
 
-    // Ensure all assignments have valid assignedStudentIds array
-    let needsResave = false;
-    inMemoryCourseAssignments = inMemoryCourseAssignments.map(a => {
-      if (!Array.isArray(a.assignedStudentIds) || a.assignedStudentIds.length === 0) {
-        needsResave = true;
-        return { ...a, assignedStudentIds: [...defaultStudentIds] };
-      }
-      return a;
-    });
-    if (needsResave) {
-      safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, inMemoryCourseAssignments);
-    }
+    const sourceList = rawList.length > 0 ? rawList : inMemoryCourseAssignments;
+    
+    // Deduplicate by normalized course code (e.g. "BTMT 3283", "BTMU 2103")
+    const map = new Map<string, CourseLecturerAssignment>();
+    sourceList.forEach(item => {
+      const normKey = (item.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+      if (!normKey) return;
 
-    return inMemoryCourseAssignments;
+      // Sync with user record if exists
+      let syncedItem = { ...item };
+      if (item.lecturerId) {
+        const matchedUser = users.find(u => u.id === item.lecturerId);
+        if (matchedUser) {
+          syncedItem.lecturerName = matchedUser.name;
+          if (matchedUser.email) syncedItem.lecturerEmail = matchedUser.email;
+          if ((matchedUser as any).staff_id) syncedItem.lecturerStaffId = (matchedUser as any).staff_id;
+        }
+      }
+
+      if (!map.has(normKey)) {
+        map.set(normKey, syncedItem);
+      } else {
+        const prev = map.get(normKey)!;
+        const prevTime = new Date(prev.updatedAt || 0).getTime();
+        const currTime = new Date(syncedItem.updatedAt || 0).getTime();
+        if (currTime >= prevTime) {
+          map.set(normKey, syncedItem);
+        }
+      }
+    });
+
+    const deduplicated = Array.from(map.values());
+    inMemoryCourseAssignments = deduplicated;
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, deduplicated);
+    return deduplicated;
   },
 
   saveCourseAssignment: async (assignmentData: Partial<CourseLecturerAssignment> & { courseCode: string; lecturerId: string; lecturerName: string }): Promise<CourseLecturerAssignment> => {
     const all = StorageService.getCourseAssignments();
-    const existingIdx = all.findIndex(a => 
-      (assignmentData.id && a.id === assignmentData.id) || a.courseCode === assignmentData.courseCode
-    );
+    const cleanTarget = (assignmentData.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+    
+    // Find lecturer from users to guarantee fresh verified name and details
+    const users = StorageService.getUsers();
+    const matchedLec = users.find(u => u.id === assignmentData.lecturerId) || 
+                       users.find(u => u.name && u.name.toLowerCase() === assignmentData.lecturerName.toLowerCase());
+
+    const lecturerName = matchedLec ? matchedLec.name : assignmentData.lecturerName;
+    const lecturerEmail = (matchedLec ? matchedLec.email : assignmentData.lecturerEmail) || '';
+    const lecturerStaffId = (matchedLec ? (matchedLec as any).staff_id : assignmentData.lecturerStaffId) || '';
 
     const now = new Date().toISOString();
-    let saved: CourseLecturerAssignment;
+    const canonicalId = assignmentData.id || `assign_${cleanTarget.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-    if (existingIdx !== -1) {
-      saved = {
-        ...all[existingIdx],
-        ...assignmentData,
-        assignedStudentIds: assignmentData.assignedStudentIds !== undefined ? assignmentData.assignedStudentIds : all[existingIdx].assignedStudentIds,
-        updatedAt: now
-      };
-      all[existingIdx] = saved;
-    } else {
-      saved = {
-        id: assignmentData.id || `assign_${assignmentData.courseCode.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
-        courseCode: assignmentData.courseCode,
-        courseName: assignmentData.courseName || assignmentData.courseCode,
-        lecturerId: assignmentData.lecturerId,
-        lecturerName: assignmentData.lecturerName,
-        lecturerStaffId: assignmentData.lecturerStaffId || '',
-        lecturerEmail: assignmentData.lecturerEmail || '',
-        semester: assignmentData.semester || 'Semester 7',
-        assignedStudentIds: assignmentData.assignedStudentIds || [],
-        updatedAt: now
-      };
-      all.push(saved);
-    }
+    // Collect obsolete docs with different IDs to delete from Cloud
+    const obsoleteIds: string[] = [];
+    const remaining = all.filter(a => {
+      const aClean = (a.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+      const isMatch = aClean === cleanTarget || a.id === assignmentData.id || a.id === canonicalId;
+      if (isMatch && a.id && a.id !== canonicalId) {
+        obsoleteIds.push(a.id);
+      }
+      return !isMatch;
+    });
 
-    inMemoryCourseAssignments = [...all];
-    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, all);
+    const existingMatch = all.find(a => {
+      const aClean = (a.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+      return aClean === cleanTarget || a.id === assignmentData.id || a.id === canonicalId;
+    });
+
+    const saved: CourseLecturerAssignment = {
+      id: canonicalId,
+      courseCode: assignmentData.courseCode,
+      courseName: assignmentData.courseName || existingMatch?.courseName || assignmentData.courseCode,
+      lecturerId: matchedLec ? matchedLec.id : assignmentData.lecturerId,
+      lecturerName: lecturerName,
+      lecturerStaffId: lecturerStaffId,
+      lecturerEmail: lecturerEmail,
+      semester: assignmentData.semester || existingMatch?.semester || 'Semester 7',
+      assignedStudentIds: assignmentData.assignedStudentIds !== undefined ? assignmentData.assignedStudentIds : (existingMatch?.assignedStudentIds || []),
+      updatedAt: now
+    };
+
+    const updatedAll = [...remaining, saved];
+    inMemoryCourseAssignments = updatedAll;
+    safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, updatedAll);
     notifyListeners();
 
     if (db) {
       try {
         await setDoc(doc(db, 'course_assignments', saved.id), sanitizeForFirebase(saved), { merge: true });
+        // Delete obsolete duplicates
+        for (const oldId of obsoleteIds) {
+          try {
+            await deleteDoc(doc(db, 'course_assignments', oldId));
+          } catch {}
+        }
       } catch (e) {
         console.warn('Firebase course assignment sync notice:', e);
       }
@@ -1960,15 +2168,17 @@ export const StorageService = {
 
     const cur = getCurrentUser();
     if (cur) {
-      await StorageService.logActivity(
-        cur.id,
-        cur.username,
-        cur.role,
-        cur.name,
-        'COURSE_LECTURER_ASSIGNED',
-        `Menetapkan pensyarah ${saved.lecturerName} untuk kursus ${saved.courseCode} (${saved.courseName}).`,
-        `Assigned lecturer ${saved.lecturerName} for course ${saved.courseCode}.`
-      );
+      try {
+        await StorageService.logActivity(
+          cur.id,
+          cur.username,
+          cur.role,
+          cur.name,
+          'course_assignment_update',
+          `Penyelaras menetapkan ${saved.lecturerName} sebagai Pensyarah Kursus bagi ${saved.courseCode}.`,
+          `Coordinator assigned ${saved.lecturerName} as Course Lecturer for ${saved.courseCode}.`
+        );
+      } catch {}
     }
 
     return saved;

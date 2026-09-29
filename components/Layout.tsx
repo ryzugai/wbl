@@ -23,7 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const currentYear = new Date().getFullYear();
 
-  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'courseEnrollment' || currentView === 'courseAnnouncements';
+  const isEvaluationView = currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'courseEnrollment' || currentView === 'courseAnnouncements';
   const [isEvaluationSubmenuOpen, setIsEvaluationSubmenuOpen] = useState(isEvaluationView);
   const [pendingEvalCount, setPendingEvalCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -93,7 +93,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   }, [currentUser]);
 
   // Navigate to course with synchronization
-  const handleCourseNavigate = (courseCode: string, view: 'monitoring' | 'evaluation') => {
+  const handleCourseNavigate = (courseCode: string, view: 'monitoring' | 'evaluation' | 'weekly') => {
     if (view === 'monitoring') {
       if (courseCode === 'all') {
         sessionStorage.removeItem('selectedMonitoringCourseCode');
@@ -101,6 +101,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
         sessionStorage.setItem('selectedMonitoringCourseCode', courseCode);
       }
       handleNavigate('lecturerCourseMonitoring');
+    } else if (view === 'weekly') {
+      if (courseCode !== 'all') {
+        sessionStorage.setItem('selectedWeeklyCourseCode', courseCode);
+      }
+      handleNavigate('weeklyAssessment');
     } else {
       if (courseCode === 'all') {
         sessionStorage.removeItem('selectedEvaluationCourseCode');
@@ -400,6 +405,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
               {/* Collapsible Submenu Links */}
               {isEvaluationSubmenuOpen && (
                 <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
+                  {/* Submenu 0: Pentaksiran Kerja Mingguan (Ikut Minggu) */}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate('weeklyAssessment')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      currentView === 'weeklyAssessment'
+                        ? 'bg-gradient-to-r from-blue-700 to-indigo-700 text-white font-black shadow-xs'
+                        : 'text-slate-700 hover:bg-blue-50 hover:text-blue-800 font-bold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'weeklyAssessment' ? 'bg-amber-300' : 'bg-blue-600'}`} />
+                      <span>{language === 'ms' ? 'Pentaksiran Ikut Minggu' : 'Weekly Assessment'}</span>
+                    </div>
+                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full ${
+                      currentView === 'weeklyAssessment' ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
+                    }`}>
+                      5 Mgg / PSM2
+                    </span>
+                  </button>
+
                   {/* Submenu 1: Borang & Senarai Penilaian */}
                   <button
                     type="button"
@@ -414,7 +440,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                       <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'studentEvaluation' ? 'bg-blue-600' : 'bg-slate-300'}`} />
                       <span>
                         {isTrainer 
-                          ? (language === 'ms' ? 'Borang & Nilai Pelajar' : 'Student Evaluations')
+                          ? (language === 'ms' ? 'Borang & Senarai Penilaian' : 'Student Evaluations')
                           : isLecturer 
                           ? (language === 'ms' ? 'Pengesahan Penilaian' : 'Verify Evaluations')
                           : isStudent
@@ -428,6 +454,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                       </span>
                     )}
                   </button>
+
+                  {/* Submenu: Borang Pentaksiran Ikut Minggu (Trainer & Coordinator) */}
+                  {(isTrainer || hasSystemAccess) && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavigate('weeklyAssessment')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'weeklyAssessment'
+                          ? 'bg-blue-50 text-blue-700 font-black'
+                          : 'text-slate-600 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'weeklyAssessment' ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                        <span>{language === 'ms' ? '🗓️ Pentaksiran Ikut Minggu (1-20)' : '🗓️ Weekly Task Assessment (1-20)'}</span>
+                      </div>
+                      <span className="text-[9px] bg-amber-100 text-amber-900 font-black px-1.5 py-0.2 rounded-full">
+                        Aktif
+                      </span>
+                    </button>
+                  )}
 
                   {/* Submenu 2: Pemantauan Kursus Pensyarah (Lecturer & Coordinator) */}
                   {(isLecturer || hasSystemAccess) && (
@@ -652,7 +699,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           {isTrainer && (
             <div className="py-1">
               <div className={`rounded-xl border transition-all ${
-                currentView === 'studentEvaluation' 
+                currentView === 'studentEvaluation' || currentView === 'weeklyAssessment'
                   ? 'border-blue-300 bg-blue-50/50 shadow-xs' 
                   : 'border-slate-200/80 bg-slate-50/60'
               }`}>
@@ -661,19 +708,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                   type="button"
                   onClick={() => setIsTrainerCourseSubmenuOpen(!isTrainerCourseSubmenuOpen)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-left ${
-                    currentView === 'studentEvaluation'
+                    currentView === 'studentEvaluation' || currentView === 'weeklyAssessment'
                       ? 'bg-blue-600 text-white font-black shadow-sm'
                       : 'text-slate-700 hover:bg-slate-100 font-bold'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <ClipboardCheck size={18} className={currentView === 'studentEvaluation' ? 'text-amber-300' : 'text-blue-600'} />
+                    <ClipboardCheck size={18} className={currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' ? 'text-amber-300' : 'text-blue-600'} />
                     <div className="flex flex-col">
                       <span className="text-xs leading-tight font-black">
                         {language === 'ms' ? 'Penilaian Kursus Semester Semasa' : 'Course Assessments (Current Sem)'}
                       </span>
                       <span className={`text-[10px] font-medium leading-none mt-0.5 ${
-                        currentView === 'studentEvaluation' ? 'text-blue-100' : 'text-slate-500'
+                        currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' ? 'text-blue-100' : 'text-slate-500'
                       }`}>
                         {allSemesterCourses.length} {language === 'ms' ? 'kursus aktif' : 'active courses'}
                       </span>
@@ -683,15 +730,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                   <div className="flex items-center gap-1.5">
                     {pendingEvalCount > 0 && (
                       <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                        currentView === 'studentEvaluation' ? 'bg-amber-400 text-slate-900' : 'bg-amber-500 text-white animate-pulse'
+                        currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' ? 'bg-amber-400 text-slate-900' : 'bg-amber-500 text-white animate-pulse'
                       }`}>
                         {pendingEvalCount}
                       </span>
                     )}
                     {isTrainerCourseSubmenuOpen ? (
-                      <ChevronDown size={14} className={currentView === 'studentEvaluation' ? 'text-white' : 'text-slate-400'} />
+                      <ChevronDown size={14} className={currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' ? 'text-white' : 'text-slate-400'} />
                     ) : (
-                      <ChevronRight size={14} className={currentView === 'studentEvaluation' ? 'text-white' : 'text-slate-400'} />
+                      <ChevronRight size={14} className={currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' ? 'text-white' : 'text-slate-400'} />
                     )}
                   </div>
                 </button>
@@ -699,6 +746,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                 {/* Submenu Course Links for Trainer */}
                 {isTrainerCourseSubmenuOpen && (
                   <div className="p-1 space-y-0.5 bg-white rounded-b-xl border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleCourseNavigate('all', 'weekly')}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        currentView === 'weeklyAssessment'
+                          ? 'bg-blue-600 text-white font-black shadow-xs'
+                          : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700 font-bold'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${currentView === 'weeklyAssessment' ? 'bg-amber-300' : 'bg-blue-600'}`} />
+                        <span>{language === 'ms' ? '🗓️ Pentaksiran Ikut Minggu' : '🗓️ Weekly Assessment'}</span>
+                      </div>
+                      <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full ${
+                        currentView === 'weeklyAssessment' ? 'bg-amber-400 text-slate-950' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        Aktif
+                      </span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleCourseNavigate('all', 'evaluation')}
@@ -709,28 +776,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                        <span>{language === 'ms' ? 'Semua Penilaian Pelajar' : 'All Student Evaluations'}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                        <span>{language === 'ms' ? '📋 Ringkasan Penilaian Pelajar' : 'All Student Evaluations'}</span>
                       </div>
-                      <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 rounded-full">
+                      <span className="text-[9px] bg-slate-100 text-slate-700 font-bold px-1.5 rounded-full">
                         {allSemesterCourses.length}
                       </span>
                     </button>
 
                     {allSemesterCourses.map(course => {
                       const stats = getTrainerCourseStats(course.courseCode);
+                      const isSelected = (currentView === 'weeklyAssessment' && sessionStorage.getItem('selectedWeeklyCourseCode') === course.courseCode) ||
+                                         (currentView === 'studentEvaluation' && sessionStorage.getItem('selectedEvaluationCourseCode') === course.courseCode);
                       return (
                         <button
                           key={course.id || course.courseCode}
                           type="button"
-                          onClick={() => handleCourseNavigate(course.courseCode, 'evaluation')}
-                          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
+                          onClick={() => handleCourseNavigate(course.courseCode, 'weekly')}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors group ${
+                            isSelected ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200' : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
+                          }`}
                           title={`${course.courseCode} - ${course.courseName}`}
                         >
                           <div className="flex items-center gap-2 overflow-hidden text-left">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-600" />
+                            <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-600' : 'bg-slate-300 group-hover:bg-blue-600'}`} />
                             <div className="flex flex-col truncate">
-                              <span className="truncate font-semibold">{course.courseCode}</span>
+                              <span className="truncate font-bold">{course.courseCode}</span>
                               <span className="text-[9px] text-slate-400 truncate">{course.courseName}</span>
                             </div>
                           </div>

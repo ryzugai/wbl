@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { StorageService } from './services/storage';
-import { User, Company, Application } from './types';
+import { User, Company, Application, UserRole } from './types';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -311,18 +311,20 @@ function App() {
             />
         )}
 
-        {(currentView === 'studentEvaluation' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'lecturerCourseMonitoring' || currentView === 'courseEnrollment' || currentView === 'courseAnnouncements') && (
+        {(currentView === 'studentEvaluation' || currentView === 'weeklyAssessment' || currentView === 'evaluationSettings' || currentView === 'evaluationRubrics' || currentView === 'lecturerCourseMonitoring' || currentView === 'courseEnrollment' || currentView === 'courseAnnouncements') && (
             <StudentEvaluationPage
                 currentUser={currentUser}
                 applications={applications}
                 users={users}
                 language={language}
                 initialTab={
+                  currentView === 'weeklyAssessment' ? 'weeklyAssessment' :
                   currentView === 'evaluationSettings' ? 'settings' :
                   currentView === 'evaluationRubrics' ? 'rubrics' :
                   currentView === 'lecturerCourseMonitoring' ? 'courseMonitoring' :
                   currentView === 'courseEnrollment' ? 'enrollment' :
-                  currentView === 'courseAnnouncements' ? 'announcements' : 'evaluations'
+                  currentView === 'courseAnnouncements' ? 'announcements' :
+                  (currentUser.role === UserRole.TRAINER ? 'weeklyAssessment' : 'evaluations')
                 }
                 onNavigate={setCurrentView}
             />

@@ -111,6 +111,12 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       setActiveTab('evaluations');
       sessionStorage.removeItem('selectedEvaluationCourseCode');
     }
+    const weeklyCourse = sessionStorage.getItem('selectedWeeklyCourseCode');
+    if (weeklyCourse) {
+      setSelectedWeeklyCourseCode(weeklyCourse);
+      setActiveTab('weeklyAssessment');
+      sessionStorage.removeItem('selectedWeeklyCourseCode');
+    }
   }, [initialTab]);
 
   useEffect(() => {
@@ -174,7 +180,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       u.role === UserRole.LECTURER || 
       u.role === UserRole.COORDINATOR || 
       u.is_jkwbl || 
-      u.role === UserRole.SUPERVISOR
+      u.role === UserRole.SUPERVISOR ||
+      Boolean((u as any).staff_id) ||
+      (u.email && u.email.toLowerCase().includes('@utem.edu.my'))
     );
   }, [users]);
 
@@ -300,12 +308,33 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   // Helper to get assigned lecturer for a course
   const getCourseAssignedLecturer = (courseCode: string): CourseLecturerAssignment | undefined => {
     if (!courseCode) return undefined;
-    const clean = courseCode.replace(/\(i\)/g, '').trim().toLowerCase();
-    return courseAssignments.find(ca => 
-      ca.courseCode === courseCode || 
-      ca.courseCode.toLowerCase() === courseCode.toLowerCase() ||
-      ca.courseCode.replace(/\(i\)/g, '').trim().toLowerCase() === clean
-    );
+    const clean = courseCode.replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const matches = courseAssignments.filter(ca => {
+      const caClean = (ca.courseCode || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
+      return ca.courseCode === courseCode || 
+             ca.courseCode?.toLowerCase() === courseCode.toLowerCase() ||
+             caClean === clean;
+    });
+
+    if (matches.length > 0) {
+      // Pick the latest assigned record
+      const sorted = [...matches].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+      const found = sorted[0];
+
+      const userLec = users.find(u => u.id === found.lecturerId) || 
+                      users.find(u => u.name && found.lecturerName && u.name.trim().toLowerCase() === found.lecturerName.trim().toLowerCase()) ||
+                      users.find(u => u.email && found.lecturerEmail && u.email.toLowerCase() === found.lecturerEmail.toLowerCase());
+      if (userLec && userLec.name) {
+        return {
+          ...found,
+          lecturerName: userLec.name,
+          lecturerEmail: userLec.email || found.lecturerEmail,
+          lecturerStaffId: (userLec as any).staff_id || found.lecturerStaffId
+        };
+      }
+      return found;
+    }
+    return undefined;
   };
 
   // Helper to determine if current user has verification rights for a course (must be assigned lecturer or coordinator)
@@ -766,24 +795,31 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       return;
     }
 
-    const lecturer = facultyLecturers.find(l => l.id === editingAssignment.lecturerId);
-    if (!lecturer) return;
+    const lecturer = facultyLecturers.find(l => l.id === editingAssignment.lecturerId) ||
+                     users.find(u => u.id === editingAssignment.lecturerId);
+    if (!lecturer) {
+      toast.error(language === 'ms' ? 'Pensyarah tidak dijumpai.' : 'Lecturer not found.');
+      return;
+    }
 
     setIsSaving(true);
     try {
       await StorageService.saveCourseAssignment({
         ...editingAssignment,
-        courseCode: editingAssignment.courseCode,
+        courseCode: editingAssignment.courseCode.trim(),
+        courseName: editingAssignment.courseName || editingAssignment.courseCode,
         lecturerId: lecturer.id,
         lecturerName: lecturer.name,
-        lecturerStaffId: (lecturer as any).staff_id,
-        lecturerEmail: lecturer.email
+        lecturerStaffId: (lecturer as any).staff_id || '',
+        lecturerEmail: lecturer.email || ''
       });
 
       loadData();
       setIsAssignModalOpen(false);
       setEditingAssignment(null);
-      toast.success(language === 'ms' ? 'Tetapan pensyarah kursus berjaya dikemaskini!' : 'Course lecturer settings updated!');
+      toast.success(language === 'ms' 
+        ? `Pensyarah ${lecturer.name} berjaya ditetapkan bagi kursus ${editingAssignment.courseCode}!` 
+        : 'Course lecturer settings updated!');
     } catch (err: any) {
       toast.error(err.message || 'Gagal menyimpan tetapan');
     } finally {
@@ -1336,7 +1372,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       <span>Pensyarah Pengesah Kursus (Ditugaskan):</span>
                     </span>
                     <span className="bg-indigo-50 text-indigo-950 font-bold px-2.5 py-0.5 rounded-lg border border-indigo-200">
-                      {assignedLec?.lecturerName || 'Dr. Mohd Guzairy bin Abd Ghani'} {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}
+                      {assignedLec?.lecturerName || facultyLecturers[0]?.name || (language === 'ms' ? 'Pensyarah Kursus Dilantik' : 'Assigned Lecturer')} {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}
                     </span>
                     {isLecturer && (
                       canVerify ? (
@@ -1787,6 +1823,44 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       )}
       {activeTab === 'evaluations' && (
         <div className="space-y-6">
+          {/* Pilihan Borang Penilaian Mengikut Minggu (Khusus untuk Jurulatih Industri & Penyelaras) */}
+          <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white p-5 rounded-3xl shadow-md border border-blue-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-black bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                  {language === 'ms' ? '🗓️ PILIHAN BORANG PENTAKSIRAN MENGIKUT MINGGU' : '🗓️ WEEKLY ASSESSMENT FORM CHOICE'}
+                </span>
+                <span className="text-[11px] bg-white/20 text-blue-200 px-2.5 py-0.5 rounded-full font-bold">
+                  {language === 'ms' ? 'Minggu 1 hingga Minggu 20 (Silibus WBL UTeM)' : 'Week 1 to Week 20 (UTeM WBL Syllabus)'}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white">
+                {language === 'ms' 
+                  ? 'Borang Penilaian Markah Tugasan Pelajar Mengikut Minggu' 
+                  : 'Weekly Student Task & Performance Evaluation Form'}
+              </h3>
+              <p className="text-xs text-blue-200/90 max-w-2xl leading-relaxed">
+                {language === 'ms'
+                  ? 'Jurulatih Industri boleh memilih borang penilaian mengikut minggu bagi menilai tugasan amali, kemahiran teknikal, dan kualiti kerja pelajar secara berperingkat dari Minggu 1 hingga 20 dengan skema 12 markah mengikut CLO rasmi UTeM.'
+                  : 'Industry Trainers can select weekly evaluation forms to score practical tasks, technical skills, and work quality progressively from Week 1 to 20 with the 12-mark rubric based on official UTeM CLO.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedCourseFilter !== 'all') {
+                    setSelectedWeeklyCourseCode(selectedCourseFilter);
+                  }
+                  setActiveTab('weeklyAssessment');
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-2xl font-black text-xs shadow-lg transition-all flex items-center gap-2 transform active:scale-95"
+              >
+                <CalendarCheck size={16} />
+                <span>{language === 'ms' ? 'Buka Borang Ikut Minggu (Minggu 1 - 20) →' : 'Open Weekly Form (Weeks 1 - 20) →'}</span>
+              </button>
+            </div>
+          </div>
           {/* Attention Banner if there are evaluations pending lecturer verification */}
           {(isLecturer || isCoordinator) && stats.pendingVerification > 0 && (
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
@@ -2042,6 +2116,19 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                         <>
                                           <button
                                             type="button"
+                                            onClick={() => {
+                                              setSelectedWeeklyStudentMatric(tr.student_id);
+                                              if (selectedCourseFilter !== 'all') setSelectedWeeklyCourseCode(selectedCourseFilter);
+                                              setActiveTab('weeklyAssessment');
+                                            }}
+                                            className="px-2.5 py-1.5 bg-blue-500/30 hover:bg-blue-500/50 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                                            title="Buka pentaksiran tugasan mingguan pelajar ini"
+                                          >
+                                            <CalendarCheck size={12} className="text-amber-300" />
+                                            <span>{language === 'ms' ? '🗓️ Ikut Minggu' : 'Weekly'}</span>
+                                          </button>
+                                          <button
+                                            type="button"
                                             onClick={() => handleOpenForm(trEval)}
                                             className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
                                           >
@@ -2058,14 +2145,30 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                           </button>
                                         </>
                                       ) : (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleOpenForm(undefined, tr, selectedCourseFilter)}
-                                          className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-black text-xs transition-all shadow flex items-center gap-1.5"
-                                        >
-                                          <Award size={13} />
-                                          <span>{language === 'ms' ? '📝 Nilai Pelajar Sekarang (Rubrik UTeM)' : 'Evaluate Now'}</span>
-                                        </button>
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedWeeklyStudentMatric(tr.student_id);
+                                              if (selectedCourseFilter !== 'all') setSelectedWeeklyCourseCode(selectedCourseFilter);
+                                              setActiveTab('weeklyAssessment');
+                                            }}
+                                            className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-black text-xs transition-all shadow flex items-center gap-1"
+                                            title="Nilai tugasan amali pelajar ikut minggu (Minggu 1 - 20)"
+                                          >
+                                            <CalendarCheck size={13} />
+                                            <span>{language === 'ms' ? '🗓️ Borang Ikut Minggu' : 'Weekly Form'}</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenForm(undefined, tr, selectedCourseFilter)}
+                                            className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg font-bold text-xs transition-colors flex items-center gap-1"
+                                            title="Isi borang penilaian keseluruhan kursus (100%)"
+                                          >
+                                            <Award size={13} />
+                                            <span>{language === 'ms' ? '📋 Penuh (100%)' : 'Full (100%)'}</span>
+                                          </button>
+                                        </div>
                                       )}
                                     </div>
                                   </div>
@@ -2126,8 +2229,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                             <div className="font-bold text-xs text-slate-800 group-hover:text-blue-700 transition-colors">
                               {course.courseName}
                             </div>
-                            <div className="text-[10px] text-slate-500">
-                              Pensyarah: {course.lecturerName || 'FPTT'}
+                            <div className="text-[10px] text-slate-500 font-medium">
+                              Pensyarah: <strong className="text-slate-800">{getCourseAssignedLecturer(course.courseCode)?.lecturerName || course.lecturerName || 'FPTT'}</strong>
                             </div>
                           </div>
 
@@ -2148,14 +2251,28 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                               )}
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setSelectedCourseFilter(course.courseCode)}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-xs"
-                            >
-                              <span>Nilai Kursus Ini</span>
-                              <ChevronRight size={12} />
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedWeeklyCourseCode(course.courseCode);
+                                  setActiveTab('weeklyAssessment');
+                                }}
+                                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-black text-xs transition-colors flex items-center gap-1 shadow-xs"
+                                title="Buka borang pentaksiran tugasan ikut minggu bagi kursus ini"
+                              >
+                                <CalendarCheck size={12} />
+                                <span>{language === 'ms' ? 'Ikut Minggu' : 'Weekly'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCourseFilter(course.courseCode)}
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-xs"
+                              >
+                                <span>{language === 'ms' ? 'Senarai' : 'List'}</span>
+                                <ChevronRight size={12} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -2310,6 +2427,22 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Open Weekly Assessment Action */}
+                              {(isTrainer || isCoordinator || isLecturer) && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedWeeklyStudentMatric(evalItem.studentMatric || evalItem.studentId);
+                                    if (evalItem.courseCode) setSelectedWeeklyCourseCode(evalItem.courseCode);
+                                    setActiveTab('weeklyAssessment');
+                                  }}
+                                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs transition-all flex items-center gap-1 border border-blue-200"
+                                  title="Buka Pentaksiran Tugasan Ikut Minggu (Minggu 1 - 20) Pelajar Ini"
+                                >
+                                  <CalendarCheck size={13} className="text-blue-600" />
+                                  <span>{language === 'ms' ? 'Ikut Minggu' : 'Weekly'}</span>
+                                </button>
+                              )}
+
                               {/* Lecturer Verification Action */}
                               {(isLecturer || isCoordinator) && isSubmitted && (
                                 <button
@@ -3364,8 +3497,12 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             {/* Course Assignments List */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {courseAssignments.map((assignment) => {
-                const assignedLec = facultyLecturers.find(l => l.id === assignment.lecturerId);
+                const assignedLec = facultyLecturers.find(l => l.id === assignment.lecturerId) || 
+                                    users.find(u => u.id === assignment.lecturerId) ||
+                                    users.find(u => u.name && assignment.lecturerName && u.name.trim().toLowerCase() === assignment.lecturerName.trim().toLowerCase());
                 const evalCount = evaluations.filter(e => e.courseCode === assignment.courseCode).length;
+                const displayLecturerName = assignedLec?.name || assignment.lecturerName;
+                const displayLecturerEmail = assignedLec?.email || assignment.lecturerEmail;
 
                 return (
                   <div key={assignment.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-blue-200 transition-all shadow-xs space-y-3">
@@ -3398,10 +3535,10 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       </div>
                       <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
                         <GraduationCap size={14} className="text-blue-600 shrink-0" />
-                        <span>{assignment.lecturerName}</span>
+                        <span>{displayLecturerName}</span>
                       </div>
-                      {assignment.lecturerEmail && (
-                        <div className="text-[11px] text-slate-500 font-mono">{assignment.lecturerEmail}</div>
+                      {displayLecturerEmail && (
+                        <div className="text-[11px] text-slate-500 font-mono">{displayLecturerEmail}</div>
                       )}
                     </div>
 
@@ -3986,7 +4123,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                   return (
                     <div className="flex items-center gap-1.5 text-xs text-amber-300 pt-0.5">
                       <ShieldCheck size={14} className="text-amber-400" />
-                      <span>Pensyarah Pengesah Kursus (Ditugaskan): <strong>{assignedLec?.lecturerName || 'Dr. Mohd Guzairy bin Abd Ghani'}</strong> {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}</span>
+                      <span>Pensyarah Pengesah Kursus (Ditugaskan): <strong>{assignedLec?.lecturerName || facultyLecturers[0]?.name || (language === 'ms' ? 'Pensyarah Kursus FPTT' : 'Course Lecturer')}</strong> {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}</span>
                     </div>
                   );
                 })()}
@@ -4310,6 +4447,46 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50">
+              {/* Form Mode / Weekly Choice Callout */}
+              <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border border-blue-800">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      {language === 'ms' ? 'Pilihan Borang Ikut Minggu' : 'Weekly Form Choice'}
+                    </span>
+                    <span className="text-xs text-blue-200 font-semibold">
+                      {language === 'ms' ? 'Silibus & Tugasan WBL Mingguan (1 - 20)' : 'Weekly Tasks (1 - 20)'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-100 max-w-xl">
+                    {language === 'ms'
+                      ? 'Adakah anda ingin menilai tugasan amali pelajar mengikut minggu (12 markah mingguan)? Anda boleh beralih ke borang ikut minggu bila-bila masa.'
+                      : 'Do you want to evaluate weekly student tasks (12 marks weekly)? You can switch to the weekly assessment form anytime.'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const studentMatric = editingEvaluation.studentMatric || editingEvaluation.studentId;
+                    const courseCode = editingEvaluation.courseCode || 'BTMU 2103(i)';
+                    setIsFormModalOpen(false);
+                    if (studentMatric) setSelectedWeeklyStudentMatric(studentMatric);
+                    if (courseCode) setSelectedWeeklyCourseCode(courseCode);
+                    setActiveTab('weeklyAssessment');
+                    toast.success(
+                      language === 'ms'
+                        ? `Membuka borang pentaksiran ikut minggu bagi ${editingEvaluation.studentName || 'pelajar'}`
+                        : `Opening weekly evaluation forms for student`
+                    );
+                  }}
+                  className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 shrink-0 transition-all active:scale-95"
+                >
+                  <CalendarCheck size={15} />
+                  <span>{language === 'ms' ? '🗓️ Beralih ke Borang Ikut Minggu' : 'Switch to Weekly Form'}</span>
+                </button>
+              </div>
+
               {/* Student & Course Selector Block */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <h4 className="font-bold text-slate-800 text-sm">
