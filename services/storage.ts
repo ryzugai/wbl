@@ -159,7 +159,16 @@ const cleanAndMigrateLocalStorage = async () => {
     if (rawUsers) {
       const users: User[] = JSON.parse(rawUsers);
       let modified = false;
-      for (const u of users) {
+      const filteredUsers = users.filter(u => {
+        if (!u.name) return true;
+        // Clean out any unrelated dummy users
+        if (u.name.includes('Amirul') && (u.name.includes('Razak') || u.name.includes('Razali'))) {
+          modified = true;
+          return false;
+        }
+        return true;
+      });
+      for (const u of filteredUsers) {
         if (u.profile_image && u.profile_image.startsWith('data:') && u.profile_image.length > 5000) {
           try {
             await IDBDocStorage.saveDocument(`${u.id}_profile_image`, u.profile_image);
@@ -171,12 +180,57 @@ const cleanAndMigrateLocalStorage = async () => {
         }
       }
       if (modified) {
-        safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
+        safeSaveLocalStorage(STORAGE_KEYS.USERS, filteredUsers);
+        inMemoryUsers = filteredUsers;
       }
     }
   } catch (e) {
     console.warn('cleanAndMigrateLocalStorage error:', e);
   }
+
+  // Sanitize stored evaluations removing/updating unrelated Amirul/Razali names
+  try {
+    const rawEvals = localStorage.getItem(STORAGE_KEYS.EVALUATIONS);
+    if (rawEvals) {
+      const evals: any[] = JSON.parse(rawEvals);
+      let modified = false;
+      evals.forEach(e => {
+        if (e.studentName && (e.studentName.includes('Amirul') || e.studentName.includes('Razak') || e.studentName.includes('Razali'))) {
+          e.studentName = 'Muhammad Faris bin Rosli';
+          e.studentMatric = 'B032110045';
+          e.studentId = 'student_1';
+          e.studentProgram = 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)';
+          modified = true;
+        }
+      });
+      if (modified) {
+        safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, evals);
+        inMemoryEvaluations = evals;
+      }
+    }
+  } catch {}
+
+  // Sanitize stored logbooks removing/updating unrelated Amirul/Razali names
+  try {
+    const rawLogs = localStorage.getItem(STORAGE_KEYS.LOGBOOKS);
+    if (rawLogs) {
+      const logs: any[] = JSON.parse(rawLogs);
+      let modified = false;
+      logs.forEach(l => {
+        if (l.studentName && (l.studentName.includes('Amirul') || l.studentName.includes('Razak') || l.studentName.includes('Razali'))) {
+          l.studentName = 'Muhammad Faris bin Rosli';
+          l.studentMatric = 'B032110045';
+          l.studentId = 'student_1';
+          l.studentProgram = 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)';
+          modified = true;
+        }
+      });
+      if (modified) {
+        safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, logs);
+        inMemoryLogbooks = logs;
+      }
+    }
+  } catch {}
 
   try {
     const rawActs = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
@@ -1235,10 +1289,10 @@ export const StorageService = {
       const demoLogs: WeeklyLogbook[] = [
         {
           id: 'logbook_demo_1',
-          studentId: 'student_demo_1',
-          studentName: 'Muhammad Amirul bin Razak',
-          studentMatric: 'B062110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          studentId: 'student_1',
+          studentName: 'Muhammad Faris bin Rosli',
+          studentMatric: 'B032110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
           companyName: 'PETRONAS Digital Sdn Bhd',
           companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
           weekNumber: 1,
@@ -1327,10 +1381,10 @@ export const StorageService = {
         },
         {
           id: 'logbook_demo_2',
-          studentId: 'student_demo_1',
-          studentName: 'Muhammad Amirul bin Razak',
-          studentMatric: 'B062110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          studentId: 'student_1',
+          studentName: 'Muhammad Faris bin Rosli',
+          studentMatric: 'B032110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
           companyName: 'PETRONAS Digital Sdn Bhd',
           companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
           weekNumber: 2,
@@ -2106,10 +2160,10 @@ export const StorageService = {
       const demoEvals: StudentEvaluation[] = [
         {
           id: 'eval_demo_1',
-          studentId: 'student_demo_1',
-          studentName: 'Muhammad Amirul bin Razak',
-          studentMatric: 'B062110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          studentId: 'student_1',
+          studentName: 'Muhammad Faris bin Rosli',
+          studentMatric: 'B032110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
           companyName: 'PETRONAS Digital Sdn Bhd',
           companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
           courseCode: 'BTMT 3283(i)',
@@ -2150,10 +2204,10 @@ export const StorageService = {
         },
         {
           id: 'eval_demo_2',
-          studentId: 'student_demo_1',
-          studentName: 'Muhammad Amirul bin Razak',
-          studentMatric: 'B062110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN DENGAN KEPUJIAN (BTEC)',
+          studentId: 'student_1',
+          studentName: 'Muhammad Faris bin Rosli',
+          studentMatric: 'B032110045',
+          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
           companyName: 'PETRONAS Digital Sdn Bhd',
           companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
           courseCode: 'BTMT 3273(i)',
@@ -3075,7 +3129,7 @@ export const StorageService = {
             senderName: 'En. Kamarul Zaman bin Harun',
             senderRole: UserRole.TRAINER,
             senderCompany: 'CTRM Aerostructures Sdn Bhd',
-            content: 'Salam Dr. Guzairy & En. Razak. Prestasi Faris amat cemerlang. Beliau sangat berdisiplin dan cepat mempelajari proses pembuatan komposit aeroangkasa. Saya akan masukkan penilaian rubrik minggu ke-5 esok.',
+            content: 'Salam Dr. Guzairy & En. Azman. Prestasi Faris amat cemerlang. Beliau sangat berdisiplin dan cepat mempelajari proses pembuatan komposit aeroangkasa. Saya akan masukkan penilaian rubrik minggu ke-5 esok.',
             createdAt: t2,
             readBy: [{ userId: 'trainer_kamarul', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
           },

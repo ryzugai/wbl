@@ -6,6 +6,8 @@ export interface WeeklyAssessmentArea {
 
 export interface WeeklyAssessmentConfig {
   week: number;
+  semesterWeek?: number;
+  semesterWeekLabel?: string;
   courseCode: string;
   courseName: string;
   cloStatement: string;
@@ -73,10 +75,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
   'BTMT 3273(i)': [
     {
       week: 1,
+      semesterWeek: 6,
+      semesterWeekLabel: 'Minggu 6 (Semester) / M1 (Modul)',
+      startDate: '2026-11-02',
+      endDate: '2026-11-06',
+      milestone: 'Modul 2 (Minggu 6 - 10)',
       courseCode: 'BTMT 3273',
       courseName: 'DIGITAL ENTREPRENEURSHIP',
       cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
-      taskTitle: 'WEEK 1 Task: Digital Business Ecosystem & Regulations',
+      taskTitle: 'MINGGU 6 (02 Nov - 06 Nov 2026): Digital Business Ecosystem & Regulations (M1)',
       taskHighlights: [
         'Explore the digital business ecosystem, startup models, and economic landscape at the placement firm',
         'Review legal and ethical frameworks in e-commerce',
@@ -91,10 +98,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 2,
+      semesterWeek: 7,
+      semesterWeekLabel: 'Minggu 7 (Semester) / M2 (Modul)',
+      startDate: '2026-11-09',
+      endDate: '2026-11-13',
+      milestone: 'Modul 2 (Minggu 6 - 10)',
       courseCode: 'BTMT 3273',
       courseName: 'DIGITAL ENTREPRENEURSHIP',
       cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
-      taskTitle: 'WEEK 2 Task: Digital Business Model Canvas (BMC) & UVP',
+      taskTitle: 'MINGGU 7 (09 Nov - 13 Nov 2026): Digital Business Model Canvas (BMC) & UVP (M2)',
       taskHighlights: [
         'Develop a Digital Business Model Canvas (Digital BMC) draft for the firm',
         'Design value propositions for digital markets and customer segmentation',
@@ -109,10 +121,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 3,
+      semesterWeek: 8,
+      semesterWeekLabel: 'Minggu 8 (Semester) / M3 (Modul)',
+      startDate: '2026-11-16',
+      endDate: '2026-11-20',
+      milestone: 'Modul 2 (Minggu 6 - 10)',
       courseCode: 'BTMT 3273',
       courseName: 'DIGITAL ENTREPRENEURSHIP',
       cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
-      taskTitle: 'WEEK 3 Task: Social Media Marketing & Creative Copywriting',
+      taskTitle: 'MINGGU 8 (16 Nov - 20 Nov 2026): Social Media Marketing & Creative Copywriting (M3)',
       taskHighlights: [
         'Implement social media marketing strategies (Facebook, Instagram, TikTok, YouTube)',
         'Produce creative copywriting and visual content for digital advertising',
@@ -127,10 +144,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 4,
+      semesterWeek: 9,
+      semesterWeekLabel: 'Minggu 9 (Semester) / M4 (Modul)',
+      startDate: '2026-11-23',
+      endDate: '2026-11-27',
+      milestone: 'Modul 2 (Minggu 6 - 10)',
       courseCode: 'BTMT 3273',
       courseName: 'DIGITAL ENTREPRENEURSHIP',
       cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
-      taskTitle: 'WEEK 4 Task: E-Marketplace Operations & Customer Fulfillment',
+      taskTitle: 'MINGGU 9 (23 Nov - 27 Nov 2026): E-Marketplace Operations & Customer Fulfillment (M4)',
       taskHighlights: [
         'Manage e-marketplace stores and cross-border e-commerce operations',
         'Integrate payment gateways and ensure transaction security',
@@ -145,10 +167,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 5,
+      semesterWeek: 10,
+      semesterWeekLabel: 'Minggu 10 (Semester) / M5 (Modul)',
+      startDate: '2026-11-30',
+      endDate: '2026-12-04',
+      milestone: 'Modul 2 (Minggu 6 - 10)',
       courseCode: 'BTMT 3273',
       courseName: 'DIGITAL ENTREPRENEURSHIP',
       cloStatement: 'CLO 3: Propose a unique digital business model (PLO8, P7, C5)',
-      taskTitle: 'WEEK 5 Task: Final Assessment, Digital Project Report & Comprehensive Presentation',
+      taskTitle: 'MINGGU 10 (30 Nov - 04 Dis 2026): Final Assessment, Digital Project Report & Comprehensive Presentation (M5)',
       taskHighlights: [
         'Measure and analyze digital business performance metrics and ROI',
         'Prepare final digital entrepreneurship project report and joint assessment presentation (Viva)',
@@ -166,10 +193,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
   'BTMU 2103(i)': [
     {
       week: 1,
+      semesterWeek: 1,
+      semesterWeekLabel: 'Minggu 1 (Semester) / M1 (Modul)',
+      startDate: '2026-09-28',
+      endDate: '2026-10-02',
+      milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
       courseName: 'OPERATIONS MANAGEMENT',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'WEEK 1 Task: Plant Layout & Process Flow Analysis',
+      taskTitle: 'MINGGU 1 (28 Sep - 02 Okt 2026): Plant Layout & Process Flow Analysis (M1)',
       taskHighlights: [
         'Map out the production plant layout and facility design at the placement firm',
         'Analyze raw material to finished goods workflow strategy (Value Stream Mapping)',
@@ -184,10 +216,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 2,
+      semesterWeek: 2,
+      semesterWeekLabel: 'Minggu 2 (Semester) / M2 (Modul)',
+      startDate: '2026-10-05',
+      endDate: '2026-10-09',
+      milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
       courseName: 'OPERATIONS MANAGEMENT',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'WEEK 2 Task: Capacity Planning & Production Scheduling',
+      taskTitle: 'MINGGU 2 (05 Okt - 09 Okt 2026): Capacity Planning & Production Scheduling (M2)',
       taskHighlights: [
         'Analyze machine and labor capacity planning and resource allocation',
         'Review production scheduling, work shifting, and demand forecasting methods',
@@ -202,10 +239,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 3,
+      semesterWeek: 3,
+      semesterWeekLabel: 'Minggu 3 (Semester) / M3 (Modul)',
+      startDate: '2026-10-12',
+      endDate: '2026-10-16',
+      milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
       courseName: 'OPERATIONS MANAGEMENT',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'WEEK 3 Task: Lean Manufacturing & JIT (Waste Elimination)',
+      taskTitle: 'MINGGU 3 (12 Okt - 16 Okt 2026): Lean Manufacturing & JIT (Waste Elimination) (M3)',
       taskHighlights: [
         'Implement 5S audits at selected plant workstations',
         'Identify and eliminate the 7 wastes (Muda) in manufacturing processes',
@@ -220,10 +262,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 4,
+      semesterWeek: 4,
+      semesterWeekLabel: 'Minggu 4 (Semester) / M4 (Modul)',
+      startDate: '2026-10-19',
+      endDate: '2026-10-23',
+      milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
       courseName: 'OPERATIONS MANAGEMENT',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'WEEK 4 Task: Quality Control & Operational System Improvement',
+      taskTitle: 'MINGGU 4 (19 Okt - 23 Okt 2026): Quality Control & Operational System Improvement (M4)',
       taskHighlights: [
         'Participate in Total Quality Management (TQM) and Statistical Process Control (SPC)',
         'Conduct defect inspections and inventory control (EOQ models)',
@@ -238,10 +285,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 5,
+      semesterWeek: 5,
+      semesterWeekLabel: 'Minggu 5 (Semester) / M5 (Modul)',
+      startDate: '2026-10-26',
+      endDate: '2026-10-30',
+      milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
       courseName: 'OPERATIONS MANAGEMENT',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'WEEK 5 Task: Final Assessment, Operations Report & Comprehensive Presentation',
+      taskTitle: 'MINGGU 5 (26 Okt - 30 Okt 2026): Final Assessment, Operations Report & Comprehensive Presentation (M5)',
       taskHighlights: [
         'Synthesize overall operations management project findings and system evaluation',
         'Prepare final case study report and joint assessment presentation (Viva)',
@@ -259,10 +311,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
   'BTMT 3283(i)': [
     {
       week: 1,
+      semesterWeek: 11,
+      semesterWeekLabel: 'Minggu 11 (Semester) / M1 (Modul)',
+      startDate: '2026-12-07',
+      endDate: '2026-12-11',
+      milestone: 'Modul 3 (Minggu 11 - 15)',
       courseCode: 'BTMT 3283',
       courseName: 'BUSINESS ANALYTICS',
       cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
-      taskTitle: 'WEEK 1 Task: Data Extraction & Business Problem Framing',
+      taskTitle: 'MINGGU 11 (07 Dis - 11 Dis 2026): Data Extraction & Business Problem Framing (M1)',
       taskHighlights: [
         'Identify business problems and scope within the industrial placement firm',
         'Extract raw data sources and execute data cleaning (data wrangling)',
@@ -277,10 +334,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 2,
+      semesterWeek: 12,
+      semesterWeekLabel: 'Minggu 12 (Semester) / M2 (Modul)',
+      startDate: '2026-12-14',
+      endDate: '2026-12-18',
+      milestone: 'Modul 3 (Minggu 11 - 15)',
       courseCode: 'BTMT 3283',
       courseName: 'BUSINESS ANALYTICS',
       cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
-      taskTitle: 'WEEK 2 Task: Exploratory Data Analysis (EDA) & Descriptive Statistics',
+      taskTitle: 'MINGGU 12 (14 Dis - 18 Dis 2026): Exploratory Data Analysis (EDA) & Descriptive Statistics (M2)',
       taskHighlights: [
         'Execute Exploratory Data Analysis (EDA) using analytics software (Excel/Python/SPSS)',
         'Summarize descriptive statistics and operational patterns',
@@ -295,10 +357,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 3,
+      semesterWeek: 13,
+      semesterWeekLabel: 'Minggu 13 (Semester) / M3 (Modul)',
+      startDate: '2026-12-21',
+      endDate: '2026-12-25',
+      milestone: 'Modul 3 (Minggu 11 - 15)',
       courseCode: 'BTMT 3283',
       courseName: 'BUSINESS ANALYTICS',
       cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
-      taskTitle: 'WEEK 3 Task: Predictive Modeling & Decision-Making Tools',
+      taskTitle: 'MINGGU 13 (21 Dis - 25 Dis 2026): Predictive Modeling & Decision-Making Tools (M3)',
       taskHighlights: [
         'Develop predictive models or optimization models to evaluate sales/inventory efficiency',
         'Apply forecasting methods for business performance projections',
@@ -313,10 +380,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 4,
+      semesterWeek: 14,
+      semesterWeekLabel: 'Minggu 14 (Semester) / M4 (Modul)',
+      startDate: '2026-12-28',
+      endDate: '2027-01-01',
+      milestone: 'Modul 3 (Minggu 11 - 15)',
       courseCode: 'BTMT 3283',
       courseName: 'BUSINESS ANALYTICS',
       cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
-      taskTitle: 'WEEK 4 Task: Dashboard Visualization & Prescriptive Insights',
+      taskTitle: 'MINGGU 14 (28 Dis 2026 - 01 Jan 2027): Dashboard Visualization & Prescriptive Insights (M4)',
       taskHighlights: [
         'Build visual dashboards (e.g., Power BI) for management review',
         'Translate data insights into strategic prescriptive recommendations',
@@ -331,10 +403,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 5,
+      semesterWeek: 15,
+      semesterWeekLabel: 'Minggu 15 (Semester) / M5 (Modul)',
+      startDate: '2027-01-04',
+      endDate: '2027-01-08',
+      milestone: 'Modul 3 (Minggu 11 - 15)',
       courseCode: 'BTMT 3283',
       courseName: 'BUSINESS ANALYTICS',
       cloStatement: 'CLO 3: Propose alternative actions for decision making (PLO8, A2/A3, C5)',
-      taskTitle: 'WEEK 5 Task: Final Assessment, Analytics Report & Comprehensive Presentation',
+      taskTitle: 'MINGGU 15 (04 Jan - 08 Jan 2027): Final Assessment, Analytics Report & Comprehensive Presentation (M5)',
       taskHighlights: [
         'Synthesize overall business analytics project findings and model verification',
         'Prepare final case study report and joint assessment presentation (Viva)',
@@ -352,10 +429,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
   'BTMT 2113(i)': [
     {
       week: 1,
+      semesterWeek: 16,
+      semesterWeekLabel: 'Minggu 16 (Semester) / M1 (Modul)',
+      startDate: '2027-01-11',
+      endDate: '2027-01-15',
+      milestone: 'Modul 4 (Minggu 16 - 20)',
       courseCode: 'BTMT 2113',
       courseName: 'BRAND MANAGEMENT',
       cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
-      taskTitle: 'WEEK 1 Task: Brand and Brand Management for a New Entrepreneurial Venture, Customer-Based Brand Equity & Brand Positioning',
+      taskTitle: 'MINGGU 16 (11 Jan - 15 Jan 2027): Brand and Brand Management for a New Entrepreneurial Venture (M1)',
       taskHighlights: [
         "Find the company's profile and brand",
         "Explain the importance of the company's brand",
@@ -370,10 +452,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 2,
+      semesterWeek: 17,
+      semesterWeekLabel: 'Minggu 17 (Semester) / M2 (Modul)',
+      startDate: '2027-01-18',
+      endDate: '2027-01-22',
+      milestone: 'Modul 4 (Minggu 16 - 20)',
       courseCode: 'BTMT 2113',
       courseName: 'BRAND MANAGEMENT',
       cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
-      taskTitle: 'WEEK 2 Task: Choosing Brand Elements & Developing Brand Equity Measurement Systems',
+      taskTitle: 'MINGGU 17 (18 Jan - 22 Jan 2027): Choosing Brand Elements & Developing Brand Equity Measurement Systems (M2)',
       taskHighlights: [
         'Pick an example of criteria of brand elements used at your place (e.g., name, logo, and color schemes)',
         'Identify a brand equity management system at your workplace',
@@ -388,10 +475,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 3,
+      semesterWeek: 18,
+      semesterWeekLabel: 'Minggu 18 (Semester) / M3 (Modul)',
+      startDate: '2027-01-25',
+      endDate: '2027-01-29',
+      milestone: 'Modul 4 (Minggu 16 - 20)',
       courseCode: 'BTMT 2113',
       courseName: 'BRAND MANAGEMENT',
       cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
-      taskTitle: 'WEEK 3 Task: Branding in Digital Era: Application of Technology & Brand Management',
+      taskTitle: 'MINGGU 18 (25 Jan - 29 Jan 2027): Branding in Digital Era: Application of Technology & Brand Management (M3)',
       taskHighlights: [
         'Define key issues and brand engagement',
         'Identify digital communications',
@@ -406,10 +498,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 4,
+      semesterWeek: 19,
+      semesterWeekLabel: 'Minggu 19 (Semester) / M4 (Modul)',
+      startDate: '2027-02-01',
+      endDate: '2027-02-05',
+      milestone: 'Modul 4 (Minggu 16 - 20)',
       courseCode: 'BTMT 2113',
       courseName: 'BRAND MANAGEMENT',
       cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
-      taskTitle: 'WEEK 4 Task: Integrating Marketing Communications (IMC), Brand Extensions & Portfolio Strategies',
+      taskTitle: 'MINGGU 19 (01 Feb - 05 Feb 2027): Integrating Marketing Communications (IMC), Brand Extensions & Portfolio Strategies (M4)',
       taskHighlights: [
         'Suggest/develop New Product and Brand Extensions',
         'Implement Brand Architecture Strategies',
@@ -424,10 +521,15 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
     },
     {
       week: 5,
+      semesterWeek: 20,
+      semesterWeekLabel: 'Minggu 20 (Semester) / M5 (Modul)',
+      startDate: '2027-02-08',
+      endDate: '2027-02-12',
+      milestone: 'Modul 4 (Minggu 16 - 20)',
       courseCode: 'BTMT 2113',
       courseName: 'BRAND MANAGEMENT',
       cloStatement: 'CLO 3: Propose brand portfolio strategies for corporate and product branding (PLO8, A1, C5)',
-      taskTitle: 'WEEK 5 Task: Final Assessment, Presentation & Comprehensive Portfolio Submission',
+      taskTitle: 'MINGGU 20 (08 Feb - 12 Feb 2027): Final Assessment, Presentation & Comprehensive Portfolio Submission (M5)',
       taskHighlights: [
         'Synthesize overall WBL brand management project findings',
         'Prepare final case study report and joint assessment presentation (Viva)',
@@ -867,7 +969,11 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
   ]
 };
 
-// Alias for BTMU 4084 (without '(i)')
+// Aliases for course codes without '(i)'
+UTEM_WEEKLY_ASSESSMENTS['BTMU 2103'] = UTEM_WEEKLY_ASSESSMENTS['BTMU 2103(i)'];
+UTEM_WEEKLY_ASSESSMENTS['BTMT 3273'] = UTEM_WEEKLY_ASSESSMENTS['BTMT 3273(i)'];
+UTEM_WEEKLY_ASSESSMENTS['BTMT 3283'] = UTEM_WEEKLY_ASSESSMENTS['BTMT 3283(i)'];
+UTEM_WEEKLY_ASSESSMENTS['BTMT 2113'] = UTEM_WEEKLY_ASSESSMENTS['BTMT 2113(i)'];
 UTEM_WEEKLY_ASSESSMENTS['BTMU 4084'] = UTEM_WEEKLY_ASSESSMENTS['BTMU 4084(i)'];
 
 // =========================================================================

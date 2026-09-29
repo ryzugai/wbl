@@ -263,7 +263,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       return [{
         studentId: currentUser.id,
         studentName: currentUser.name,
-        studentMatric: currentUser.matric_no || 'B062110045',
+        studentMatric: currentUser.matric_no || 'B032110045',
         studentProgram: currentUser.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
         companyName: currentUser.company_affiliation || 'PETRONAS Digital Sdn Bhd',
         companyDistrict: 'Kuala Lumpur',
@@ -277,7 +277,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         return {
           studentId: u?.id || app.student_id || 'student',
           studentName: app.student_name || u?.name || 'Pelajar WBL',
-          studentMatric: app.student_id || app.studentMatric || u?.matric_no || 'B062110045',
+          studentMatric: app.student_id || (app as any).studentMatric || u?.matric_no || 'B032110045',
           studentProgram: app.student_program || u?.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
           companyName: app.company_name || currentUser.company_affiliation || 'Syarikat Penempatan Industri',
           companyDistrict: app.company_district || '',
@@ -289,13 +289,40 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     return stUsers.map(u => ({
       studentId: u.id,
       studentName: u.name,
-      studentMatric: u.matric_no || 'B062110045',
+      studentMatric: u.matric_no || 'B032110045',
       studentProgram: u.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
       companyName: u.company_affiliation || currentUser.company_affiliation || 'PETRONAS Digital Sdn Bhd',
       companyDistrict: 'Kuala Lumpur',
       companyState: 'W.P. Kuala Lumpur'
     }));
   }, [isStudent, currentUser, myCompanyStudents, applications, users]);
+
+  // Helper to get assigned lecturer for a course
+  const getCourseAssignedLecturer = (courseCode: string): CourseLecturerAssignment | undefined => {
+    if (!courseCode) return undefined;
+    const clean = courseCode.replace(/\(i\)/g, '').trim().toLowerCase();
+    return courseAssignments.find(ca => 
+      ca.courseCode === courseCode || 
+      ca.courseCode.toLowerCase() === courseCode.toLowerCase() ||
+      ca.courseCode.replace(/\(i\)/g, '').trim().toLowerCase() === clean
+    );
+  };
+
+  // Helper to determine if current user has verification rights for a course (must be assigned lecturer or coordinator)
+  const canUserVerifyCourse = (courseCode: string): boolean => {
+    if (isCoordinator) return true; // Penyelaras WBL / Admin
+    if (!isLecturer) return false;
+    const assigned = getCourseAssignedLecturer(courseCode);
+    if (!assigned) return false;
+
+    const matchId = assigned.lecturerId === currentUser.id;
+    const matchEmail = Boolean(assigned.lecturerEmail && currentUser.email && assigned.lecturerEmail.toLowerCase() === currentUser.email.toLowerCase());
+    const matchName = Boolean(assigned.lecturerName && currentUser.name && (
+      assigned.lecturerName.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+      currentUser.name.toLowerCase().includes(assigned.lecturerName.toLowerCase())
+    ));
+    return matchId || matchEmail || matchName;
+  };
 
   useEffect(() => {
     if (!selectedWeeklyStudentMatric && activeWeeklyStudents.length > 0) {
@@ -370,7 +397,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     if (!evaluatingWeekConfig || !currentSelectedStudent) return;
     setIsSaving(true);
     try {
-      const assignment = courseAssignments.find(ca => ca.courseCode === selectedWeeklyCourseCode);
+      const assignment = getCourseAssignedLecturer(selectedWeeklyCourseCode);
       const weeklySum = weeklyAreaScores.area1 + weeklyAreaScores.area2 + weeklyAreaScores.area3;
       const totalScore = Math.round((weeklySum / 12) * 100);
       const gradeObj = calculateUTeMGrade(totalScore);
@@ -404,8 +431,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         trainerPhone: currentUser.phone,
         lecturerId: assignment?.lecturerId || facultyLecturers[0]?.id || '',
         lecturerName: assignment?.lecturerName || facultyLecturers[0]?.name || 'Pensyarah Kursus FPTT',
-        lecturerStaffId: assignment?.lecturerStaffId,
-        lecturerEmail: assignment?.lecturerEmail,
+        lecturerStaffId: assignment?.lecturerStaffId || '',
+        lecturerEmail: assignment?.lecturerEmail || '',
         scores: {
           taskKnowledge: Math.round(weeklyAreaScores.area1 * 2.5),
           workQuality: Math.round(weeklyAreaScores.area2 * 2.5),
@@ -432,13 +459,33 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       await StorageService.saveEvaluation(evalData);
       toast.success(
         submitNow 
-          ? `Markah Minggu ${evaluatingWeekConfig.week} berjaya dihantar dan disahkan!` 
+          ? `Markah Minggu ${evaluatingWeekConfig.week} berjaya dihantar kepada Pensyarah Kursus (${assignment?.lecturerName || 'Ditugaskan'}) untuk pengesahan!` 
           : `Draf penilaian Minggu ${evaluatingWeekConfig.week} berjaya disimpan.`
       );
       setIsWeeklyModalOpen(false);
       loadData();
     } catch (err: any) {
       toast.error(`Gagal menyimpan penilaian: ${err.message || 'Ralat'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Verify Weekly Assessment by Assigned Course Lecturer
+  const handleVerifyWeeklyEvaluation = async (evaluationId: string, comments?: string) => {
+    setIsSaving(true);
+    try {
+      await StorageService.verifyEvaluationByLecturer(evaluationId, {
+        lecturerComments: comments || 'Markah penilaian hasil kerja mingguan disahkan memenuhi sukatan kursus WBL oleh pensyarah kursus.',
+        verifiedByLecturerName: currentUser.name
+      });
+      loadData();
+      setIsWeeklyModalOpen(false);
+      toast.success(language === 'ms' 
+        ? `Markah mingguan telah berjaya DISAHKAN oleh Pensyarah Kursus (${currentUser.name})!` 
+        : `Weekly mark verified successfully!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengesahkan markah');
     } finally {
       setIsSaving(false);
     }
@@ -660,6 +707,15 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   // Confirm Lecturer Verification
   const handleConfirmLecturerVerification = async () => {
     if (!reviewingEvaluation) return;
+    if (!canUserVerifyCourse(reviewingEvaluation.courseCode)) {
+      const assigned = getCourseAssignedLecturer(reviewingEvaluation.courseCode);
+      toast.error(
+        language === 'ms'
+          ? `Hanya pensyarah yang ditugaskan (${assigned?.lecturerName || 'Pensyarah Kursus'}) atau Penyelaras WBL yang berkuasa mengesahkan markah ini.`
+          : `Only the assigned course lecturer (${assigned?.lecturerName || 'Course Lecturer'}) or Coordinator can verify these marks.`
+      );
+      return;
+    }
     setIsSaving(true);
     try {
       const verified = await StorageService.verifyEvaluationByLecturer(reviewingEvaluation.id, {
@@ -670,8 +726,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       loadData();
       setReviewingEvaluation(null);
       toast.success(language === 'ms' 
-        ? `Penilaian bagi ${verified.studentName} (${verified.courseCode}) telah berjaya DISAHKAN!` 
-        : `Evaluation for ${verified.studentName} verified successfully!`);
+        ? `Penilaian bagi ${verified.studentName} (${verified.courseCode}) telah berjaya DISAHKAN oleh ${currentUser.name}!` 
+        : `Evaluation for ${verified.studentName} verified successfully by ${currentUser.name}!`);
     } catch (err: any) {
       toast.error(err.message || 'Gagal mengesahkan penilaian');
     } finally {
@@ -746,7 +802,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
           currentUser.name.toLowerCase().includes(ca.lecturerName.toLowerCase())
         ))
       );
-      return myCourses.length > 0 ? myCourses : courseAssignments.slice(0, 2);
+      return myCourses;
     }
     return courseAssignments;
   }, [courseAssignments, currentUser, isLecturer, isCoordinator]);
@@ -1268,6 +1324,34 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               <p className="text-xs text-slate-500 max-w-3xl">
                 {activeCourseSequenceItem.description}
               </p>
+
+              {/* Course Assigned Lecturer Info */}
+              {(() => {
+                const assignedLec = getCourseAssignedLecturer(activeCourseSequenceItem.courseCode);
+                const canVerify = canUserVerifyCourse(activeCourseSequenceItem.courseCode);
+                return (
+                  <div className="flex flex-wrap items-center gap-2 pt-1.5 text-xs">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <ShieldCheck size={15} className={canVerify ? "text-emerald-600" : "text-blue-600"} />
+                      <span>Pensyarah Pengesah Kursus (Ditugaskan):</span>
+                    </span>
+                    <span className="bg-indigo-50 text-indigo-950 font-bold px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                      {assignedLec?.lecturerName || 'Dr. Mohd Guzairy bin Abd Ghani'} {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}
+                    </span>
+                    {isLecturer && (
+                      canVerify ? (
+                        <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md text-[11px] border border-emerald-300">
+                          ✓ Anda Pensyarah Pengesah Kursus Ini
+                        </span>
+                      ) : (
+                        <span className="bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-md text-[11px] border border-slate-200">
+                          Ditugaskan kepada pensyarah lain
+                        </span>
+                      )
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Student Selector */}
@@ -1476,16 +1560,32 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     >
                       {/* Week Card Header */}
                       <div className={`p-4 sm:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b ${
-                        isEvaluated ? 'bg-emerald-50/40 border-emerald-100' : 'bg-slate-50/70 border-slate-100'
+                        ev?.status === 'verified_by_lecturer'
+                          ? 'bg-emerald-50/50 border-emerald-100'
+                          : ev?.status === 'submitted_by_trainer'
+                          ? 'bg-amber-50/50 border-amber-100'
+                          : isEvaluated
+                          ? 'bg-blue-50/30 border-blue-100'
+                          : 'bg-slate-50/70 border-slate-100'
                       }`}>
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span className={`font-black text-xs px-3 py-1 rounded-xl font-mono ${
-                            isEvaluated
+                            ev?.status === 'verified_by_lecturer'
                               ? 'bg-emerald-600 text-white shadow-xs'
+                              : ev?.status === 'submitted_by_trainer'
+                              ? 'bg-amber-600 text-white shadow-xs'
+                              : isEvaluated
+                              ? 'bg-blue-700 text-white shadow-xs'
                               : 'bg-blue-600 text-white shadow-xs'
                           }`}>
-                            MINGGU {w.week}
+                            {w.semesterWeek ? `MINGGU ${w.semesterWeek} (M${w.week})` : `MINGGU ${w.week}`}
                           </span>
+
+                          {w.semesterWeekLabel && (
+                            <span className="text-xs font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                              📌 {w.semesterWeekLabel}
+                            </span>
+                          )}
 
                           {w.startDate && w.endDate && (
                             <span className="text-xs font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
@@ -1499,10 +1599,20 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                             </span>
                           )}
 
-                          {isEvaluated ? (
-                            <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
+                          {ev?.status === 'verified_by_lecturer' ? (
+                            <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1 border border-emerald-300">
                               <CheckCircle2 size={13} className="text-emerald-600" />
-                              <span>Telah Dinilai: {wTotal} / 12 ({wPercent}%) — Gred {wGrade.grade}</span>
+                              <span>Disahkan Pensyarah ({ev.verifiedByLecturerName || getCourseAssignedLecturer(selectedWeeklyCourseCode)?.lecturerName || 'Ditugaskan'}): {wTotal} / 12 ({wPercent}%) — Gred {wGrade.grade}</span>
+                            </span>
+                          ) : ev?.status === 'submitted_by_trainer' ? (
+                            <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1 border border-amber-300 animate-pulse">
+                              <Clock size={13} className="text-amber-600" />
+                              <span>Menunggu Pengesahan Pensyarah Kursus ({getCourseAssignedLecturer(selectedWeeklyCourseCode)?.lecturerName || 'Ditugaskan'}) • Markah: {wTotal} / 12</span>
+                            </span>
+                          ) : isEvaluated ? (
+                            <span className="text-xs font-black text-blue-800 bg-blue-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
+                              <Save size={13} className="text-blue-600" />
+                              <span>Draf: {wTotal} / 12 ({wPercent}%)</span>
                             </span>
                           ) : (
                             <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
@@ -1523,6 +1633,26 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                               <Printer size={13} />
                               <span className="hidden sm:inline">Cetak</span>
                             </button>
+                          )}
+
+                          {/* Verification action for assigned course lecturer */}
+                          {ev && ev.status === 'submitted_by_trainer' && (
+                            canUserVerifyCourse(selectedWeeklyCourseCode) ? (
+                              <button
+                                onClick={() => handleOpenReviewModal(ev)}
+                                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-all"
+                                title="Semak dan sahkan markah minggu ini sebagai pensyarah kursus yang ditugaskan"
+                              >
+                                <ShieldCheck size={14} />
+                                <span>Sahkan Markah</span>
+                              </button>
+                            ) : (
+                              isLecturer && (
+                                <span className="text-[11px] text-slate-500 font-semibold px-2.5 py-1 bg-slate-100 rounded-lg border border-slate-200" title={`Hanya ${getCourseAssignedLecturer(selectedWeeklyCourseCode)?.lecturerName || 'pensyarah kursus'} boleh mengesahkan`}>
+                                  Pengesah: {getCourseAssignedLecturer(selectedWeeklyCourseCode)?.lecturerName?.split(' ')?.[0] || 'Ditugaskan'}
+                                </span>
+                              )
+                            )
                           )}
 
                           {(isTrainer || isCoordinator) && (
@@ -2709,14 +2839,27 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                 <td className="p-3.5 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
                                     {isSubmitted && row.evaluation && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReviewModal(row.evaluation!)}
-                                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center gap-1"
-                                      >
-                                        <ShieldCheck size={13} />
-                                        <span>{language === 'ms' ? 'Semak & Sahkan' : 'Review & Verify'}</span>
-                                      </button>
+                                      canUserVerifyCourse(currentCourse.courseCode) ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenReviewModal(row.evaluation!)}
+                                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center gap-1"
+                                          title="Semak dan sahkan penilaian pelajar ini sebagai pensyarah kursus yang ditugaskan"
+                                        >
+                                          <ShieldCheck size={13} />
+                                          <span>{language === 'ms' ? 'Semak & Sahkan' : 'Review & Verify'}</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenReviewModal(row.evaluation!)}
+                                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-slate-300"
+                                          title={`Pengesah rasmi: ${getCourseAssignedLecturer(currentCourse.courseCode)?.lecturerName || 'Pensyarah Kursus Ditugaskan'}`}
+                                        >
+                                          <Eye size={13} className="text-slate-500" />
+                                          <span>{language === 'ms' ? 'Lihat Markah' : 'View Marks'}</span>
+                                        </button>
+                                      )
                                     )}
 
                                     {isVerified && row.evaluation && (
@@ -3837,6 +3980,16 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                 <p className="text-xs text-indigo-200/90 font-medium">
                   Pelajar: <strong>{currentSelectedStudent.studentName}</strong> ({currentSelectedStudent.studentMatric}) • {currentSelectedStudent.companyName}
                 </p>
+
+                {(() => {
+                  const assignedLec = getCourseAssignedLecturer(evaluatingWeekConfig.courseCode);
+                  return (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-300 pt-0.5">
+                      <ShieldCheck size={14} className="text-amber-400" />
+                      <span>Pensyarah Pengesah Kursus (Ditugaskan): <strong>{assignedLec?.lecturerName || 'Dr. Mohd Guzairy bin Abd Ghani'}</strong> {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <button
@@ -4849,44 +5002,82 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </div>
 
               {/* LECTURER VERIFICATION SECTION */}
-              <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm space-y-4">
-                <h4 className="font-bold text-emerald-900 text-sm flex items-center gap-2 border-b border-emerald-100 pb-2">
-                  <ShieldCheck size={18} className="text-emerald-600" />
-                  <span>{language === 'ms' ? 'Pengesahan Rasmi Pensyarah Kursus' : 'Course Lecturer Verification'}</span>
-                </h4>
+              {(() => {
+                const assignedLec = getCourseAssignedLecturer(reviewingEvaluation.courseCode);
+                const canVerify = canUserVerifyCourse(reviewingEvaluation.courseCode);
 
-                {!isRevisionMode ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {language === 'ms' ? 'Ulasan & Catatan Pensyarah Kursus:' : 'Course Lecturer Comments:'}
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={lecturerCommentsInput}
-                        onChange={(e) => setLecturerCommentsInput(e.target.value)}
-                        placeholder={language === 'ms'
-                          ? 'Markah dan gred penilaian prestasi industri disahkan memenuhi standard kursus WBL...'
-                          : 'Marks and grade confirmed for WBL course...'}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                      />
+                return (
+                  <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-100 pb-3">
+                      <h4 className="font-bold text-emerald-900 text-sm flex items-center gap-2">
+                        <ShieldCheck size={18} className="text-emerald-600" />
+                        <span>{language === 'ms' ? 'Pengesahan Rasmi Pensyarah Kursus' : 'Course Lecturer Verification'}</span>
+                      </h4>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-slate-500">Pensyarah Ditugaskan:</span>
+                        <span className="bg-indigo-50 text-indigo-950 font-bold px-2 py-0.5 rounded-lg border border-indigo-200 text-xs">
+                          {assignedLec?.lecturerName || reviewingEvaluation.lecturerName || 'Pensyarah Kursus FPTT'} {assignedLec?.lecturerStaffId ? `(${assignedLec.lecturerStaffId})` : ''}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Authorization Status Notice */}
+                    {canVerify ? (
+                      <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs text-emerald-900 flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <span>
+                          {isCoordinator 
+                            ? 'Anda log masuk sebagai Penyelaras WBL / Pentadbir (kuasa pengesahan penuh).' 
+                            : `Anda adalah pensyarah yang ditugaskan (${currentUser.name}) untuk mengesahkan markah kursus ini.`}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-300 p-3.5 rounded-xl text-xs text-amber-950 flex items-start gap-2.5">
+                        <AlertCircle size={17} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block mb-0.5">Sekatan Akses Pengesahan Markah:</strong>
+                          Mengikut ketetapan universiti, pengesahan markah Jurulatih Industri bagi kursus <strong>{reviewingEvaluation.courseCode}</strong> hanya sah disahkan oleh pensyarah yang diassign iaitu <strong>{assignedLec?.lecturerName || 'Pensyarah Kursus Ditugaskan'}</strong> atau Penyelaras WBL. Anda kini log masuk sebagai <strong>{currentUser.name}</strong>.
+                        </div>
+                      </div>
+                    )}
+
+                    {!isRevisionMode ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            {language === 'ms' ? 'Ulasan & Catatan Pensyarah Kursus:' : 'Course Lecturer Comments:'}
+                          </label>
+                          <textarea
+                            rows={3}
+                            disabled={!canVerify}
+                            value={lecturerCommentsInput}
+                            onChange={(e) => setLecturerCommentsInput(e.target.value)}
+                            placeholder={language === 'ms'
+                              ? 'Markah dan gred penilaian prestasi industri disahkan memenuhi standard kursus WBL...'
+                              : 'Marks and grade confirmed for WBL course...'}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white disabled:bg-slate-100 disabled:text-slate-500"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 bg-rose-50 p-4 rounded-xl border border-rose-200">
+                        <label className="block text-xs font-bold text-rose-900 mb-1">
+                          {language === 'ms' ? 'Catatan Permohonan Semakan Semula kepada Jurulatih:' : 'Revision Request Notes:'}
+                        </label>
+                        <textarea
+                          rows={3}
+                          disabled={!canVerify}
+                          value={revisionNotesInput}
+                          onChange={(e) => setRevisionNotesInput(e.target.value)}
+                          placeholder={language === 'ms' ? 'Sila jelaskan kriteria yang perlu disemak semula...' : 'Specify criteria to revise...'}
+                          className="w-full px-3 py-2 border border-rose-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                        />
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-3 bg-rose-50 p-4 rounded-xl border border-rose-200">
-                    <label className="block text-xs font-bold text-rose-900 mb-1">
-                      {language === 'ms' ? 'Catatan Permohonan Semakan Semula kepada Jurulatih:' : 'Revision Request Notes:'}
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={revisionNotesInput}
-                      onChange={(e) => setRevisionNotesInput(e.target.value)}
-                      placeholder={language === 'ms' ? 'Sila jelaskan kriteria yang perlu disemak semula...' : 'Specify criteria to revise...'}
-                      className="w-full px-3 py-2 border border-rose-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500 bg-white"
-                    />
-                  </div>
-                )}
-              </div>
+                );
+              })()}
             </div>
 
             {/* Modal Footer Actions */}
@@ -4907,7 +5098,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsRevisionMode(true)}
-                        className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                        disabled={!canUserVerifyCourse(reviewingEvaluation.courseCode)}
+                        className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={!canUserVerifyCourse(reviewingEvaluation.courseCode) ? 'Hanya pensyarah kursus yang ditugaskan boleh meminta semakan' : undefined}
                       >
                         <AlertCircle size={14} />
                         <span>{language === 'ms' ? 'Minta Semakan Semula' : 'Request Revision'}</span>
@@ -4916,8 +5109,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       <button
                         type="button"
                         onClick={handleConfirmLecturerVerification}
-                        disabled={isSaving}
-                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
+                        disabled={isSaving || !canUserVerifyCourse(reviewingEvaluation.courseCode)}
+                        title={!canUserVerifyCourse(reviewingEvaluation.courseCode) ? `Hanya ${getCourseAssignedLecturer(reviewingEvaluation.courseCode)?.lecturerName || 'pensyarah kursus yang ditugaskan'} atau Penyelaras WBL boleh mengesahkan markah` : undefined}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 size={16} />
                         <span>{isSaving ? 'Mengesahkan...' : (language === 'ms' ? 'Sahkan Penilaian Pelajar' : 'Verify Student Evaluation')}</span>
@@ -4936,7 +5130,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       <button
                         type="button"
                         onClick={handleConfirmRevisionRequest}
-                        disabled={isSaving}
+                        disabled={isSaving || !canUserVerifyCourse(reviewingEvaluation.courseCode)}
                         className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 disabled:opacity-50"
                       >
                         <Send size={14} />
