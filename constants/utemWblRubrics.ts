@@ -4,6 +4,19 @@ export interface WeeklyAssessmentArea {
   description?: string;
 }
 
+export interface SectorAdaptationExample {
+  sector: 'perkhidmatan' | 'pembarangan' | 'perdagangan' | 'pembuatan' | 'universal';
+  sectorName: string;
+  icon: string;
+  applicationGuide: string;
+  examples: string[];
+  areaInterpretations?: {
+    area1: string;
+    area2: string;
+    area3: string;
+  };
+}
+
 export interface WeeklyAssessmentConfig {
   week: number;
   semesterWeek?: number;
@@ -18,6 +31,7 @@ export interface WeeklyAssessmentConfig {
   startDate?: string;
   endDate?: string;
   milestone?: string;
+  sectorGuides?: SectorAdaptationExample[];
 }
 
 export interface RubricCriterionLevel {
@@ -199,18 +213,68 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
       endDate: '2026-10-02',
       milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
-      courseName: 'OPERATIONS MANAGEMENT',
+      courseName: 'OPERATIONS MANAGEMENT (PENGURUSAN OPERASI)',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'MINGGU 1 (28 Sep - 02 Okt 2026): Plant Layout & Process Flow Analysis (M1)',
+      taskTitle: 'MINGGU 1 (28 Sep - 02 Okt 2026): Susun Atur Fasiliti Operasi & Analisis Aliran Proses Kerja (Operations Facility Layout & Process Flow Analysis)',
       taskHighlights: [
-        'Map out the production plant layout and facility design at the placement firm',
-        'Analyze raw material to finished goods workflow strategy (Value Stream Mapping)',
-        'Identify critical workstations and global transfer operational principles'
+        'Memetakan susun atur ruang operasi & fasiliti tempat kerja (pejabat perkhidmatan, stor barangan, hab gudang/logistik, atau lantai operasi)',
+        'Menganalisis aliran proses kerja (workflow) dari pesanan/input sehingga penyerahan produk atau perkhidmatan siap (Value Stream Mapping / Service Blueprint)',
+        'Mengenal pasti stesen kerja kritikal, titik sentuh operasi/pelanggan (touchpoints), dan prinsip aliran lancar bebas sekatan'
       ],
       areas: [
-        { id: 1, title: 'Map out the production plant layout and facility design at the placement firm' },
-        { id: 2, title: 'Analyze raw material to finished goods workflow strategy (Value Stream Mapping)' },
-        { id: 3, title: 'Identify critical workstations and global transfer operational principles' }
+        { id: 1, title: 'Pemetaan susun atur fasiliti operasi (ruang kerja/stor/kaunter/gudang) dan reka bentuk ruang kerja yang ergonomik serta efisien' },
+        { id: 2, title: 'Analisis aliran proses kerja (workflow) dari penerimaan pesanan/input sehingga penyerahan produk atau perkhidmatan akhir' },
+        { id: 3, title: 'Pengecaman stesen kerja kritikal, titik sentuh operasi/pelanggan, dan pematuhan prinsip aliran lancar' }
+      ],
+      sectorGuides: [
+        {
+          sector: 'perkhidmatan',
+          sectorName: 'Perkhidmatan (Services - IT, Perundingan, Perbankan, Agensi, Hospitaliti)',
+          icon: '🏢',
+          applicationGuide: 'Fokus kepada Service Blueprint, susun atur ruang kerja/kaunter pelanggan, dan aliran pemprosesan tiket, dokumen atau tugasan digital.',
+          examples: ['Memetakan perjalanan pelanggan (Customer Journey) di kaunter/portal', 'Aliran semakan & kelulusan dokumen tanpa kelewatan', 'Susun atur ergonomik stesen kerja staf sokongan pelanggan'],
+          areaInterpretations: {
+            area1: 'Susun atur ruang pejabat/kaunter servis pelanggan dan ergonomik stesen kerja staf sokongan digital/fizikal',
+            area2: 'Pemetaan Service Blueprint dan aliran proses tiket permohonan/projek dari penerimaan sehingga kelulusan akhir',
+            area3: 'Pengecaman titik sentuh pelanggan (customer touchpoints) dan pematuhan aliran interaksi bebas gangguan'
+          }
+        },
+        {
+          sector: 'pembarangan',
+          sectorName: 'Pembarangan (Merchandising / Stor / Runcit / FMCG)',
+          icon: '🏪',
+          applicationGuide: 'Fokus kepada susunan rak jualan (planogram), reka bentuk ruang stor barangan, aliran penerimaan stok masuk dan paparan jualan.',
+          examples: ['Pelan susun atur lantai jualan dan pergerakan pelanggan', 'Aliran pemindahan stok dari stor belakang ke rak jualan', 'Pengecaman zon barangan panas (high-traffic merchandising zones)'],
+          areaInterpretations: {
+            area1: 'Susun atur lantai jualan (planogram), zon peragaan barangan dan reka bentuk ruang stor simpanan',
+            area2: 'Aliran pemindahan stok barangan masuk dari dok penerimaan sehingga dipamerkan di rak jualan',
+            area3: 'Pengecaman zon jualan panas, kelancaran laluan troli/pelanggan dan titik sentuh kaunter juruwang'
+          }
+        },
+        {
+          sector: 'perdagangan',
+          sectorName: 'Perdagangan & Pengedaran (Trade / Commerce / Pemborongan / Logistik)',
+          icon: '💼',
+          applicationGuide: 'Fokus kepada susun atur hab gudang transit, zon pembungkusan, laluan logistik pemunggahan dan aliran pemprosesan pesanan.',
+          examples: ['Susun atur kawasan pengambilan pesanan (order picking layout)', 'Aliran penerimaan kargo dari pembekal sehingga pelepasan penghantaran', 'Laluan pantas barangan keluar-masuk (cross-docking route)'],
+          areaInterpretations: {
+            area1: 'Susun atur hab gudang pengedaran, zon penyimpanan palet dan stesen pembungkusan kargo',
+            area2: 'Aliran proses pemenuhan pesanan (order picking, packing, dispatch) dari tempahan sehingga pengedaran',
+            area3: 'Pengecaman zon pemunggahan kritikal, laluan pantas cross-docking dan keselamatan trafik armada'
+          }
+        },
+        {
+          sector: 'pembuatan',
+          sectorName: 'Pembuatan & Kejuruteraan (Manufacturing / Production)',
+          icon: '🏭',
+          applicationGuide: 'Fokus kepada susun atur sel pengeluaran kilang, aliran bahan mentah ke barangan siap, dan interaksi mesin-operator.',
+          examples: ['Susun atur sel berbentuk U atau barisan pemasangan', 'Analisis Value Stream Mapping bahan mentah ke produk siap', 'Pengecaman stesen kerja kritikal dan zon keselamatan kilang'],
+          areaInterpretations: {
+            area1: 'Susun atur lantai kilang (cellular/line layout), ruang kerja mesin dan zon keselamatan ergonomik',
+            area2: 'Pemetaan aliran proses nilai (Value Stream Mapping) dari bahan mentah sehingga pemasangan produk siap',
+            area3: 'Pengecaman stesen kerja kekangan mesin dan pematuhan prinsip aliran lancar bahan dalam proses'
+          }
+        }
       ],
       maxMarks: 12
     },
@@ -222,18 +286,68 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
       endDate: '2026-10-09',
       milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
-      courseName: 'OPERATIONS MANAGEMENT',
+      courseName: 'OPERATIONS MANAGEMENT (PENGURUSAN OPERASI)',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'MINGGU 2 (05 Okt - 09 Okt 2026): Capacity Planning & Production Scheduling (M2)',
+      taskTitle: 'MINGGU 2 (05 Okt - 09 Okt 2026): Perancangan Kapasiti Sumber & Penjadualan Operasi (Capacity Planning & Operational Scheduling)',
       taskHighlights: [
-        'Analyze machine and labor capacity planning and resource allocation',
-        'Review production scheduling, work shifting, and demand forecasting methods',
-        'Assess operations time management in daily plant operations'
+        'Menganalisis perancangan kapasiti sumber manusia, sistem/peralatan operasi, dan peruntukan beban kerja mengikut unjuran permintaan firma',
+        'Menilai penjadualan operasi, agihan giliran tugas/syif kerja, dan kaedah ramalan permintaan perkhidmatan atau barangan niaga',
+        'Menilai pengurusan masa operasi harian, masa kitaran (cycle/lead time), dan produktiviti operasi firma'
       ],
       areas: [
-        { id: 1, title: 'Analyze machine and labor capacity planning and resource allocation' },
-        { id: 2, title: 'Review production scheduling, work shifting, and demand forecasting methods' },
-        { id: 3, title: 'Assess operations time management in daily plant operations' }
+        { id: 1, title: 'Analisis perancangan kapasiti sumber (tenaga kerja, sistem digital/peralatan, dan ruang operasi) mengikut permintaan pasaran' },
+        { id: 2, title: 'Penjadualan operasi kerja, giliran tugas staf/syif, dan ketepatan masa pemenuhan pesanan atau perkhidmatan' },
+        { id: 3, title: 'Pengurusan masa operasi, kawalan masa kitaran (lead time) dan kecekapan penyelesaian tugasan harian' }
+      ],
+      sectorGuides: [
+        {
+          sector: 'perkhidmatan',
+          sectorName: 'Perkhidmatan (Services - IT, Perundingan, Perbankan, Agensi)',
+          icon: '🏢',
+          applicationGuide: 'Fokus kepada kapasiti perunding/staf teknikal, pengurusan masa menunggu klien, penjadualan janji temu, dan pemenuhan tempahan.',
+          examples: ['Mengimbangi nisbah pegawai kaunter dengan jumlah pelanggan waktu puncak', 'Penjadualan syif meja bantuan sokongan IT/pelanggan', 'Pengurangan masa pemprosesan permohonan/tiket pelanggan'],
+          areaInterpretations: {
+            area1: 'Perancangan kapasiti bilangan staf perunding/eksekutif servis mengikut lonjakan tiket/pelanggan',
+            area2: 'Penjadualan syif meja bantuan, penetapan janji temu klien dan ketepatan masa pemenuhan servis',
+            area3: 'Kawalan masa penyelesaian (Service Level Agreement - SLA), masa menunggu giliran dan kecekapan harian'
+          }
+        },
+        {
+          sector: 'pembarangan',
+          sectorName: 'Pembarangan (Merchandising / Runcit / FMCG / Stor)',
+          icon: '🏪',
+          applicationGuide: 'Fokus kepada had muatan stok stor, kapasiti juruwang waktu puncak, dan unjuran keperluan barangan musim promosi.',
+          examples: ['Penjadualan waktu penerimaan lori bekalan di dermaga pemunggahan', 'Perancangan kapasiti juruwang semasa hujung minggu/kempen jualan', 'Unjuran kuantiti stok barangan laris bagi mengelakkan ketiadaan stok'],
+          areaInterpretations: {
+            area1: 'Perancangan kapasiti ruang simpanan stor, kuota juruwang aktif dan unjuran keperluan stok jualan promosi',
+            area2: 'Penjadualan syif kaunter juruwang dan waktu ketibaan lori pembekal di dermaga penerimaan stor',
+            area3: 'Masa kitaran pemunggahan stok sehingga susun atur di rak jualan dan pengurangan masa beratur pelanggan'
+          }
+        },
+        {
+          sector: 'perdagangan',
+          sectorName: 'Perdagangan & Pengedaran (Trade / Commerce / Logistik / Borong)',
+          icon: '💼',
+          applicationGuide: 'Fokus kepada keupayaan pemprosesan pesanan harian (order fulfillment capacity), peruntukan armada logistik, dan jadual pemuatan.',
+          examples: ['Pengiraan volum maksimum pesanan boleh diproses sehari (order throughput)', 'Penjadualan laluan lori penghantaran mengikut zon geografi', 'Perancangan sumber gudang mengikut ramalan permintaan eksport/import'],
+          areaInterpretations: {
+            area1: 'Perancangan had kapasiti pemprosesan pesanan harian (order throughput) dan saiz muatan ruang kontena/lori',
+            area2: 'Penjadualan masa pemuatan kargo, agihan zon penghantaran dan giliran staf logistik gudang',
+            area3: 'Kawalan masa kitaran pemprosesan pesanan (order-to-delivery lead time) dan ketepatan masa penghantaran'
+          }
+        },
+        {
+          sector: 'pembuatan',
+          sectorName: 'Pembuatan & Kejuruteraan (Manufacturing / Production)',
+          icon: '🏭',
+          applicationGuide: 'Fokus kepada kapasiti mesin dan operator, penjadualan kelompok pengeluaran (batch scheduling), dan pengiraan utilization rate.',
+          examples: ['Perancangan jam operasi mesin dan penyelenggaraan berkala', 'Penjadualan giliran operator syif pagi dan petang', 'Pengiraan masa kitaran pengeluaran produk bagi memenuhi kuota'],
+          areaInterpretations: {
+            area1: 'Perancangan kapasiti mesin (OEE), keseimbangan barisan kerja (line balancing) dan operator syif kilang',
+            area2: 'Penjadualan kelompok pengeluaran (master production schedule) dan giliran syif operasi kerja berjadual',
+            area3: 'Kawalan masa kitaran (cycle/takt time), pengurangan masa henti mesin dan pencapaian kuota harian'
+          }
+        }
       ],
       maxMarks: 12
     },
@@ -245,18 +359,68 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
       endDate: '2026-10-16',
       milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
-      courseName: 'OPERATIONS MANAGEMENT',
+      courseName: 'OPERATIONS MANAGEMENT (PENGURUSAN OPERASI)',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'MINGGU 3 (12 Okt - 16 Okt 2026): Lean Manufacturing & JIT (Waste Elimination) (M3)',
+      taskTitle: 'MINGGU 3 (12 Okt - 16 Okt 2026): Operasi Ramping, 5S & Penghapusan Pembaziran (Lean Operations, 5S & Waste Elimination)',
       taskHighlights: [
-        'Implement 5S audits at selected plant workstations',
-        'Identify and eliminate the 7 wastes (Muda) in manufacturing processes',
-        'Apply Kanban and pull production systems (Just-In-Time / Kaizen principles)'
+        'Melaksanakan amalan atau audit 5S (Sisih, Susun, Sapu, Seragam, Sentiasa Amal) di ruang kerja fizikal, stor, kaunter, atau sistem digital firma',
+        'Mengenal pasti dan menghapuskan pembaziran operasi (Wastes/Muda) seperti masa menunggu, kerja berulang (rework), lebihan stok, dan proses lewah',
+        'Mengaplikasikan prinsip Kaizen (penambahbaikan berterusan), visual management, dan sistem aliran kerja lancar (Just-In-Time / Pull System)'
       ],
       areas: [
-        { id: 1, title: 'Implement 5S audits at selected plant workstations' },
-        { id: 2, title: 'Identify and eliminate the 7 wastes (Muda) in manufacturing processes' },
-        { id: 3, title: 'Apply Kanban and pull production systems (Just-In-Time / Kaizen principles)' }
+        { id: 1, title: 'Pelaksanaan audit dan amalan organisasi tempat kerja 5S yang kemas, selamat, dan teratur di ruang kerja firma' },
+        { id: 2, title: 'Keupayaan mengenal pasti dan mengurangkan pembaziran operasi (masa menunggu, kesilapan dokumen/proses, lewah kerja, atau lebihan stok)' },
+        { id: 3, title: 'Aplikasi kaedah penambahbaikan berterusan (Kaizen) dan visual management/Kanban untuk kelancaran operasi' }
+      ],
+      sectorGuides: [
+        {
+          sector: 'perkhidmatan',
+          sectorName: 'Perkhidmatan (Services - IT, Perundingan, Agensi, Bank)',
+          icon: '🏢',
+          applicationGuide: '5S sistem fail/komputer, visual management papan tugasan (Trello/Kanban), penghapusan pembaziran langkah birokrasi dan masa menunggu.',
+          examples: ['5S pangkalan data dokumen dan storan digital', 'Penghapusan kerja berulang (rework) akibat kesilapan borang pelanggan', 'Pelaksanaan papan visual status perkhidmatan klien secara masa nyata'],
+          areaInterpretations: {
+            area1: 'Amalan 5S sistem fail digital/komputer, organisasi ruang kerja pejabat dan susun atur borang/peralatan servis',
+            area2: 'Mengenal pasti dan menghapuskan pembaziran langkah birokrasi, kerja berulang (rework) dokumen dan masa menunggu kelulusan',
+            area3: 'Aplikasi papan status tugasan visual (Kanban/Trello) dan penambahbaikan berterusan (Kaizen) perkhidmatan'
+          }
+        },
+        {
+          sector: 'pembarangan',
+          sectorName: 'Pembarangan (Merchandising / Runcit / FMCG / Stor)',
+          icon: '🏪',
+          applicationGuide: '5S stor simpanan & label harga, penyingkiran barangan rosak/luput (dead stock), dan sistem pengisian stok berterusan (Kanban shelf replenishment).',
+          examples: ['Label kod bar dan tagging lokasi barangan yang jelas di stor', 'Pemisahan segera barangan rosak/luput daripada ruang jualan aktif', 'Papan tanda visual zon kategori barangan untuk memudahkan pelanggan & staf'],
+          areaInterpretations: {
+            area1: 'Amalan 5S ruang stor barangan, zon pelabelan harga dan susunan rak jualan yang kemas serta selamat',
+            area2: 'Penghapusan pembaziran kerosakan barangan, penyingkiran barangan lapuk/mati (dead stock) dan lewah simpanan',
+            area3: 'Sistem visual amaran kehabisan stok, papan kawalan stor dan sistem pengisian semula rak jualan (shelf Kanban)'
+          }
+        },
+        {
+          sector: 'perdagangan',
+          sectorName: 'Perdagangan & Pengedaran (Trade / Commerce / Logistik)',
+          icon: '💼',
+          applicationGuide: '5S kawasan pembungkusan barangan, pengurangan pergerakan pembaziran staf dalam gudang, dan sistem pesanan berasaskan tarikan pelanggan (pull order).',
+          examples: ['Penyusunan alatan pembungkusan di stesen kerja secara teratur', 'Pengurangan laluan berpatah balik staf semasa mengambil barangan (pick-path optimization)', 'Kad arahan kerja visual untuk penghantaran berkembar'],
+          areaInterpretations: {
+            area1: 'Amalan 5S stesen pembungkusan kargo, pelabelan palet dan kebersihan serta ketenteraman laluan gudang',
+            area2: 'Pengurangan pergerakan pembaziran pekerja (pick-path optimization), lebihan bahan pembungkusan dan kesilapan resit',
+            area3: 'Penggunaan kad kerja visual, papan pemantauan status lori pengedaran dan sistem pesanan berasaskan tarikan pelanggan'
+          }
+        },
+        {
+          sector: 'pembuatan',
+          sectorName: 'Pembuatan & Kejuruteraan (Manufacturing / Production)',
+          icon: '🏭',
+          applicationGuide: '5S lantai kilang, penyingkiran 7 Muda (pergerakan, lebihan inventori, kecacatan, masa menunggu, overproduction), dan Kanban JIT.',
+          examples: ['Garis sempadan keselamatan dan pelabelan perkakasan di stesen mesin', 'Pengurangan inventori kerja dalam proses (WIP reduction)', 'Kaizen berpasukan untuk mempercepat masa pertukaran alatan (setup time)'],
+          areaInterpretations: {
+            area1: 'Pelaksanaan audit 5S lantai operasi kilang, penandaan sempadan keselamatan dan susunan alat kerja mesin',
+            area2: 'Pengecaman dan penghapusan 7 pembaziran pembuatan (Muda: kerja berulang, inventori WIP berlebihan, masa henti)',
+            area3: 'Pelaksanaan sistem kad Kanban JIT, visual management papan andon dan amalan Kaizen berpasukan'
+          }
+        }
       ],
       maxMarks: 12
     },
@@ -268,18 +432,68 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
       endDate: '2026-10-23',
       milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
-      courseName: 'OPERATIONS MANAGEMENT',
+      courseName: 'OPERATIONS MANAGEMENT (PENGURUSAN OPERASI)',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'MINGGU 4 (19 Okt - 23 Okt 2026): Quality Control & Operational System Improvement (M4)',
+      taskTitle: 'MINGGU 4 (19 Okt - 23 Okt 2026): Kawalan Kualiti, Pengurusan Inventori & Penyelesaian Kekangan (Quality Control, Inventory & Bottleneck Resolution)',
       taskHighlights: [
-        'Participate in Total Quality Management (TQM) and Statistical Process Control (SPC)',
-        'Conduct defect inspections and inventory control (EOQ models)',
-        'Analyze queue systems and operational bottlenecks'
+        'Melibatkan diri dalam jaminan kualiti operasi (TQM), pematuhan Prosedur Operasi Standard (SOP) dan kawalan standard kualiti output perkhidmatan/barangan',
+        'Menjalankan pemantauan kawalan inventori/stok, semakan ralat atau ketepatan pesanan, dan pengurusan pembekal',
+        'Menganalisis sistem giliran (queueing system) dan mengenal pasti penyelesaian bagi mengatasi kekangan/kesesakan (operational bottlenecks)'
       ],
       areas: [
-        { id: 1, title: 'Participate in Total Quality Management (TQM) and Statistical Process Control (SPC)' },
-        { id: 2, title: 'Conduct defect inspections and inventory control (EOQ models)' },
-        { id: 3, title: 'Analyze queue systems and operational bottlenecks' }
+        { id: 1, title: 'Pematuhan piawaian kualiti, SOP organisasi, dan pengesanan ralat/kecacatan operasi secara sistematik' },
+        { id: 2, title: 'Pengurusan inventori, kawalan rekod stok/data, dan ketepatan pemenuhan keperluan pelanggan atau rakan niaga' },
+        { id: 3, title: 'Analisis sistem giliran dan cadangan praktikal bagi menyelesaikan kesesakan/kelewatan (bottlenecks) operasi' }
+      ],
+      sectorGuides: [
+        {
+          sector: 'perkhidmatan',
+          sectorName: 'Perkhidmatan (Services - IT, Perundingan, Agensi, Bank)',
+          icon: '🏢',
+          applicationGuide: 'Pematuhan Service Level Agreement (SLA), audit semakan kepuasan pelanggan, analisis kesesakan meja perkhidmatan (service bottleneck).',
+          examples: ['Memantau kadar pematuhan SLA masa maklum balas pelanggan', 'Menganalisis punca kelewatan pengesahan peringkat pengurusan', 'Menyusun semula aliran kerja bagi melancarkan proses giliran tiket aduan'],
+          areaInterpretations: {
+            area1: 'Pematuhan standard kualiti perkhidmatan (SLA), semakan ralat dokumen dan audit kepuasan pelanggan',
+            area2: 'Pengurusan inventori alatan pejabat/pangkalan data dan ketepatan pemfailan maklumat pelanggan',
+            area3: 'Analisis sistem giliran pelanggan (kaunter/tiket) dan penyelesaian kesesakan (bottleneck) kelulusan'
+          }
+        },
+        {
+          sector: 'pembarangan',
+          sectorName: 'Pembarangan (Merchandising / Runcit / FMCG / Stor)',
+          icon: '🏪',
+          applicationGuide: 'Pemeriksaan kualiti barangan masuk (receiving inspection), pengurusan stok penampan (safety stock), dan penyelesaian kesesakan kaunter bayaran.',
+          examples: ['Pemeriksaan fizikal bungkusan dan tarikh luput barangan pembekal', 'Kawalan stok minimum dan amaran pesanan semula automatik', 'Pengaktifan kaunter bayaran ekspres semasa barisan pelanggan panjang'],
+          areaInterpretations: {
+            area1: 'Pemeriksaan kualiti penerimaan barangan pembekal, semakan tarikh luput dan integriti bungkusan',
+            area2: 'Kawalan stok penampan (safety stock), pengiraan tahap pesanan semula (ROP) dan audit stok POS',
+            area3: 'Analisis masa menunggu barisan pelanggan di kaunter juruwang dan pengaktifan kaunter pantas'
+          }
+        },
+        {
+          sector: 'perdagangan',
+          sectorName: 'Perdagangan & Pengedaran (Trade / Commerce / Logistik)',
+          icon: '💼',
+          applicationGuide: 'Semakan ketepatan invois dan barangan keluar (dispatch accuracy audit), pengurusan inventori transit, dan analisis kesesakan kontena/logistik.',
+          examples: ['Audit kadar ketepatan pesanan barangan pelanggan (Order Accuracy Rate)', 'Pengurusan dokumentasi kastam dan insurans penghantaran', 'Penyelesaian kelewatan pemunggahan di pintu gudang logistik'],
+          areaInterpretations: {
+            area1: 'Audit ketepatan pesanan keluar (order accuracy audit), pematuhan piawaian pembungkusan dan semakan dokumen',
+            area2: 'Kawalan inventori transit kargo, rekod sistem pengurusan gudang (WMS) dan audit ketepatan stok',
+            area3: 'Analisis kesesakan pemunggahan di pintu gudang dan penyelarasan jadual ketibaan lori pengedaran'
+          }
+        },
+        {
+          sector: 'pembuatan',
+          sectorName: 'Pembuatan & Kejuruteraan (Manufacturing / Production)',
+          icon: '🏭',
+          applicationGuide: 'Kawalan proses statistik (SPC), pemeriksaan kecacatan produk akhir, pengiraan Economic Order Quantity (EOQ), dan bottleneck mesin.',
+          examples: ['Penggunaan carta kawalan kualiti dan senarai semak kecacatan', 'Pengiraan kuantiti pesanan ekonomi bahan mentah utama', 'Penyelarasan semula aliran pengeluaran bagi mengelakkan mesin penumpukan'],
+          areaInterpretations: {
+            area1: 'Kawalan kualiti statistik (SPC), pemeriksaan kecacatan produk mengikut spesifikasi toleransi',
+            area2: 'Pengiraan kuantiti pesanan ekonomi (EOQ), pengurusan inventori bahan mentah dan stok penampan',
+            area3: 'Analisis kekangan stesen mesin penumpukan (Theory of Constraints / Line Balancing) bagi memaksimumkan output'
+          }
+        }
       ],
       maxMarks: 12
     },
@@ -291,18 +505,80 @@ export const UTEM_WEEKLY_ASSESSMENTS: Record<string, WeeklyAssessmentConfig[]> =
       endDate: '2026-10-30',
       milestone: 'Modul 1 (Minggu 1 - 5)',
       courseCode: 'BTMU 2103',
-      courseName: 'OPERATIONS MANAGEMENT',
+      courseName: 'OPERATIONS MANAGEMENT (PENGURUSAN OPERASI)',
       cloStatement: 'CLO 3: Evaluate effective operational systems utilizing all available resources (PLO9, A5, C3F)',
-      taskTitle: 'MINGGU 5 (26 Okt - 30 Okt 2026): Final Assessment, Operations Report & Comprehensive Presentation (M5)',
+      taskTitle: 'MINGGU 5 (26 Okt - 30 Okt 2026): Penilaian Akhir, Laporan Kajian Kes Operasi & Pembentangan (Final Operational Assessment & Comprehensive Report)',
       taskHighlights: [
-        'Synthesize overall operations management project findings and system evaluation',
-        'Prepare final case study report and joint assessment presentation (Viva)',
-        'Final verification by Industry Coach (JI) and Faculty Supervisor (TPF)'
+        'Mensintesis keseluruhan dapatan penilaian operasi industri (susun atur, kapasiti, kecekapan lean, dan kawalan kualiti) di firma penempatan',
+        'Menyediakan laporan kajian kes penambahbaikan operasi firma yang komprehensif disokong data sebenar tempat kerja',
+        'Membentangkan hasil projek operasi dan cadangan penambahbaikan sistem di hadapan Jurulatih Industri dan Pensyarah Kursus'
       ],
       areas: [
-        { id: 1, title: 'Comprehensive presentation and defense of operations management project' },
-        { id: 2, title: 'Quality, depth and accuracy of final operations case study report documentation' },
-        { id: 3, title: 'Professionalism, ethics and overall industrial performance across 5 weeks' }
+        { id: 1, title: 'Pembentangan dan pembelaan hasil projek penambahbaikan sistem operasi firma secara profesional' },
+        { id: 2, title: 'Kualiti, ketelitian dan kesahihan dokumentasi laporan kajian kes operasi industri merentasi 5 minggu' },
+        { id: 3, title: 'Profesionalisme, etika kerja, disiplin dan komitmen sepanjang tempoh penilaian operasi industri' }
+      ],
+      sectorGuides: [
+        {
+          sector: 'perkhidmatan',
+          sectorName: 'Perkhidmatan (Services - IT, Perundingan, Agensi, Bank)',
+          icon: '🏢',
+          applicationGuide: 'Laporan dan pembentangan akhir merumuskan impak penambahbaikan Service Blueprint, pengurangan masa respons klien, kecekapan aliran kerja digital dan kepuasan pelanggan.',
+          examples: ['Laporan kajian kes penambahbaikan aliran tiket perkhidmatan & kepuasan klien', 'Slaid pembentangan impak pengurangan masa pemprosesan perkhidmatan', 'Refleksi etika kerahsiaan dan cadangan penambahbaikan berterusan'],
+          areaInterpretations: {
+            area1: 'Pembentangan projek penambahbaikan aliran perkhidmatan, Service Blueprint dan impak kepuasan pelanggan secara profesional',
+            area2: 'Ketelitian laporan kajian kes operasi perkhidmatan lengkap berserta bukti data masa respon (SLA) dan analisis sebelum vs selepas',
+            area3: 'Profesionalisme, pematuhan kerahsiaan data klien, disiplin waktu kerja dan etika perundingan'
+          }
+        },
+        {
+          sector: 'pembarangan',
+          sectorName: 'Pembarangan (Merchandising / Runcit / FMCG / Stor)',
+          icon: '🏪',
+          applicationGuide: 'Laporan dan pembentangan akhir merumuskan keberkesanan pelan susun atur jualan (planogram), pengurangan pembaziran stok luput, kelancaran aliran juruwang dan peningkatan jualan.',
+          examples: ['Laporan kajian kes pengoptimuman susun atur rak jualan & pengurusan stok stor', 'Pembentangan visual sebelum vs selepas pelaksanaan 5S stor dan rak jualan', 'Refleksi disiplin, khidmat pelanggan runcit dan inisiatif operasi jualan'],
+          areaInterpretations: {
+            area1: 'Pembentangan projek penambahbaikan susun atur jualan runcit, pembarangan visual dan pengurusan stor di hadapan panel',
+            area2: 'Dokumentasi laporan kajian kes operasi stor/jualan yang kemas disokong rekod pusingan inventori dan data jualan',
+            area3: 'Profesionalisme, integriti pengendalian stok barangan, disiplin kehadiran dan ketepatan masa di lantai jualan'
+          }
+        },
+        {
+          sector: 'perdagangan',
+          sectorName: 'Perdagangan & Pengedaran (Trade / Commerce / Logistik)',
+          icon: '💼',
+          applicationGuide: 'Laporan dan pembentangan akhir merumuskan peningkatan keupayaan pemprosesan pesanan (throughput), ketepatan inventori transit, kelajuan penghantaran dan penjimatan kos operasi logistik.',
+          examples: ['Laporan kajian kes pemendekan masa pemenuhan pesanan gudang logistik', 'Pembentangan pelan susun atur hab transit dan pengoptimuman laluan lori pengedaran', 'Refleksi etika perdagangan, pematuhan regulatori dan komitmen operasi'],
+          areaInterpretations: {
+            area1: 'Pembentangan hasil projek pengoptimuman aliran pengedaran, ketepatan pesanan dan logistik perdagangan secara meyakinkan',
+            area2: 'Laporan kajian kes komprehensif mengandungi metrik pemenuhan pesanan harian, analisis kos logistik dan carta alir gudang',
+            area3: 'Profesionalisme, akauntabiliti terhadap barangan niaga, kepatuhan piawaian keselamatan logistik dan integriti perdagangan'
+          }
+        },
+        {
+          sector: 'pembuatan',
+          sectorName: 'Pembuatan & Kejuruteraan (Manufacturing / Production)',
+          icon: '🏭',
+          applicationGuide: 'Laporan dan pembentangan akhir merumuskan penjimatan kos pengeluaran, penghapusan pembaziran 5S/Lean, peningkatan OEE mesin dan kawalan kecacatan produk kilang.',
+          examples: ['Laporan kajian kes pengurangan kecacatan produk dan pengimbangan barisan mesin (line balancing)', 'Pembentangan slaid teknikal impak pelaksanaan Lean/Kaizen terhadap kuota harian', 'Refleksi amalan keselamatan industri (OSHA) dan etika kejuruteraan pembuatan'],
+          areaInterpretations: {
+            area1: 'Pembentangan projek teknikal operasi kilang, analisis penambahbaikan OEE dan penjimatan kos pengeluaran',
+            area2: 'Kualiti laporan kajian kes teknikal lengkap dengan data statistik kualiti (SPC), analisis VSM dan cadangan kejuruteraan',
+            area3: 'Pematuhan piawaian OSHA/keselamatan industri, disiplin kerja syif kilang dan etika kejuruteraan profesional'
+          }
+        },
+        {
+          sector: 'universal',
+          sectorName: 'Semua Sektor (Perkhidmatan, Pembarangan, Perdagangan, Pembuatan)',
+          icon: '🌐',
+          applicationGuide: 'Laporan dan pembentangan akhir merumuskan impak penambahbaikan operasi terhadap kecekapan, pengurangan kos/pembaziran, dan kepuasan pelanggan firma.',
+          examples: ['Laporan komprehensif kajian kes operasi firma dengan analisis sebelum vs selepas', 'Slaid pembentangan profesional di hadapan Jurulatih Industri & Pensyarah', 'Refleksi pengalaman amali operasi dan cadangan kesinambungan bagi firma'],
+          areaInterpretations: {
+            area1: 'Pembentangan dan pembelaan hasil projek penambahbaikan sistem operasi firma secara profesional',
+            area2: 'Kualiti, ketelitian dan kesahihan dokumentasi laporan kajian kes operasi industri merentasi 5 minggu',
+            area3: 'Profesionalisme, etika kerja, disiplin dan komitmen sepanjang tempoh penilaian operasi industri'
+          }
+        }
       ],
       maxMarks: 12
     }
@@ -1010,7 +1286,7 @@ export const WBL_COURSE_SEQUENCE: WblCourseSequenceItem[] = [
     evaluatorRatio: 'JI: 60% | TPF: 40%',
     jiWeightPercent: 60,
     tpfWeightPercent: 40,
-    description: 'Bermula 28 September 2026 (Minggu 1 - 5): Tata atur kilang, perancangan kapasiti, lean manufacturing (7 Muda & JIT), kawalan kualiti & pembentangan akhir.'
+    description: 'Bermula 28 September 2026 (Minggu 1 - 5): Susun atur operasi fasiliti, perancangan kapasiti sumber, operasi ramping (Lean 5S & penghapusan pembaziran), kawalan kualiti/SOP & laporan projek operasi (Universal untuk Pembarangan, Perdagangan, Perkhidmatan & Pembuatan).'
   },
   {
     order: 2,
@@ -1662,24 +1938,24 @@ export const UTEM_PORTFOLIO_SCHEMES: Record<string, CoursePortfolioScheme> = {
         criteria: [
           {
             id: 'om_w_1',
-            title: '1. Kefahaman Aliran Operasi & Susun Atur (W1-W4)',
+            title: '1. Kefahaman Aliran Operasi & Susun Atur Fasiliti (W1-W4)',
             maxScore: 4,
             levels: {
-              1: 'Gagal memahami susun atur lantai pengeluaran dan aliran bahan mentah ke produk siap.',
-              2: 'Memahami prinsip asas aliran operasi tetapi memerlukan pemantauan kerap.',
-              3: 'Memahami aliran operasi, stesen kerja dan pengurusan masa operasi dengan tepat.',
-              4: 'Penguasaan mendalam aliran operasi, kapasiti mesin, dan mengenal pasti kekangan (bottleneck) secara proaktif.'
+              1: 'Gagal memahami susun atur fasiliti operasi (ruang kerja/kaunter/gudang/stor/pejabat) dan aliran proses kerja dari input sehingga penyerahan output/perkhidmatan.',
+              2: 'Memahami prinsip asas aliran operasi tetapi memerlukan bimbingan berterusan dalam memetakan proses kerja firma.',
+              3: 'Memahami aliran operasi, stesen kerja, pengurusan masa dan susun atur fasiliti operasi dengan tepat.',
+              4: 'Penguasaan mendalam aliran operasi fasiliti, perancangan kapasiti sumber (manusia/sistem/peralatan), dan proaktif mengenal pasti serta mengatasi kekangan (bottleneck) operasi.'
             }
           },
           {
             id: 'om_w_2',
-            title: '2. Aplikasi Alat & Teknik Pengurusan Operasi',
+            title: '2. Aplikasi Alat & Teknik Pengurusan Operasi (Universal Lean & Kaizen)',
             maxScore: 4,
             levels: {
-              1: 'Tidak menggunakan alat kualiti/lean (5S, Kaizen, Kanban, JIT) dalam tugasan operasi.',
+              1: 'Tidak menggunakan alat pengurusan operasi (5S, Kaizen, Kanban, SLA/SOP kualiti) dalam tugasan harian.',
               2: 'Mengaplikasikan alat operasi secara minimum dan terhad kepada arahan langsung.',
-              3: 'Menggunakan alat pengurusan operasi dengan betul dan konsisten dalam tugasan.',
-              4: 'Sangat mahir mengaplikasi kaedah Lean/JIT, mengenal pasti pembaziran (Muda) dan meningkatkan produktiviti.'
+              3: 'Menggunakan alat pengurusan operasi (5S, SOP, aliran kerja lancar) dengan betul dan konsisten dalam tugasan.',
+              4: 'Sangat mahir mengaplikasi kaedah penambahbaikan operasi (Lean/Kaizen/5S), mengenal pasti pembaziran dan meningkatkan produktiviti perkhidmatan/barangan.'
             }
           },
           {
@@ -1690,7 +1966,7 @@ export const UTEM_PORTFOLIO_SCHEMES: Record<string, CoursePortfolioScheme> = {
               1: 'Laporan mingguan tidak lengkap, lewat dihantar, dan tidak mengandungi data operasi.',
               2: 'Laporan sekadar ringkasan aktiviti harian tanpa analisis teknikal operasi.',
               3: 'Laporan berstruktur, mengandungi data operasi dan dihantar tepat pada masanya.',
-              4: 'Laporan sangat komprehensif, mengandungi analisis log operasi yang analitikal, reflektif dan disokong data.'
+              4: 'Laporan sangat komprehensif, mengandungi analisis log operasi yang analitikal, reflektif dan disokong data sebenar tempat kerja.'
             }
           },
           {
@@ -1700,8 +1976,8 @@ export const UTEM_PORTFOLIO_SCHEMES: Record<string, CoursePortfolioScheme> = {
             levels: {
               1: 'Pasif terhadap masalah operasi dan tiada inisiatif menyelesaikan isu kerja.',
               2: 'Cuba menyelesaikan masalah rutin tetapi bergantung sepenuhnya kepada bimbingan.',
-              3: 'Berjaya menyelesaikan masalah operasi rutin di lantai industri secara berdikari.',
-              4: 'Proaktif, mencadangkan penyelesaian inovatif untuk mengatasi isu kapasiti dan kawalan kualiti.'
+              3: 'Berjaya menyelesaikan masalah operasi rutin di ruang kerja industri secara berdikari.',
+              4: 'Proaktif, mencadangkan penyelesaian inovatif untuk mengatasi isu kapasiti, masa menunggu, kesesakan dan kawalan kualiti sistem.'
             }
           }
         ]

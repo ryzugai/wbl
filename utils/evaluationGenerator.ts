@@ -1078,6 +1078,17 @@ export const generateWeeklyStudentAssessmentPrint = (
   const total = wScores.total || (wScores.area1 + wScores.area2 + wScores.area3);
   const percent = Math.round((total / 12) * 100);
 
+  const sectorLabels: Record<string, string> = {
+    perkhidmatan: '🏢 Perkhidmatan (Services / IT / Agensi / Perbankan)',
+    pembarangan: '🏪 Pembarangan (Merchandising / Runcit / FMCG / Stor)',
+    perdagangan: '💼 Perdagangan & Pengedaran (Trade / Commerce / Logistik)',
+    pembuatan: '🏭 Pembuatan & Kejuruteraan (Manufacturing / Production)',
+    universal: '🌐 Universal (Semua Sektor Industri)'
+  };
+  const activeSector = evaluation.industrySector || 'universal';
+  const sectorLabel = sectorLabels[activeSector] || '🌐 Universal (Semua Sektor Industri)';
+  const matchedSectorGuide = weekConfig?.sectorGuides?.find((s: any) => s.sector === activeSector) || weekConfig?.sectorGuides?.[0];
+
   const html = `
     <!DOCTYPE html>
     <html lang="ms">
@@ -1137,6 +1148,7 @@ export const generateWeeklyStudentAssessmentPrint = (
             MAKLUMAT KURSUS & MINGGU PENTAKSIRAN
           </div>
           <div><strong>Kursus:</strong> ${evaluation.courseCode} - ${evaluation.courseName}</div>
+          <div><strong>Sektor Firma:</strong> <span style="background: #e0f2fe; color: #0369a1; padding: 1px 6px; border-radius: 4px; font-weight: bold;">${sectorLabel}</span></div>
           <div><strong>Minggu Pentaksiran:</strong> <span style="background: #fef08a; padding: 1px 6px; border-radius: 4px; font-weight: bold;">Minggu ${weekNum}</span></div>
           <div><strong>Tempoh Tarikh:</strong> ${evaluation.startDate || weekConfig?.startDate || '-'} hingga ${evaluation.endDate || weekConfig?.endDate || '-'}</div>
           <div><strong>Jurulatih Penilai (JI):</strong> ${evaluation.trainerName} (${evaluation.trainerPosition || 'Jurulatih Industri'})</div>
@@ -1148,6 +1160,11 @@ export const generateWeeklyStudentAssessmentPrint = (
           ${evaluation.weeklyTaskTitle || weekConfig?.taskTitle || `Tugasan Pembelajaran Minggu ${weekNum}`}
         </div>
         ${weekConfig?.cloStatement ? `<div style="font-size: 8pt; color: #3b82f6; margin-top: 2px; font-weight: 600;">${weekConfig.cloStatement}</div>` : ''}
+        ${matchedSectorGuide ? `
+          <div style="margin-top: 6px; padding: 6px 8px; background: #ffffff; border: 1px solid #bfdbfe; border-radius: 4px; font-size: 8pt; color: #1e3a8a;">
+            <strong>Aplikasi Sektor Firma:</strong> ${matchedSectorGuide.applicationGuide}
+          </div>
+        ` : ''}
         ${weekConfig?.taskHighlights ? `
           <ul style="margin: 6px 0 0 16px; padding: 0; font-size: 8pt; color: #334155;">
             ${weekConfig.taskHighlights.map((h: string) => `<li>${h}</li>`).join('')}
@@ -1169,6 +1186,11 @@ export const generateWeeklyStudentAssessmentPrint = (
             <td style="text-align: center; font-weight: bold;">1</td>
             <td>
               <strong>${weekConfig?.areas?.[0]?.title || 'Penguasaan konsep dan metodologi kerja industri'}</strong>
+              ${matchedSectorGuide?.areaInterpretations?.area1 ? `
+                <div style="font-size: 7.5pt; color: #475569; margin-top: 3px; background: #f8fafc; padding: 2px 6px; border-left: 2px solid #3b82f6;">
+                  <em>Fokus Sektor (${matchedSectorGuide.sectorName.split(' ')[0]}): ${matchedSectorGuide.areaInterpretations.area1}</em>
+                </div>
+              ` : ''}
             </td>
             <td style="text-align: center; font-size: 8pt;">
               ${wScores.area1 === 4 ? '<span style="color: #065f46; font-weight: bold;">Cemerlang (Skor 4)</span>' : 
@@ -1182,6 +1204,11 @@ export const generateWeeklyStudentAssessmentPrint = (
             <td style="text-align: center; font-weight: bold;">2</td>
             <td>
               <strong>${weekConfig?.areas?.[1]?.title || 'Kualiti hasil kerja, ketepatan analisis dan pematuhan SOP'}</strong>
+              ${matchedSectorGuide?.areaInterpretations?.area2 ? `
+                <div style="font-size: 7.5pt; color: #475569; margin-top: 3px; background: #f8fafc; padding: 2px 6px; border-left: 2px solid #3b82f6;">
+                  <em>Fokus Sektor (${matchedSectorGuide.sectorName.split(' ')[0]}): ${matchedSectorGuide.areaInterpretations.area2}</em>
+                </div>
+              ` : ''}
             </td>
             <td style="text-align: center; font-size: 8pt;">
               ${wScores.area2 === 4 ? '<span style="color: #065f46; font-weight: bold;">Cemerlang (Skor 4)</span>' : 
@@ -1195,6 +1222,11 @@ export const generateWeeklyStudentAssessmentPrint = (
             <td style="text-align: center; font-weight: bold;">3</td>
             <td>
               <strong>${weekConfig?.areas?.[2]?.title || 'Etika profesionalisme, inisiatif kendiri dan buku log'}</strong>
+              ${matchedSectorGuide?.areaInterpretations?.area3 ? `
+                <div style="font-size: 7.5pt; color: #475569; margin-top: 3px; background: #f8fafc; padding: 2px 6px; border-left: 2px solid #3b82f6;">
+                  <em>Fokus Sektor (${matchedSectorGuide.sectorName.split(' ')[0]}): ${matchedSectorGuide.areaInterpretations.area3}</em>
+                </div>
+              ` : ''}
             </td>
             <td style="text-align: center; font-size: 8pt;">
               ${wScores.area3 === 4 ? '<span style="color: #065f46; font-weight: bold;">Cemerlang (Skor 4)</span>' : 

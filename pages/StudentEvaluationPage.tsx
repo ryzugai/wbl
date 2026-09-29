@@ -70,6 +70,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   const [weeklyDeliverableNotes, setWeeklyDeliverableNotes] = useState<string>('');
   const [studentWeeklyLogbook, setStudentWeeklyLogbook] = useState<WeeklyLogbook | null>(null);
   const [isViewingLogbookModalOpen, setIsViewingLogbookModalOpen] = useState(false);
+  const [selectedIndustrySector, setSelectedIndustrySector] = useState<'all' | 'perkhidmatan' | 'pembarangan' | 'perdagangan' | 'pembuatan'>('all');
 
   // Official UTeM Rubrics View State (matching lampiran)
   const [selectedRubricCourseCode, setSelectedRubricCourseCode] = useState<string>('BTMT 3273(i)');
@@ -400,6 +401,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       setWeeklyTrainerComments(existing.trainerComments || '');
       setWeeklyTrainerRecommendation(existing.trainerRecommendation || '');
       setWeeklyDeliverableNotes(existing.weeklyDeliverableNotes || '');
+      if (existing.industrySector) {
+        setSelectedIndustrySector(existing.industrySector);
+      }
     } else {
       setWeeklyAreaScores({ area1: 3, area2: 3, area3: 3 });
       setWeeklyTrainerComments(
@@ -441,6 +445,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         courseCode: selectedWeeklyCourseCode,
         courseName: evaluatingWeekConfig.courseName,
         evaluationType: 'weekly',
+        industrySector: selectedIndustrySector,
         weekNumber: evaluatingWeekConfig.week,
         startDate: evaluatingWeekConfig.startDate,
         endDate: evaluatingWeekConfig.endDate,
@@ -1432,6 +1437,113 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             </div>
           </div>
 
+          {/* Universal Industry Sector Adaptation Banner for Operations Management (BTMU 2103) */}
+          {(activeCourseSequenceItem.courseCode.includes('2103') || selectedWeeklyCourseCode.includes('2103')) && (
+            <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white p-5 rounded-3xl border border-blue-800 shadow-md space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2.5 bg-amber-400 text-slate-950 rounded-2xl font-black text-base shadow-sm">
+                    🌐
+                  </span>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black text-white flex flex-wrap items-center gap-2">
+                      <span>Penilaian Operasi Universal: Disesuaikan Bagi Semua Jenis Industri</span>
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                        Pembarangan • Perdagangan • Perkhidmatan • Pembuatan
+                      </span>
+                    </h4>
+                    <p className="text-xs text-blue-200 mt-0.5 leading-relaxed">
+                      Penilaian kursus Pengurusan Operasi (BTMU 2103) adalah universal dan terpakai secara adil kepada semua sektor firma penempatan pelajar WBL, bukan terhad kepada pembuatan sahaja.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-amber-300 font-mono font-semibold shrink-0 bg-white/10 px-3 py-1 rounded-xl">
+                  CLO 3: Evaluate effective operational systems
+                </div>
+              </div>
+
+              {/* Sector Switcher Chips */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-xs font-bold text-slate-300 mr-1">
+                  Pilih Panduan Sektor Firma Anda:
+                </span>
+
+                {[
+                  { id: 'all', label: 'Semua Sektor (Universal)', icon: '🌐' },
+                  { id: 'perkhidmatan', label: 'Perkhidmatan (Services - IT, Perundingan, Bank)', icon: '🏢' },
+                  { id: 'pembarangan', label: 'Pembarangan (Merchandising - Runcit, Stor, FMCG)', icon: '🏪' },
+                  { id: 'perdagangan', label: 'Perdagangan & Pengedaran (Trade - Logistik, Borong)', icon: '💼' },
+                  { id: 'pembuatan', label: 'Pembuatan (Manufacturing - Kilang, Pemasangan)', icon: '🏭' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedIndustrySector(s.id as any)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 text-xs ${
+                      selectedIndustrySector === s.id
+                        ? 'bg-amber-400 text-slate-950 shadow-md font-black ring-2 ring-amber-300/40'
+                        : 'bg-white/10 hover:bg-white/20 text-blue-100'
+                    }`}
+                  >
+                    <span>{s.icon}</span>
+                    <span>{s.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Contextual Sector Guide Card based on selection */}
+              <div className="bg-white/10 rounded-2xl p-4 border border-white/10 text-xs space-y-2">
+                {selectedIndustrySector === 'perkhidmatan' ? (
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-1">
+                      🏢 Panduan Operasi Sektor Perkhidmatan (Services / IT / Agensi / Perundingan):
+                    </span>
+                    <p className="text-blue-100 text-[11px] leading-relaxed">
+                      Operasi dinilai menerusi <strong>aliran perkhidmatan (Service Blueprint / Customer Journey)</strong>, susun atur kaunter & pejabat, <strong>kapasiti staf profesional & masa respons (SLA)</strong>, amalan <strong>5S digital / sistem fail</strong>, pengurangan masa menunggu kelulusan, dan jaminan kualiti perkhidmatan kepada klien.
+                    </p>
+                  </div>
+                ) : selectedIndustrySector === 'pembarangan' ? (
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-1">
+                      🏪 Panduan Operasi Sektor Pembarangan (Merchandising / Stor / Runcit / FMCG):
+                    </span>
+                    <p className="text-blue-100 text-[11px] leading-relaxed">
+                      Operasi dinilai menerusi <strong>susunan rak jualan (planogram) & ruang stor simpanan</strong>, aliran penerimaan stok dari pembekal, <strong>had muatan inventori & staf juruwang waktu puncak</strong>, amalan <strong>5S stor & pelabelan harga</strong>, penyingkiran barangan luput/rosak (dead stock), dan kawalan kualiti barangan masuk.
+                    </p>
+                  </div>
+                ) : selectedIndustrySector === 'perdagangan' ? (
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-1">
+                      💼 Panduan Operasi Sektor Perdagangan & Pengedaran (Trade / Commerce / Logistik):
+                    </span>
+                    <p className="text-blue-100 text-[11px] leading-relaxed">
+                      Operasi dinilai menerusi <strong>susun atur hab gudang transit & stesen pembungkusan</strong>, laluan pantas barangan (cross-docking), <strong>kapasiti pemenuhan pesanan harian (order fulfillment throughput)</strong>, penjadualan armada pengangkutan, amalan <strong>5S laluan gudang</strong>, dan semakan ketepatan invois/pesanan keluar.
+                    </p>
+                  </div>
+                ) : selectedIndustrySector === 'pembuatan' ? (
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-1">
+                      🏭 Panduan Operasi Sektor Pembuatan & Kejuruteraan (Manufacturing / Production):
+                    </span>
+                    <p className="text-blue-100 text-[11px] leading-relaxed">
+                      Operasi dinilai menerusi <strong>susun atur lantai operasi kilang & sel kerja</strong>, aliran bahan mentah ke produk siap (Value Stream Mapping), <strong>kapasiti mesin & operator syif</strong>, amalan <strong>5S stesen kerja & 7 pembaziran (Muda)</strong>, serta kawalan kualiti statistik (SPC) dan pengurusan inventori JIT.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-1">
+                      🌐 Panduan Universal Merentas Semua Industri (Pembarangan, Perdagangan, Perkhidmatan & Pembuatan):
+                    </span>
+                    <p className="text-blue-100 text-[11px] leading-relaxed">
+                      Setiap minggu merangkumi 4 elemen teras operasi yang terpakai untuk semua jenis firma: <strong>Minggu 1:</strong> Susun atur ruang kerja & proses aliran kerja • <strong>Minggu 2:</strong> Kapasiti sumber, agihan giliran tugas & pengurusan masa • <strong>Minggu 3:</strong> Organisasi tempat kerja 5S, pengurangan pembaziran & kecekapan proses • <strong>Minggu 4:</strong> Pematuhan kualiti/SOP, kawalan inventori & penyelesaian kesesakan operasi • <strong>Minggu 5:</strong> Laporan kajian kes operasi & pembentangan akhir.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Cumulative Scorecard for Selected Student & Course */}
           {currentSelectedStudent && (() => {
             const totalWeeksInCourse = activeCourseSequenceItem.durationWeeks;
@@ -1656,6 +1768,13 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                               <span>Menunggu Penilaian Jurulatih</span>
                             </span>
                           )}
+
+                          {ev?.industrySector && (
+                            <span className="text-xs font-bold text-indigo-900 bg-indigo-100/90 px-2.5 py-0.5 rounded-lg border border-indigo-300 flex items-center gap-1 shadow-2xs">
+                              <span>{ev.industrySector === 'perkhidmatan' ? '🏢' : ev.industrySector === 'pembarangan' ? '🏪' : ev.industrySector === 'perdagangan' ? '💼' : ev.industrySector === 'pembuatan' ? '🏭' : '🌐'}</span>
+                              <span className="capitalize">{ev.industrySector}</span>
+                            </span>
+                          )}
                         </div>
 
                         {/* Action buttons */}
@@ -1737,6 +1856,51 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                           </div>
                         )}
 
+                        {/* Universal Sector Guides for Operations Management */}
+                        {w.sectorGuides && w.sectorGuides.length > 0 && (
+                          <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/60 to-purple-50/70 p-3.5 rounded-2xl border border-blue-200/70 space-y-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                              <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                                <span>🌐</span>
+                                <span>Panduan Universal Mengikut Sektor Industri (Pembarangan, Perdagangan, Perkhidmatan & Pembuatan):</span>
+                              </span>
+                              <span className="text-[10px] text-blue-700 font-bold bg-white px-2 py-0.5 rounded-full border border-blue-200 self-start sm:self-auto">
+                                Universal
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                              {w.sectorGuides.map((guide, gIdx) => {
+                                const isMatched = guide.sector === (ev?.industrySector || (selectedIndustrySector !== 'all' ? selectedIndustrySector : 'universal'));
+                                return (
+                                  <div 
+                                    key={gIdx} 
+                                    className={`p-2.5 rounded-xl border transition-all space-y-1 ${
+                                      isMatched 
+                                        ? 'bg-amber-50/90 border-amber-400 shadow-sm ring-1 ring-amber-400/50' 
+                                        : 'bg-white border-blue-100 shadow-2xs'
+                                    }`}
+                                  >
+                                    <div className="font-bold text-slate-800 flex items-center justify-between gap-1 text-[11px]">
+                                      <div className="flex items-center gap-1">
+                                        <span>{guide.icon}</span>
+                                        <span>{guide.sectorName.split(' ')[0]}</span>
+                                      </div>
+                                      {isMatched && (
+                                        <span className="text-[9px] font-black bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded">
+                                          Aktif
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-600 leading-tight">
+                                      {guide.applicationGuide}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* 3 Assessment Areas with Rubric Scores */}
                         <div className="space-y-2">
                           <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
@@ -1748,6 +1912,14 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                               const scoreVal = isEvaluated && ev?.weeklyScores 
                                 ? (aIdx === 0 ? ev.weeklyScores.area1 : aIdx === 1 ? ev.weeklyScores.area2 : ev.weeklyScores.area3)
                                 : null;
+
+                              const activeSector = ev?.industrySector || (selectedIndustrySector !== 'all' ? selectedIndustrySector : 'universal');
+                              const matchedGuide = w.sectorGuides?.find(g => g.sector === activeSector) || w.sectorGuides?.[0];
+                              const sectorNote = matchedGuide?.areaInterpretations ? (
+                                aIdx === 0 ? matchedGuide.areaInterpretations.area1 :
+                                aIdx === 1 ? matchedGuide.areaInterpretations.area2 :
+                                matchedGuide.areaInterpretations.area3
+                              ) : null;
 
                               return (
                                 <div
@@ -1766,6 +1938,11 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                     <div className="text-xs font-bold text-slate-800 leading-snug">
                                       {area.title}
                                     </div>
+                                    {sectorNote && (
+                                      <div className="mt-1.5 p-1.5 rounded-lg bg-blue-50/90 border border-blue-100 text-[10px] text-blue-900 leading-snug">
+                                        <span className="font-bold text-blue-700">🎯 {matchedGuide?.sectorName.split(' ')[0]}:</span> {sectorNote}
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between">
@@ -4217,6 +4394,83 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                 </div>
               )}
 
+              {/* Universal Industry Sector Adaptation Selector for Operations Management */}
+              {evaluatingWeekConfig.sectorGuides && evaluatingWeekConfig.sectorGuides.length > 0 && (
+                <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-4 sm:p-5 rounded-2xl border border-indigo-700/60 shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 bg-amber-400 text-slate-950 rounded-xl text-sm font-black shadow-xs">
+                        🌐
+                      </span>
+                      <div>
+                        <h5 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+                          <span>Sektor Industri Firma Penempatan Pelajar:</span>
+                          <span className="text-[10px] bg-emerald-500/30 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-400/40">
+                            Universal Terpakai Semua Industri
+                          </span>
+                        </h5>
+                        <p className="text-[11px] text-blue-200">
+                          Pilih sektor operasi firma anda bagi memaparkan panduan rubrik dan contoh bukti kerja yang disesuaikan secara khusus:
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sector Buttons */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                    {[
+                      { id: 'universal', label: 'Universal (Semua Sektor)', icon: '🌐' },
+                      { id: 'perkhidmatan', label: 'Perkhidmatan (Services/IT)', icon: '🏢' },
+                      { id: 'pembarangan', label: 'Pembarangan (Runcit/Stor)', icon: '🏪' },
+                      { id: 'perdagangan', label: 'Perdagangan (Logistik)', icon: '💼' },
+                      { id: 'pembuatan', label: 'Pembuatan (Kilang)', icon: '🏭' },
+                    ].map((sec) => (
+                      <button
+                        key={sec.id}
+                        type="button"
+                        onClick={() => setSelectedIndustrySector(sec.id as any)}
+                        className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border text-center ${
+                          selectedIndustrySector === sec.id
+                            ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md ring-2 ring-amber-300/40'
+                            : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/10'
+                        }`}
+                      >
+                        <span>{sec.icon}</span>
+                        <span className="truncate">{sec.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sector Guidance Callout */}
+                  {(() => {
+                    const matchedGuide = evaluatingWeekConfig.sectorGuides.find(s => s.sector === selectedIndustrySector) || evaluatingWeekConfig.sectorGuides[0];
+                    if (!matchedGuide) return null;
+
+                    return (
+                      <div className="bg-white/10 rounded-xl p-3 border border-white/10 text-xs space-y-2">
+                        <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
+                          <span>{matchedGuide.icon}</span>
+                          <span>Fokus Operasi Sektor: {matchedGuide.sectorName}</span>
+                        </div>
+                        <p className="text-[11px] text-blue-100 leading-relaxed">
+                          {matchedGuide.applicationGuide}
+                        </p>
+                        {matchedGuide.examples && matchedGuide.examples.length > 0 && (
+                          <div className="pt-1.5 border-t border-white/10 flex flex-wrap gap-1.5 items-center">
+                            <span className="text-[10px] text-slate-300 font-semibold">Contoh Bukti Operasi:</span>
+                            {matchedGuide.examples.map((ex, exIdx) => (
+                              <span key={exIdx} className="text-[10px] bg-white/15 text-blue-100 px-2 py-0.5 rounded-md border border-white/10">
+                                ✓ {ex}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
               {/* 3 Assessment Areas Rubric Scoring (12 Marks Max) */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -4237,16 +4491,29 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     else setWeeklyAreaScores(prev => ({ ...prev, area3: val }));
                   };
 
+                  const matchedSector = evaluatingWeekConfig.sectorGuides?.find(s => s.sector === selectedIndustrySector) || evaluatingWeekConfig.sectorGuides?.[0];
+                  const sectorAreaNote = matchedSector?.areaInterpretations ? (
+                    aIdx === 0 ? matchedSector.areaInterpretations.area1 :
+                    aIdx === 1 ? matchedSector.areaInterpretations.area2 :
+                    matchedSector.areaInterpretations.area3
+                  ) : null;
+
                   return (
                     <div key={area.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-0.5">
+                        <div className="space-y-1">
                           <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
                             Bidang {aIdx + 1} (Maks: 4 Markah)
                           </span>
                           <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
                             {area.title}
                           </h5>
+                          {sectorAreaNote && (
+                            <div className="mt-1 p-2 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-950 flex items-start gap-1.5">
+                              <span className="font-bold text-blue-700 shrink-0">🎯 Aplikasi Sektor {matchedSector?.sectorName.split(' ')[0]}:</span>
+                              <span className="leading-snug">{sectorAreaNote}</span>
+                            </div>
+                          )}
                         </div>
 
                         <span className={`text-xs font-black px-2.5 py-1 rounded-xl shrink-0 font-mono ${

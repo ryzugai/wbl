@@ -252,6 +252,7 @@ export interface StudentEvaluation {
   companyAddress?: string;
   courseCode: string;
   courseName: string;
+  industrySector?: 'perkhidmatan' | 'pembarangan' | 'perdagangan' | 'pembuatan' | 'universal';
   evaluationType?: EvaluationFormType;
   weekNumber?: number;
   startDate?: string;
