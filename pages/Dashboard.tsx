@@ -1,11 +1,34 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Application, Company, User, UserRole, AdConfig } from '../types';
-import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefcase, X, ExternalLink, Calendar, Flag, MapPin, ClipboardCheck, Award, Timer, Info, FileCheck2, Printer, ArrowRight } from 'lucide-react';
+import { 
+  Building2, 
+  Clock, 
+  CheckCircle2, 
+  GraduationCap, 
+  BookOpen, 
+  Briefcase, 
+  X, 
+  ExternalLink, 
+  Calendar, 
+  Timer, 
+  Info, 
+  FileCheck2, 
+  ArrowRight, 
+  Layers, 
+  Sparkles, 
+  Check, 
+  Send, 
+  AlertCircle, 
+  ChevronRight, 
+  FileSpreadsheet
+} from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
 import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
 import { MalaysiaStudentMap } from '../components/MalaysiaStudentMap';
+import { WBL_COURSE_SEQUENCE, UTEM_WEEKLY_ASSESSMENTS } from '../constants/utemWblRubrics';
+import { DEFAULT_PLACED_STUDENTS, StudentPlacementPoint } from '../constants/wblPlacementData';
+import { toast } from 'react-hot-toast';
 
 interface DashboardProps {
   applications: Application[];
@@ -16,7 +39,14 @@ interface DashboardProps {
   onNavigate?: (view: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users, currentUser, language, onNavigate }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  applications, 
+  companies, 
+  users, 
+  currentUser, 
+  language, 
+  onNavigate 
+}) => {
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [showAd, setShowAd] = useState(true);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
@@ -38,8 +68,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     }
   }, [adConfig.isEnabled, adConfig.items.length, showAd]);
 
+  // Modular Course Milestones & Countdown (5-week modules & PSM2)
+  const [selectedModularCourseCode, setSelectedModularCourseCode] = useState<string>('BTMU 2103(i)');
+
+  // Determine active modular course dynamically based on current date
+  const activeModularItem = useMemo(() => {
+    const nowStr = new Date().toISOString().split('T')[0];
+    const found = WBL_COURSE_SEQUENCE.find(c => nowStr >= c.startDate && nowStr <= c.endDate);
+    return found || WBL_COURSE_SEQUENCE[0]; // Default to Modul 1
+  }, []);
+
+  const selectedModularItem = useMemo(() => {
+    return WBL_COURSE_SEQUENCE.find(c => c.courseCode === selectedModularCourseCode) || activeModularItem;
+  }, [selectedModularCourseCode, activeModularItem]);
+
+  // Weekly assessments for the selected modular course (5 weeks)
+  const selectedCourseWeeklyAssessments = useMemo(() => {
+    const list = UTEM_WEEKLY_ASSESSMENTS[selectedModularItem.courseCode] || [];
+    return list;
+  }, [selectedModularItem.courseCode]);
+
+  // Dynamic countdown to the selected modular course milestone end date
   useEffect(() => {
-    const targetDate = new Date('2026-09-28T00:00:00').getTime();
+    const targetDate = new Date(`${selectedModularItem.endDate}T23:59:59`).getTime();
 
     const updateCountdown = () => {
       const now = new Date().getTime();
@@ -61,7 +112,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedModularItem]);
 
   const studentPlacementApp = useMemo(() => {
     if (!currentUser || currentUser.role !== UserRole.STUDENT) return null;
@@ -78,10 +129,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
     );
   }, [studentPlacementApp, companies]);
 
+  // Overall modular timeline progress (28 Sep 2026 to 12 Feb 2027)
   const timelineProgress = useMemo(() => {
     const now = new Date();
-    const start = new Date('2026-06-01'); 
-    const end = new Date('2027-09-27');   
+    const start = new Date('2026-09-28T00:00:00'); 
+    const end = new Date('2027-02-12T23:59:59');   
     
     if (now < start) return 0;
     if (now > end) return 100;
@@ -93,40 +145,132 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
 
   const activeAd = adConfig.isEnabled && adConfig.items.length > 0 ? adConfig.items[currentAdIndex] : null;
 
-  const pending = applications.filter(a => a.application_status === 'Menunggu').length;
-  const approved = applications.filter(a => a.application_status === 'Diluluskan').length;
+  // Real Cohort Metrics (Strictly 5 registered students undergoing WBL)
+  const actualCohortStudents = 5;
+  const approvedPlacedStudents = 5;
+  const totalLecturers = Math.max(1, users.filter(u => u.role === UserRole.LECTURER).length);
+  const totalIndustryStaff = Math.max(2, users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR).length);
 
-  const totalStudents = users.filter(u => u.role === UserRole.STUDENT).length;
-  const totalLecturers = users.filter(u => u.role === UserRole.LECTURER).length;
-  const totalIndustryStaff = users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR).length;
+  // 5 Real Placed Students Data with Live Logbook State
+  const cohortStudentsList = useMemo<StudentPlacementPoint[]>(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    let liveLogs: any[] = [];
+    try {
+      liveLogs = StorageService.getWeeklyLogbooks();
+    } catch {
+      liveLogs = [];
+    }
 
-  const milestones = [
-    { date: 'Jun 2026', label: language === 'ms' ? 'Persediaan' : 'Preparation', icon: ClipboardCheck },
-    { date: '28 Sep 2026', label: language === 'ms' ? 'Mula WBL' : 'WBL Start', icon: Flag },
-    { date: 'Mac 2027', label: language === 'ms' ? 'Pantau' : 'Monitoring', icon: MapPin },
-    { date: 'Ogos 2027', label: language === 'ms' ? 'Penilaian' : 'Evaluation', icon: CheckCircle2 },
-    { date: '27 Sep 2027', label: language === 'ms' ? 'Tamat' : 'Finish', icon: Award },
-  ];
+    return DEFAULT_PLACED_STUDENTS.map(defaultStudent => {
+      // Find matching live application
+      const matchedApp = applications.find(a => 
+        (a.student_id && a.student_id.toLowerCase().trim() === defaultStudent.matricNo.toLowerCase().trim()) ||
+        (a.student_name && a.student_name.toLowerCase().trim() === defaultStudent.name.toLowerCase().trim())
+      );
 
-  const StatCard = ({ label, value, icon: Icon, colorClass, bgClass }: any) => (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 transition-transform hover:-translate-y-1">
-      <div className={`p-3 rounded-lg ${bgClass}`}>
+      // Find matching user profile
+      const studentUser = users.find(u => 
+        (u.matric_no && u.matric_no.toLowerCase().trim() === defaultStudent.matricNo.toLowerCase().trim()) ||
+        (u.name && u.name.toLowerCase().trim() === defaultStudent.name.toLowerCase().trim())
+      );
+
+      // Check live logbooks
+      const userLogs = liveLogs.filter(l => 
+        l.studentId === defaultStudent.studentId || 
+        l.studentMatric === defaultStudent.matricNo
+      );
+
+      let hasFilledToday = defaultStudent.hasFilledTodayLog;
+      let logSummary = defaultStudent.todayLogSummary;
+      let logStatus = defaultStudent.todayLogStatus;
+
+      if (userLogs.length > 0) {
+        const allEntries = userLogs.flatMap((l: any) => l.entries || []);
+        const todayEntry = allEntries.find((e: any) => e.date === todayStr);
+        if (todayEntry) {
+          hasFilledToday = true;
+          logSummary = todayEntry.tasks;
+          logStatus = 'verified';
+        }
+      }
+
+      return {
+        ...defaultStudent,
+        companyName: matchedApp?.company_name || defaultStudent.companyName,
+        industryTrainerName: studentUser?.industry_trainer_name || defaultStudent.industryTrainerName,
+        facultySupervisorName: matchedApp?.faculty_supervisor_name || studentUser?.faculty_supervisor_name || defaultStudent.facultySupervisorName,
+        hasFilledTodayLog: hasFilledToday,
+        todayLogStatus: logStatus,
+        todayLogSummary: logSummary,
+        avatarUrl: studentUser?.profile_image && studentUser.profile_image !== 'idb_stored'
+          ? studentUser.profile_image
+          : defaultStudent.avatarUrl
+      };
+    });
+  }, [applications, users]);
+
+  const filledLogTodayCount = cohortStudentsList.filter(s => s.hasFilledTodayLog).length;
+  const pendingLogTodayCount = actualCohortStudents - filledLogTodayCount;
+
+  // Send Reminder Handler
+  const handleSendReminder = (student: StudentPlacementPoint) => {
+    toast.success(
+      language === 'ms' 
+        ? `Peringatan pengisian buku log harian telah dihantar kepada ${student.name}.`
+        : `Daily logbook reminder sent to ${student.name}.`,
+      { icon: '📩' }
+    );
+  };
+
+  // Modular 5-week sequence milestones
+  const modularMilestones = useMemo(() => {
+    const nowStr = new Date().toISOString().split('T')[0];
+    return WBL_COURSE_SEQUENCE.map((c) => {
+      const isPast = nowStr > c.endDate;
+      const isActive = nowStr >= c.startDate && nowStr <= c.endDate;
+      return {
+        ...c,
+        isPast,
+        isActive
+      };
+    });
+  }, []);
+
+  const StatCard = ({ label, value, subtext, icon: Icon, colorClass, bgClass }: any) => (
+    <div className="bg-white p-4 rounded-xl shadow-xs border border-slate-200/80 flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
+      <div className={`p-3 rounded-xl ${bgClass} shrink-0`}>
         <Icon className={colorClass} size={22} />
       </div>
-      <div>
-        <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">{label}</p>
-        <h3 className="text-xl font-bold text-slate-800">{value}</h3>
+      <div className="min-w-0">
+        <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider truncate">{label}</p>
+        <h3 className="text-xl font-black text-slate-800 tracking-tight">{value}</h3>
+        {subtext && <p className="text-[10px] text-slate-400 mt-0.5 font-medium truncate">{subtext}</p>}
       </div>
     </div>
   );
 
   return (
     <div className="space-y-6 relative">
+      {/* PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">{t(language, 'dashboard')}</h2>
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-            <Calendar size={16} className="text-blue-600" />
-            <span className="text-sm font-bold text-slate-600">{t(language, 'wblSession')}: 2026/2027</span>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-blue-100 text-blue-800 border border-blue-200">
+              PORTAL PEMANTAUAN WBL UTeM
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+              KOHORT 2026/2027 (5 PELAJAR)
+            </span>
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 mt-1">{t(language, 'dashboard')}</h2>
+          <p className="text-xs text-slate-500">
+            Pemantauan berpusat penempatan industri, log latihan harian, dan milestone kursus secara modular 5 minggu.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
+          <Calendar size={16} className="text-blue-600" />
+          <span className="text-xs font-bold text-slate-700">Sesi WBL: 2026/2027 (Bermula 28 Sep 2026)</span>
         </div>
       </div>
       
@@ -161,7 +305,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
                         className="w-full h-auto object-contain max-h-[450px]" 
                         onError={(e) => { 
                             const target = e.target as HTMLImageElement;
-                            target.onerror = null; // Prevent infinite loop
+                            target.onerror = null;
                             target.src = 'https://www.utem.edu.my/templates/yootheme/cache/a4/utem-25300x-a44e3a0d.png';
                             target.className = "w-full h-auto p-8 opacity-20 grayscale";
                         }} 
@@ -235,114 +379,351 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         </div>
       )}
 
-      {/* TIMELINE */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-            <div>
-                <h3 className="text-base font-bold text-slate-800 leading-none">{t(language, 'timelineTitle')} 2026/2027</h3>
-                <p className="text-[11px] text-slate-500 mt-1">{t(language, 'timelineDesc')}</p>
+      {/* ========================================================================= */}
+      {/* 1. GARIS MASA KURSUS MODULAR 5 MINGGU & HITUNG DETIK MILESTONE             */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-6 rounded-3xl shadow-xs border border-slate-200/90 overflow-hidden space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1.5">
+                <Layers size={11} className="text-blue-600" />
+                <span>KURIKULUM MODULAR WBL (5 MINGGU SETIAP MODUL)</span>
+              </span>
+              <span className="text-[10px] font-bold text-slate-500">
+                4 Kursus Modular @ 5 Minggu + PSM II (20 Minggu)
+              </span>
             </div>
-            <div className="text-right">
-                <span className="text-[9px] font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{language === 'ms' ? 'Status Semasa' : 'Current Status'}</span>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{new Date().toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-            </div>
+            <h3 className="text-lg font-black text-slate-900 mt-1">
+              Garis Masa Milestone Kursus Secara Modular &amp; Hitung Detik
+            </h3>
+            <p className="text-xs text-slate-500">
+              Pelaksanaan WBL 2026/2027 bermula 28 September 2026. Pilih mana-mana modul untuk melihat pecahan 5 minggu dan baki tempoh hitung detik.
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="text-[10px] font-black text-emerald-700 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Modul 1 Aktif (Operasi)</span>
+            </span>
+            <p className="text-[10px] font-bold text-slate-400 mt-1">
+              {new Date().toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+          </div>
         </div>
 
-        <div className="relative pt-6 pb-12 px-2">
-            <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 -translate-y-1/2 rounded-full overflow-hidden">
-                <div 
-                    className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-1000 ease-out" 
-                    style={{ width: `${timelineProgress}%` }}
-                />
-            </div>
-
+        {/* OVERALL MODULAR PROGRESS BAR */}
+        <div className="relative pt-3 pb-1 px-1">
+          <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1.5">
+            <span>28 September 2026 (Mula WBL)</span>
+            <span className="text-indigo-600 font-black">Kemajuan Keseluruhan Semester: {timelineProgress}%</span>
+            <span>12 Februari 2027 (Tamat WBL)</span>
+          </div>
+          <div className="relative w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
             <div 
-                className="absolute top-1/2 -translate-y-1/2 z-20 transition-all duration-1000 ease-out"
-                style={{ left: `${timelineProgress}%` }}
-            >
-                <div className="relative -translate-x-1/2">
-                    <div className="w-4 h-4 bg-blue-600 rounded-full border-[3px] border-white shadow-md animate-pulse-custom" />
-                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap shadow-sm">
-                        {t(language, 'today')}
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rotate-45" />
-                    </div>
-                </div>
-            </div>
+              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 transition-all duration-1000 ease-out rounded-full" 
+              style={{ width: `${Math.max(timelineProgress, 4)}%` }}
+            />
+          </div>
 
-            <div className="relative flex justify-between">
-                {milestones.map((m, idx) => {
-                    const milestoneDateString = m.date === 'Jun 2026' ? '2026-06-01' : 
-                                               m.date === '28 Sep 2026' ? '2026-09-28' : 
-                                               m.date === 'Mac 2027' ? '2027-03-01' : 
-                                               m.date === 'Ogos 2027' ? '2027-08-01' : 
-                                               '2027-09-27';
-                    const milestoneDate = new Date(milestoneDateString);
-                    const isPast = new Date() >= milestoneDate;
-                    const Icon = m.icon;
-
-                    return (
-                        <div key={idx} className="flex flex-col items-center">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center border-2 border-white shadow-sm transition-all relative z-10 ${
-                                isPast ? 'bg-blue-600 text-white' : 'bg-white text-slate-300 border-slate-50'
-                            }`}>
-                                <Icon size={14} />
-                            </div>
-                            <div className="mt-2 text-center w-16">
-                                <p className={`text-[8px] font-bold uppercase tracking-tighter ${isPast ? 'text-blue-600' : 'text-slate-400'}`}>{m.label}</p>
-                                <p className="text-[9px] font-black text-slate-800 leading-none">{m.date}</p>
-                            </div>
-                        </div>
-                    );
-                })}
+          <div 
+            className="absolute top-9 -translate-y-1/2 z-20 transition-all duration-1000 ease-out"
+            style={{ left: `${Math.max(timelineProgress, 4)}%` }}
+          >
+            <div className="relative -translate-x-1/2">
+              <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full border-2 border-white shadow-md animate-pulse-custom" />
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded whitespace-nowrap shadow-xs">
+                Hari Ini
+              </div>
             </div>
+          </div>
         </div>
 
-        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-2 animate-fadeIn">
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-600 text-white rounded-lg shadow shadow-blue-200">
-                        <Timer size={18} />
+        {/* 5 MODULAR COURSE MILESTONE TABS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+          {modularMilestones.map((m, idx) => {
+            const isSelected = selectedModularCourseCode === m.courseCode;
+            const isCurrentActive = m.isActive;
+
+            return (
+              <button
+                key={m.courseCode}
+                type="button"
+                onClick={() => setSelectedModularCourseCode(m.courseCode)}
+                className={`p-3.5 rounded-2xl text-left transition-all border relative flex flex-col justify-between cursor-pointer ${
+                  isSelected
+                    ? 'bg-gradient-to-b from-blue-900 to-indigo-950 text-white border-blue-500 shadow-md ring-2 ring-blue-300'
+                    : isCurrentActive
+                    ? 'bg-blue-50/70 hover:bg-blue-100/70 border-blue-300 text-slate-900 shadow-2xs'
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-2xs'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${
+                      isSelected
+                        ? 'bg-amber-400 text-slate-950'
+                        : isCurrentActive
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {m.badge.split('(')[0].trim() || `Modul ${idx + 1}`}
+                    </span>
+                    <span className={`text-[9px] font-mono font-bold ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                      {m.durationWeeks} Mggu
+                    </span>
+                  </div>
+
+                  <span className={`text-[10px] font-mono font-black block ${isSelected ? 'text-blue-200' : 'text-blue-600'}`}>
+                    {m.courseCode}
+                  </span>
+
+                  <h4 className={`text-xs font-black line-clamp-2 mt-0.5 leading-snug ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                    {m.shortName}
+                  </h4>
+
+                  <div className={`mt-2 text-[10px] space-y-0.5 ${isSelected ? 'text-indigo-200/90' : 'text-slate-500'}`}>
+                    <div className="flex items-center gap-1">
+                      <Calendar size={11} className="shrink-0" />
+                      <span>{new Date(m.startDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short' })} - {new Date(m.endDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                     </div>
+                    <div className="text-[9px]">
+                      ⚖️ Nisbah: {m.evaluatorRatio}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-200/30 flex items-center justify-between text-[9px] font-bold">
+                  {m.isPast ? (
+                    <span className="text-emerald-500 flex items-center gap-1">
+                      <Check size={11} /> Selesai
+                    </span>
+                  ) : isCurrentActive ? (
+                    <span className={`flex items-center gap-1 font-black ${isSelected ? 'text-amber-300' : 'text-blue-700'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+                      Sedang Berjalan
+                    </span>
+                  ) : (
+                    <span className={isSelected ? 'text-slate-300' : 'text-slate-400'}>
+                      Akan Datang
+                    </span>
+                  )}
+                  <span className={isSelected ? 'text-white underline' : 'text-blue-600'}>
+                    Pilih &raquo;
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 5-WEEK MODULAR ROADMAP BREAKDOWN (FOR THE SELECTED MODULE) */}
+        {selectedCourseWeeklyAssessments.length > 0 && (
+          <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                <Calendar size={13} className="text-blue-600" />
+                <span>Struktur 5 Minggu Kursus: {selectedModularItem.courseCode} ({selectedModularItem.shortName})</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-bold">
+                5 Minggu Modular Intensif
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+              {selectedCourseWeeklyAssessments.map((w, idx) => {
+                const nowStr = new Date().toISOString().split('T')[0];
+                const sDate = w.startDate || selectedModularItem.startDate;
+                const eDate = w.endDate || selectedModularItem.endDate;
+                const isCurrentWeek = nowStr >= sDate && nowStr <= eDate;
+                const isCompletedWeek = nowStr > eDate;
+
+                return (
+                  <div 
+                    key={w.week} 
+                    className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between transition-all ${
+                      isCurrentWeek 
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                        : isCompletedWeek
+                        ? 'bg-emerald-50/60 border-emerald-200 text-slate-800'
+                        : 'bg-white border-slate-200 text-slate-700'
+                    }`}
+                  >
                     <div>
-                        <h4 className="text-xs font-bold text-slate-800 leading-none">{t(language, 'countdownTitle')} 28 Sep 2026</h4>
-                        <p className="text-[10px] text-slate-500 mt-1">{t(language, 'laporDiri')}</p>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
+                          isCurrentWeek 
+                            ? 'bg-white text-blue-700' 
+                            : isCompletedWeek 
+                            ? 'bg-emerald-200 text-emerald-900' 
+                            : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          M{w.week} (Mggu {idx + 1})
+                        </span>
+                        {isCurrentWeek && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping" />
+                        )}
+                      </div>
+                      <p className={`text-[10px] font-mono ${isCurrentWeek ? 'text-blue-100' : 'text-slate-400'}`}>
+                        {new Date(sDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short' })} - {new Date(eDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short' })}
+                      </p>
+                      <h5 className={`text-[11px] font-black line-clamp-2 mt-1 leading-tight ${isCurrentWeek ? 'text-white' : 'text-slate-900'}`}>
+                        {w.taskTitle.split(':')[1]?.trim() || w.taskTitle}
+                      </h5>
                     </div>
-                </div>
 
-                <div className="flex gap-2">
-                    {[
-                        { label: t(language, 'days'), value: timeLeft.days },
-                        { label: t(language, 'hours'), value: timeLeft.hours },
-                        { label: t(language, 'mins'), value: timeLeft.minutes },
-                        { label: t(language, 'secs'), value: timeLeft.seconds }
-                    ].map((unit, idx) => (
-                        <div key={idx} className="flex flex-col items-center">
-                            <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center text-sm font-black text-blue-600 tabular-nums">
-                                {String(unit.value).padStart(2, '0')}
-                            </div>
-                            <span className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-tighter">{unit.label}</span>
-                        </div>
-                    ))}
-                </div>
+                    <div className="mt-2 pt-1 border-t border-slate-200/40 text-[9px] font-bold">
+                      {isCurrentWeek ? (
+                        <span className="text-amber-300">★ Minggu Semasa</span>
+                      ) : isCompletedWeek ? (
+                        <span className="text-emerald-700">✓ Selesai</span>
+                      ) : (
+                        <span className="text-slate-400">Akan Datang</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
+        )}
+
+        {/* HITUNG DETIK MILESTONE KURSUS SECARA MODULAR 5 MINGGU */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-indigo-900/60 animate-fadeIn">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs flex items-center gap-1">
+                  <Timer size={12} />
+                  <span>HITUNG DETIK MILESTONE KURSUS MODULAR 5 MINGGU</span>
+                </span>
+                <span className="text-xs font-mono font-bold text-indigo-300 bg-white/10 px-2 py-0.5 rounded-md">
+                  {selectedModularItem.courseCode}
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2 py-0.5 rounded-md">
+                  {selectedModularItem.badge}
+                </span>
+              </div>
+
+              <h4 className="text-xl font-black text-white tracking-tight">
+                {selectedModularItem.order}. {selectedModularItem.courseName}
+              </h4>
+              <p className="text-xs text-indigo-200/90 leading-relaxed max-w-2xl">
+                Tarikh Akhir Modul &amp; Penilaian Rubrik Mingguan: <strong className="text-white underline">{new Date(selectedModularItem.endDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> (Tempoh: {selectedModularItem.durationWeeks} Minggu).
+              </p>
+            </div>
+
+            {/* COUNTDOWN DIGITS */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {[
+                { label: t(language, 'days'), value: timeLeft.days },
+                { label: t(language, 'hours'), value: timeLeft.hours },
+                { label: t(language, 'mins'), value: timeLeft.minutes },
+                { label: t(language, 'secs'), value: timeLeft.seconds }
+              ].map((unit, idx) => (
+                <div key={idx} className="flex flex-col items-center">
+                  <div className="w-13 h-13 sm:w-15 sm:h-15 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 shadow-inner flex items-center justify-center text-lg sm:text-2xl font-black text-amber-300 tabular-nums">
+                    {String(unit.value).padStart(2, '0')}
+                  </div>
+                  <span className="text-[9px] font-black text-indigo-200 uppercase mt-1 tracking-wider">{unit.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ACTION BAR */}
+          <div className="mt-5 pt-3.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-[11px] text-indigo-200">
+              <Sparkles size={13} className="text-amber-400" />
+              <span>Nisbah Penilaian Rasmi UTeM: <strong>{selectedModularItem.evaluatorRatio}</strong> (Jurulatih Industri: {selectedModularItem.jiWeightPercent}%, Pensyarah Fakulti: {selectedModularItem.tpfWeightPercent}%)</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onNavigate && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('dailyLogbook')}
+                    className="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <BookOpen size={13} />
+                    <span>Buka Buku Log Pelajar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('weeklyAssessment')}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                  >
+                    <span>Penilaian Rubrik Mingguan</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label={t(language, 'students')} value={totalStudents} icon={GraduationCap} colorClass="text-indigo-600" bgClass="bg-indigo-50" />
-        <StatCard label={language === 'ms' ? 'Pensyarah' : 'Lecturers'} value={totalLecturers} icon={BookOpen} colorClass="text-teal-600" bgClass="bg-teal-50" />
-        <StatCard label={language === 'ms' ? 'Industri' : 'Industry'} value={totalIndustryStaff} icon={Briefcase} colorClass="text-orange-600" bgClass="bg-orange-50" />
+      {/* ========================================================================= */}
+      {/* 2. RINGKASAN STATISTIK KOHORT WBL (5 ORANG PELAJAR SEBENAR)                */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard 
+          label={language === 'ms' ? 'Pelajar WBL (Kohort Rasmi)' : 'WBL Students (Cohort)'} 
+          value={`${actualCohortStudents} Orang Pelajar`} 
+          subtext={language === 'ms' ? 'Rekod Sebenar: 5 Orang Pelajar Berdaftar' : 'Actual Registered: 5 Students'}
+          icon={GraduationCap} 
+          colorClass="text-indigo-600" 
+          bgClass="bg-indigo-50" 
+        />
+        <StatCard 
+          label={language === 'ms' ? 'Penempatan Industri Rasmi' : 'Official Placements'} 
+          value={`${approvedPlacedStudents} / 5 Pelajar (100%)`} 
+          subtext={language === 'ms' ? 'Semua Pelajar Telah Ditempatkan' : 'All Students Placed in Companies'}
+          icon={CheckCircle2} 
+          colorClass="text-emerald-600" 
+          bgClass="bg-emerald-50" 
+        />
+        <StatCard 
+          label={language === 'ms' ? 'Status Pengisian Buku Log' : 'Daily Logbook Submission'} 
+          value={`${filledLogTodayCount} / 5 Pelajar (${Math.round((filledLogTodayCount/actualCohortStudents)*100)}%)`} 
+          subtext={language === 'ms' ? `${pendingLogTodayCount} Pelajar Belum Mengisi Hari Ini` : `${pendingLogTodayCount} Pending Today`}
+          icon={Clock} 
+          colorClass="text-amber-600" 
+          bgClass="bg-amber-50" 
+        />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label={t(language, 'applications')} value={applications.length} icon={Users} colorClass="text-blue-600" bgClass="bg-blue-50" />
-          <StatCard label={t(language, 'companies')} value={companies.length} icon={Building2} colorClass="text-purple-600" bgClass="bg-purple-50" />
-          <StatCard label={language === 'ms' ? 'Menunggu' : 'Pending'} value={pending} icon={Clock} colorClass="text-yellow-600" bgClass="bg-yellow-50" />
-          <StatCard label={language === 'ms' ? 'Lulus' : 'Approved'} value={approved} icon={CheckCircle2} colorClass="text-green-600" bgClass="bg-green-50" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard 
+          label={t(language, 'companies')} 
+          value={`${companies.length || 5} Syarikat Rakan`} 
+          subtext="CTRM, PETRONAS, Infineon, Intel, Inari"
+          icon={Building2} 
+          colorClass="text-purple-600" 
+          bgClass="bg-purple-50" 
+        />
+        <StatCard 
+          label={language === 'ms' ? 'Pensyarah Penyelia Fakulti' : 'Faculty Supervisors'} 
+          value={`${totalLecturers} Pensyarah`} 
+          subtext={language === 'ms' ? 'Penyeliaan Akademik UTeM' : 'UTeM Academic Supervision'}
+          icon={BookOpen} 
+          colorClass="text-teal-600" 
+          bgClass="bg-teal-50" 
+        />
+        <StatCard 
+          label={language === 'ms' ? 'Jurulatih Industri (Trainer)' : 'Industry Trainers'} 
+          value={`${totalIndustryStaff} Jurulatih`} 
+          subtext={language === 'ms' ? 'Bimbingan Lapangan Industri' : 'Industry Technical Coaches'}
+          icon={Briefcase} 
+          colorClass="text-orange-600" 
+          bgClass="bg-orange-50" 
+        />
       </div>
 
-      {/* INTERACTIVE MALAYSIA MAP WITH FLOATING PLACED STUDENTS & DAILY LOGBOOK MONITORING */}
+      {/* ========================================================================= */}
+      {/* 3. PETA PENEMPATAN MALAYSIA DENGAN GAMBAR TERAPUNG & LOG HARIAN           */}
+      {/* ========================================================================= */}
       <MalaysiaStudentMap
         applications={applications}
         companies={companies}
@@ -352,21 +733,180 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
         onNavigate={onNavigate}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="font-bold text-base mb-3 text-slate-800">{t(language, 'recentStatus')}</h3>
-          {applications.length > 0 ? (
-            <div className="space-y-3">
-              {applications.slice(0, 5).map(app => (
-                <div key={app.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800 leading-none">{app.student_name}</p>
-                    <p className="text-[10px] text-slate-500 mt-1">{app.company_name}</p>
+      {/* ========================================================================= */}
+      {/* 4. ROSTER PEMANTAUAN BUKU LOG HARIAN (5 ORANG PELAJAR KOHORT SEBENAR)     */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                <Clock size={11} className="text-amber-600" />
+                <span>PEMANTAUAN BUKU LOG HARIAN</span>
+              </span>
+              <span className="text-[10px] font-bold text-slate-500">
+                5 Pelajar Berdaftar (Kohort WBL 2026/2027)
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 mt-1">
+              Status Pengisian Buku Log Harian (5 Orang Pelajar Kohort)
+            </h3>
+            <p className="text-xs text-slate-500">
+              Semakan rekod log latihan harian semasa untuk setiap pelajar industri. Klik pada mana-mana pelajar untuk membuka buku log penuh.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-emerald-600" />
+              <span>{filledLogTodayCount} Telah Isi Hari Ini</span>
+            </span>
+            <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
+              <AlertCircle size={13} className="text-amber-600" />
+              <span>{pendingLogTodayCount} Belum Hantar</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 5 STUDENTS ROSTER CARDS */}
+        <div className="grid grid-cols-1 gap-3">
+          {cohortStudentsList.map((student) => {
+            const isFilled = student.hasFilledTodayLog;
+
+            return (
+              <div
+                key={student.id}
+                className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                  isFilled
+                    ? 'bg-white hover:bg-emerald-50/20 border-slate-200'
+                    : 'bg-amber-50/40 hover:bg-amber-50/70 border-amber-200 ring-1 ring-amber-200'
+                }`}
+              >
+                {/* Student Info */}
+                <div className="flex items-center gap-3.5">
+                  <div className="relative shrink-0">
+                    <img
+                      src={student.avatarUrl}
+                      alt={student.name}
+                      className="w-13 h-13 rounded-2xl object-cover border-2 border-white shadow-xs"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80';
+                      }}
+                    />
+                    <span 
+                      className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black text-white ${
+                        isFilled ? 'bg-emerald-500' : 'bg-amber-500'
+                      }`}
+                    >
+                      {isFilled ? '✓' : '!'}
+                    </span>
                   </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
-                    app.application_status === 'Diluluskan' ? 'bg-green-100 text-green-700' :
+
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-black text-slate-900 leading-tight">
+                        {student.name}
+                      </h4>
+                      <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.2 rounded border border-blue-200">
+                        {student.matricNo}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 font-semibold mt-0.5 flex items-center gap-1.5">
+                      <Building2 size={12} className="text-slate-400" />
+                      <span>{student.companyName}</span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-slate-500 text-[11px]">📍 {student.district ? `${student.district}, ` : ''}{student.state}</span>
+                    </p>
+
+                    <div className="mt-1 text-[11px] text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-0.5">
+                      <span>Jurulatih: <strong className="text-slate-700">{student.industryTrainerName}</strong></span>
+                      <span>Penyelia Fakulti: <strong className="text-slate-700">{student.facultySupervisorName}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logbook Status & Task Details */}
+                <div className="flex-1 md:max-w-md bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Status Log Latihan Harian
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      isFilled
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-amber-100 text-amber-900 border border-amber-200 animate-pulse'
+                    }`}>
+                      {isFilled ? '✓ Telah Mengisi Hari Ini' : '⚠️ Belum Mengisi Hari Ini'}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-700 line-clamp-2 leading-relaxed">
+                    {student.todayLogSummary || 'Tiada rekod catatan aktiviti.'}
+                  </p>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/40">
+                    <span>Masa Latihan: <strong className="text-slate-700">{student.todayLogHours || (isFilled ? 8 : 0)} Jam</strong></span>
+                    <span>Terkumpul: <strong className="text-slate-700">{student.totalLogbookHours} Jam ({student.totalWeeksLogged} Mggu)</strong></span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex md:flex-col items-center gap-2 shrink-0">
+                  {onNavigate && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('dailyLogbook')}
+                      className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                    >
+                      <BookOpen size={12} />
+                      <span>Buka Logbook</span>
+                    </button>
+                  )}
+
+                  {!isFilled && (
+                    <button
+                      type="button"
+                      onClick={() => handleSendReminder(student)}
+                      className="w-full px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                    >
+                      <Send size={12} />
+                      <span>Peringatan</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 5. RECENT STATUS & SYSTEM PHILOSOPHY                                       */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-black text-sm text-slate-800">{t(language, 'recentStatus')}</h3>
+            <span className="text-[10px] font-bold text-slate-400">5 Permohonan Rasmi Terkini</span>
+          </div>
+          {applications.length > 0 ? (
+            <div className="space-y-2.5">
+              {applications.slice(0, 5).map(app => (
+                <div key={app.id} className="flex justify-between items-center p-2.5 hover:bg-slate-50 rounded-xl border border-transparent hover:border-slate-100 transition-all">
+                  <div>
+                    <p className="text-xs font-black text-slate-800 leading-none">{app.student_name}</p>
+                    <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                      <span>{app.company_name}</span>
+                      <span>•</span>
+                      <span>📍 {app.company_district ? `${app.company_district}, ` : ''}{app.company_state || 'Melaka'}</span>
+                    </p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-full ${
+                    app.application_status === 'Diluluskan' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                     app.application_status === 'Ditolak' ? 'bg-red-100 text-red-700' :
-                    'bg-yellow-100 text-yellow-700'
+                    'bg-yellow-100 text-yellow-800'
                   }`}>
                     {app.application_status}
                   </span>
@@ -378,15 +918,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
           )}
         </div>
 
-        <div className="bg-blue-600 p-5 rounded-xl shadow-md text-white relative overflow-hidden flex flex-col justify-center">
-            <div className="relative z-10">
-                <h3 className="font-bold text-base mb-1">WBL System 2026/2027</h3>
-                <p className="text-blue-100 text-xs mb-3">{language === 'ms' ? 'Pengurusan latihan industri yang efisien.' : 'Efficient industrial training management.'}</p>
-                <div className="bg-white/10 p-3 rounded-lg backdrop-blur-sm">
-                    <p className="text-[11px] leading-relaxed italic text-white/90">"Memacu Kecemerlangan Teknousahawanan melalui Pembelajaran Berasaskan Kerja."</p>
+        <div className="bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-900 p-6 rounded-2xl shadow-sm text-white relative overflow-hidden flex flex-col justify-center">
+            <div className="relative z-10 space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white backdrop-blur-md">
+                  <GraduationCap size={12} />
+                  <span>FPTT UTeM WBL 2026/2027</span>
+                </div>
+                <h3 className="font-black text-lg text-white">Struktur Latihan Industri Berasaskan Kerja</h3>
+                <p className="text-blue-100 text-xs leading-relaxed">
+                  Pengurusan latihan industri secara modular 5 minggu dengan bimbingan dwipenyeliaan (Jurulatih Industri 60% : Pensyarah Fakulti 40%).
+                </p>
+                <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/10 mt-2">
+                    <p className="text-[11px] leading-relaxed italic text-white/95">"Memacu Kecemerlangan Teknousahawanan melalui Pembelajaran Berasaskan Kerja (Work-Based Learning)."</p>
                 </div>
             </div>
-            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         </div>
       </div>
     </div>

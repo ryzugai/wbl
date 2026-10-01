@@ -68,117 +68,93 @@ export const MalaysiaStudentMap: React.FC<MalaysiaStudentMapProps> = ({
   }, []);
 
   // Compute merged students list from applications/users OR default fallback placed students
+  // Guaranteed to represent strictly the 5 actual registered students cohort
   const studentPlacementPoints = useMemo<StudentPlacementPoint[]>(() => {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Find all approved applications
-    const approvedApps = applications.filter(a => a.application_status === 'Diluluskan');
-
-    if (approvedApps.length === 0) {
-      // Return default high-fidelity points synced with live logbooks
-      return DEFAULT_PLACED_STUDENTS.map(p => {
-        // Check if there is a live logbook for this student
-        const liveLogs = allWeeklyLogbooks.filter(l => l.studentId === p.studentId || l.studentMatric === p.matricNo);
-        if (liveLogs.length > 0) {
-          const allEntries: DailyLogEntry[] = liveLogs.flatMap(l => l.entries || []);
-          const todayEntry = allEntries.find(e => e.date === todayStr);
-          const latestEntry = allEntries.length > 0 ? allEntries[allEntries.length - 1] : null;
-
-          if (todayEntry) {
-            return {
-              ...p,
-              hasFilledTodayLog: true,
-              todayLogDate: todayEntry.date,
-              todayLogStatus: 'verified' as const,
-              todayLogSummary: todayEntry.tasks,
-              todayDepartment: todayEntry.department,
-              todayTools: todayEntry.toolsUsed,
-              todayLogHours: 8
-            };
-          } else if (latestEntry) {
-            return {
-              ...p,
-              todayLogSummary: `Entri terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 80)}...`
-            };
-          }
-        }
-        return p;
-      });
-    }
-
-    // Merge approved applications with user profiles & companies
-    const points: StudentPlacementPoint[] = approvedApps.map((app, idx) => {
-      const studentUser = users.find(u => 
-        (u.matric_no && u.matric_no === app.student_id) || 
-        (u.username && u.username === app.created_by) ||
-        (u.name && u.name.toLowerCase() === app.student_name.toLowerCase())
-      );
-
-      const comp = companies.find(c => 
-        c.company_name.toLowerCase().trim() === app.company_name.toLowerCase().trim()
-      );
-
-      const stateName = app.company_state || comp?.company_state || 'Melaka';
-      const districtName = app.company_district || comp?.company_district || '';
-      const address = comp?.company_address || `${districtName}, ${stateName}`;
-      const industry = comp?.company_industry || 'Teknologi & Perindustrian WBL';
-
-      // Check logbook status
-      const studentLogs = allWeeklyLogbooks.filter(l => 
-        l.studentId === (studentUser?.id || app.student_id) || 
-        l.studentMatric === (studentUser?.matric_no || app.student_id)
-      );
-      const allEntries = studentLogs.flatMap(l => l.entries || []);
-      const todayEntry = allEntries.find(e => e.date === todayStr);
-      const latestEntry = allEntries[allEntries.length - 1];
-
-      // If student has a today entry or is Faris/Aina/Amirul default points
-      const defaultMatch = DEFAULT_PLACED_STUDENTS.find(dp => 
-        dp.matricNo === (studentUser?.matric_no || app.student_id) ||
-        dp.name.toLowerCase().includes(app.student_name.toLowerCase()) ||
-        app.student_name.toLowerCase().includes(dp.name.toLowerCase())
-      );
-
-      const hasFilled = !!todayEntry || (defaultMatch ? defaultMatch.hasFilledTodayLog : (idx % 3 !== 1));
-      const logStatus = todayEntry ? 'verified' : (defaultMatch ? defaultMatch.todayLogStatus : (hasFilled ? 'submitted' : 'pending'));
-      const logSummary = todayEntry?.tasks || defaultMatch?.todayLogSummary || (hasFilled ? 'Melaksanakan modul operasi harian dan pengujian sistem bersama bimbingan jurulatih.' : 'Belum mengemukakan entri buku log harian untuk tarikh hari ini.');
-
-      const coords = getStudentCoordinatesByState(stateName, districtName, idx);
-
-      const avatar = studentUser?.profile_image && studentUser.profile_image !== 'idb_stored'
-        ? studentUser.profile_image
-        : defaultMatch?.avatarUrl || `https://images.unsplash.com/photo-${1530000000000 + (idx * 154321)}?auto=format&fit=crop&w=256&h=256&q=80`;
-
-      return {
-        id: `placement_pt_${app.id || idx}`,
-        studentId: studentUser?.id || `student_${idx}`,
-        name: studentUser?.name || app.student_name,
-        matricNo: studentUser?.matric_no || app.student_id || `B0321100${idx + 10}`,
-        program: studentUser?.program || app.student_program || 'Sarjana Muda Teknousahawanan (BTEC)',
-        email: studentUser?.email || app.student_email || 'pelajar@student.utem.edu.my',
-        phone: studentUser?.phone || '012-3456789',
-        avatarUrl: avatar,
-        companyName: app.company_name,
-        companyAddress: address,
-        state: stateName,
-        district: districtName,
-        industry: industry,
-        industryTrainerName: studentUser?.industry_trainer_name || defaultMatch?.industryTrainerName || 'Jurulatih Industri Berdaftar',
-        facultySupervisorName: app.faculty_supervisor_name || studentUser?.faculty_supervisor_name || 'Dr. Mohd Guzairy bin Abd Ghani',
-        mapCoordinates: defaultMatch?.mapCoordinates || coords,
-        hasFilledTodayLog: hasFilled,
-        todayLogDate: todayEntry?.date || todayStr,
-        todayLogStatus: logStatus,
-        todayLogSummary: logSummary,
-        todayLogHours: hasFilled ? 8 : 0,
-        todayDepartment: todayEntry?.department || defaultMatch?.todayDepartment || 'Bahagian Operasi & Latihan Amali',
-        todayTools: todayEntry?.toolsUsed || defaultMatch?.todayTools || 'Perisian Korporat, Portal Sistem WBL',
-        totalLogbookHours: defaultMatch?.totalLogbookHours || (hasFilled ? 240 : 180),
-        totalWeeksLogged: defaultMatch?.totalWeeksLogged || 6
-      };
+    // Deduplicate applications by unique student matric / username
+    const studentAppMap = new Map<string, Application>();
+    applications.forEach(app => {
+      const studentKey = (app.student_id || app.created_by || app.student_name).toLowerCase().trim();
+      const existing = studentAppMap.get(studentKey);
+      if (!existing) {
+        studentAppMap.set(studentKey, app);
+      } else if (app.application_status === 'Diluluskan' && existing.application_status !== 'Diluluskan') {
+        studentAppMap.set(studentKey, app);
+      }
     });
 
-    return points;
+    // Start with the 5 official real student records
+    return DEFAULT_PLACED_STUDENTS.map((defaultPoint) => {
+      // Check if student has an actual application in storage
+      const app = Array.from(studentAppMap.values()).find(a => 
+        (a.student_id && a.student_id.toLowerCase().trim() === defaultPoint.matricNo.toLowerCase().trim()) ||
+        (a.student_name && a.student_name.toLowerCase().trim() === defaultPoint.name.toLowerCase().trim()) ||
+        (a.created_by && defaultPoint.matricNo.toLowerCase().includes(a.created_by.toLowerCase()))
+      );
+
+      const studentUser = users.find(u => 
+        (u.matric_no && u.matric_no.toLowerCase().trim() === defaultPoint.matricNo.toLowerCase().trim()) ||
+        (u.name && u.name.toLowerCase().trim() === defaultPoint.name.toLowerCase().trim())
+      );
+
+      const comp = app ? companies.find(c => 
+        c.company_name.toLowerCase().trim() === app.company_name.toLowerCase().trim()
+      ) : undefined;
+
+      // Check live weekly logbook entries
+      const liveLogs = allWeeklyLogbooks.filter(l => 
+        l.studentId === defaultPoint.studentId || 
+        l.studentMatric === defaultPoint.matricNo ||
+        (studentUser && l.studentId === studentUser.id)
+      );
+
+      let hasTodayLog = defaultPoint.hasFilledTodayLog;
+      let todayLogDate = defaultPoint.todayLogDate;
+      let todayLogStatus = defaultPoint.todayLogStatus;
+      let todayLogSummary = defaultPoint.todayLogSummary;
+      let todayDept = defaultPoint.todayDepartment;
+      let todayTools = defaultPoint.todayTools;
+      let todayLogHours = defaultPoint.todayLogHours;
+
+      if (liveLogs.length > 0) {
+        const allEntries: DailyLogEntry[] = liveLogs.flatMap(l => l.entries || []);
+        const todayEntry = allEntries.find(e => e.date === todayStr);
+        const latestEntry = allEntries.length > 0 ? allEntries[allEntries.length - 1] : null;
+
+        if (todayEntry) {
+          hasTodayLog = true;
+          todayLogDate = todayEntry.date;
+          todayLogStatus = 'verified';
+          todayLogSummary = todayEntry.tasks;
+          todayDept = todayEntry.department;
+          todayTools = todayEntry.toolsUsed;
+          todayLogHours = 8;
+        } else if (latestEntry) {
+          todayLogSummary = `Entri harian terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 100)}`;
+        }
+      }
+
+      return {
+        ...defaultPoint,
+        companyName: app?.company_name || defaultPoint.companyName,
+        companyAddress: comp?.company_address || defaultPoint.companyAddress,
+        state: app?.company_state || comp?.company_state || defaultPoint.state,
+        district: app?.company_district || comp?.company_district || defaultPoint.district,
+        industryTrainerName: studentUser?.industry_trainer_name || defaultPoint.industryTrainerName,
+        facultySupervisorName: app?.faculty_supervisor_name || studentUser?.faculty_supervisor_name || defaultPoint.facultySupervisorName,
+        hasFilledTodayLog: hasTodayLog,
+        todayLogDate: todayLogDate,
+        todayLogStatus: todayLogStatus,
+        todayLogSummary: todayLogSummary,
+        todayDepartment: todayDept,
+        todayTools: todayTools,
+        todayLogHours: todayLogHours,
+        avatarUrl: studentUser?.profile_image && studentUser.profile_image !== 'idb_stored' 
+          ? studentUser.profile_image 
+          : defaultPoint.avatarUrl
+      };
+    });
   }, [applications, companies, users, allWeeklyLogbooks]);
 
   // Filtered students for display
