@@ -58,6 +58,8 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
   };
 
   useEffect(() => {
+    // Automatically disentangle any Hisham messages that were linked to Amirul
+    StorageService.disentangleHishamMessages().catch(() => {});
     loadConversations();
     const unsub = StorageService.subscribe(loadConversations);
     return () => unsub();
@@ -90,6 +92,68 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
   const activeConversation = useMemo(() => {
     return conversations.find(c => c.id === activeConversationId);
   }, [conversations, activeConversationId]);
+
+  // Check if active conversation has any unread incoming messages for currentUser
+  const isActiveUnread = useMemo(() => {
+    return messages.some(m => m.senderId !== currentUser.id && !(m.readBy || []).some(r => r.userId === currentUser.id));
+  }, [messages, currentUser.id]);
+
+  // Check if messages in active conversation include any from Hisham
+  const hasHishamMessages = useMemo(() => {
+    return messages.some(m => m.senderName && m.senderName.toLowerCase().includes('hisham'));
+  }, [messages]);
+
+  // Helper to format clean conversation title
+  const getConversationTitle = (conv: WBLConversation): string => {
+    if (conv.type === 'direct') {
+      const otherEntry = Object.entries(conv.participantNames || {}).find(([id]) => id !== currentUser.id);
+      if (otherEntry && otherEntry[1]) {
+        return otherEntry[1];
+      }
+    }
+    return conv.title;
+  };
+
+  const handleToggleActiveConversationRead = async () => {
+    if (!activeConversationId) return;
+    if (isActiveUnread) {
+      await StorageService.markConversationAsRead(activeConversationId, currentUser.id);
+      toast.success(language === 'ms' ? 'Perbualan dilabelkan sebagai telah dibaca.' : 'Conversation marked as read.');
+    } else {
+      await StorageService.markConversationAsUnread(activeConversationId, currentUser.id);
+      toast.success(language === 'ms' ? 'Perbualan dilabelkan sebagai belum dibaca.' : 'Conversation marked as unread.');
+    }
+    setMessages(StorageService.getWBLMessages(activeConversationId));
+    loadConversations();
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const count = await StorageService.markAllConversationsAsRead(currentUser.id);
+    if (activeConversationId) {
+      setMessages(StorageService.getWBLMessages(activeConversationId));
+    }
+    loadConversations();
+    toast.success(
+      language === 'ms' 
+        ? `${count > 0 ? `${count} mesej` : 'Semua mesej'} berjaya dilabelkan sebagai telah dibaca.` 
+        : 'All messages marked as read.'
+    );
+  };
+
+  const handleToggleSingleMessageRead = async (msg: WBLMessage) => {
+    const isRead = (msg.readBy || []).some(r => r.userId === currentUser.id);
+    if (isRead) {
+      await StorageService.markMessageAsUnread(msg.id, currentUser.id);
+      toast.success(language === 'ms' ? 'Mesej dilabelkan sebagai belum dibaca.' : 'Message marked as unread.');
+    } else {
+      await StorageService.markMessageAsRead(msg.id, currentUser.id);
+      toast.success(language === 'ms' ? 'Mesej dilabelkan sebagai telah dibaca.' : 'Message marked as read.');
+    }
+    if (activeConversationId) {
+      setMessages(StorageService.getWBLMessages(activeConversationId));
+    }
+    loadConversations();
+  };
 
   // Filtered conversations
   const filteredConversations = useMemo(() => {
@@ -348,6 +412,22 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
               />
             </div>
 
+            {/* Header of channels with Mark All Read button */}
+            <div className="flex items-center justify-between pb-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                {language === 'ms' ? 'Saluran Perbincangan' : 'Chat Channels'}
+              </span>
+              <button
+                type="button"
+                onClick={handleMarkAllAsRead}
+                className="px-2 py-0.5 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 flex items-center gap-1 transition-colors"
+                title={language === 'ms' ? "Tanda semua perbualan sebagai telah dibaca" : "Mark all as read"}
+              >
+                <CheckCheck size={12} />
+                <span>{language === 'ms' ? 'Tanda Semua Telah Baca' : 'Mark All Read'}</span>
+              </button>
+            </div>
+
             {/* Filter Tabs */}
             <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] font-bold">
               <button
@@ -412,6 +492,10 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
                 const isTrio = conv.type === 'student_trio';
                 const isGroup = conv.type === 'course_group';
 
+                const convMsgs = StorageService.getWBLMessages(conv.id);
+                const convUnreadCount = convMsgs.filter(m => m.senderId !== currentUser.id && !(m.readBy || []).some(r => r.userId === currentUser.id)).length;
+                const displayTitle = getConversationTitle(conv);
+
                 return (
                   <button
                     key={conv.id}
@@ -431,23 +515,55 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
                           ? 'bg-purple-100 text-purple-800'
                           : 'bg-indigo-100 text-indigo-800'
                       }`}>
-                        {isTrio ? <Users size={18} /> : isGroup ? <GraduationCap size={18} /> : conv.title.charAt(0)}
+                        {isTrio ? <Users size={18} /> : isGroup ? <GraduationCap size={18} /> : displayTitle.charAt(0)}
                       </div>
+                      {convUnreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-600 rounded-full border-2 border-white animate-pulse" />
+                      )}
                     </div>
 
                     <div className="flex-1 overflow-hidden space-y-1">
                       <div className="flex items-center justify-between gap-1">
                         <h4 className={`text-xs truncate font-black ${isSelected ? 'text-indigo-950' : 'text-slate-800'}`}>
-                          {conv.title}
+                          {displayTitle}
                         </h4>
-                        {conv.lastMessageAt && (
-                          <span className="text-[10px] text-slate-400 shrink-0 font-mono">
-                            {new Date(conv.lastMessageAt).toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit' })}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {convUnreadCount > 0 ? (
+                            <div className="flex items-center gap-1">
+                              <span className="px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-black text-[9px] shadow-2xs">
+                                {convUnreadCount} baru
+                              </span>
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await StorageService.markConversationAsRead(conv.id, currentUser.id);
+                                  if (activeConversationId === conv.id) {
+                                    setMessages(StorageService.getWBLMessages(conv.id));
+                                  }
+                                  loadConversations();
+                                  toast.success(language === 'ms' ? 'Perbualan dilabelkan sebagai telah dibaca.' : 'Conversation marked as read.');
+                                }}
+                                className="p-0.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                title={language === 'ms' ? "Label perbualan ini sebagai telah dibaca" : "Mark as read"}
+                              >
+                                <CheckCheck size={13} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[9px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                              <CheckCheck size={10} /> Dibaca
+                            </span>
+                          )}
+                          {conv.lastMessageAt && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(conv.lastMessageAt).toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {conv.relatedStudentName && (
+                      {conv.type === 'student_trio' && conv.relatedStudentName && (
                         <div className="text-[10px] text-indigo-700 font-semibold truncate flex items-center gap-1">
                           <span>Pelatih:</span>
                           <span className="underline">{conv.relatedStudentName}</span>
@@ -501,10 +617,16 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
                         {activeConversation.relatedCourseCode}
                       </span>
                     )}
+                    {activeConversation.type === 'student_trio' && activeConversation.relatedStudentName && (
+                      <span className="text-[10px] font-bold bg-amber-50 text-amber-900 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                        <span>Pelatih:</span>
+                        <span className="underline">{activeConversation.relatedStudentName}</span>
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="font-black text-sm text-slate-900">
-                    {activeConversation.title}
+                    {getConversationTitle(activeConversation)}
                   </h3>
 
                   {/* Active Participants Display with Role Badges */}
@@ -525,7 +647,48 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {/* Separate Hisham messages button if found in another chat */}
+                  {hasHishamMessages && activeConversation.id !== 'conv_direct_hisham' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await StorageService.disentangleHishamMessages();
+                        toast.success(
+                          language === 'ms' 
+                            ? 'Mesej En. Hisham berjaya diasingkan ke saluran Mesej Terus beliau.' 
+                            : "Hisham's messages separated into his Direct channel."
+                        );
+                        setActiveConversationId(res.conversationId);
+                        loadConversations();
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-colors"
+                      title={language === 'ms' ? 'Asingkan mesej En. Hisham ke saluran perbualan terus beliau' : 'Separate Hisham messages into direct chat'}
+                    >
+                      <Sparkles size={14} />
+                      <span>{language === 'ms' ? 'Asingkan Mesej Hisham' : 'Separate Hisham Chat'}</span>
+                    </button>
+                  )}
+
+                  {/* Mark Conversation Read / Unread Button */}
+                  <button
+                    type="button"
+                    onClick={handleToggleActiveConversationRead}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs ${
+                      isActiveUnread
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white ring-2 ring-blue-300'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                    title={isActiveUnread ? 'Label semua mesej sebagai telah dibaca' : 'Label perbualan sebagai belum dibaca'}
+                  >
+                    <CheckCheck size={14} className={isActiveUnread ? 'text-white' : 'text-emerald-600'} />
+                    <span>
+                      {isActiveUnread
+                        ? (language === 'ms' ? '✓ Label Telah Baca' : '✓ Mark as Read')
+                        : (language === 'ms' ? 'Tanda Belum Baca' : 'Mark Unread')}
+                    </span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -558,6 +721,7 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
                     const isMe = msg.senderId === currentUser.id;
                     const isMsgTrainer = msg.senderRole === UserRole.TRAINER;
                     const isMsgSupervisor = msg.senderRole === UserRole.SUPERVISOR || msg.senderRole === UserRole.LECTURER;
+                    const isReadByMe = (msg.readBy || []).some(r => r.userId === currentUser.id);
 
                     return (
                       <div 
@@ -592,15 +756,42 @@ export const WBLMessaging: React.FC<WBLMessagingProps> = ({
                           <p className="whitespace-pre-line">{msg.content}</p>
                         </div>
 
-                        {/* Timestamp & Read Checkmark */}
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400 px-1 font-mono">
+                        {/* Timestamp & Read / Unread Status Button */}
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 px-1 font-mono">
                           <span>
                             {new Date(msg.createdAt).toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {isMe && (
-                            <span title="Dihantar" className="text-indigo-600 font-bold">
-                              ✓✓
+                          {isMe ? (
+                            <span title="Dihantar" className="text-indigo-600 font-bold flex items-center gap-0.5">
+                              <CheckCheck size={12} />
+                              <span className="text-[9px] font-sans">
+                                {(msg.readBy || []).length > 1 ? 'Dibaca' : 'Dihantar'}
+                              </span>
                             </span>
+                          ) : (
+                            <div className="flex items-center gap-1 font-sans">
+                              {isReadByMe ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSingleMessageRead(msg)}
+                                  className="inline-flex items-center gap-1 text-[9px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold transition-colors"
+                                  title={language === 'ms' ? 'Telah dibaca. Klik untuk tanda belum dibaca.' : 'Read. Click to mark unread.'}
+                                >
+                                  <CheckCheck size={11} className="text-emerald-600" />
+                                  <span>{language === 'ms' ? 'Telah Dibaca' : 'Read'}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSingleMessageRead(msg)}
+                                  className="inline-flex items-center gap-1 text-[9px] text-white bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded font-bold shadow-xs transition-all animate-pulse"
+                                  title={language === 'ms' ? 'Klik untuk label mesej ini sebagai telah dibaca' : 'Click to label as read'}
+                                >
+                                  <CheckCheck size={11} />
+                                  <span>{language === 'ms' ? 'Label Telah Baca' : 'Mark Read'}</span>
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

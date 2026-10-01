@@ -232,6 +232,113 @@ const cleanAndMigrateLocalStorage = async () => {
     }
   } catch {}
 
+  // Disentangle and fix any messages from Hisham that were linked to Muhamad Amirul bin Razali
+  try {
+    const rawConvs = localStorage.getItem(STORAGE_KEYS.WBL_CONVERSATIONS);
+    const rawMsgs = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let convs: WBLConversation[] = rawConvs ? JSON.parse(rawConvs) : [];
+    let msgs: WBLMessage[] = rawMsgs ? JSON.parse(rawMsgs) : [];
+    let convsModified = false;
+    let msgsModified = false;
+
+    // 1. Find if there are messages from Hisham
+    const hishamMsgs = msgs.filter(m => 
+      (m.senderName && m.senderName.toLowerCase().includes('hisham')) ||
+      m.senderId === 'hisham_trainer' || m.senderId === 'hisham'
+    );
+
+    // Ensure a dedicated direct conversation for Hisham exists
+    let hishamConv = convs.find(c => c.id === 'conv_direct_hisham' || (
+      c.type === 'direct' && Object.values(c.participantNames || {}).some(n => n.toLowerCase().includes('hisham'))
+    ));
+
+    if (hishamMsgs.length > 0) {
+      if (!hishamConv) {
+        const now = new Date().toISOString();
+        const latestHishamMsg = hishamMsgs[hishamMsgs.length - 1];
+        hishamConv = {
+          id: 'conv_direct_hisham',
+          type: 'direct',
+          title: 'En. Hisham & Dr. Mohd Guzairy',
+          participantIds: ['hisham_trainer', 'coordinator_guzairy', 'coordinator'],
+          participantRoles: {
+            'hisham_trainer': UserRole.TRAINER,
+            'coordinator_guzairy': UserRole.COORDINATOR,
+            'coordinator': UserRole.COORDINATOR
+          },
+          participantNames: {
+            'hisham_trainer': latestHishamMsg.senderName || 'En. Hisham bin Ahmad',
+            'coordinator_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani',
+            'coordinator': 'Penyelaras WBL FPTT'
+          },
+          participantCompanies: {
+            'hisham_trainer': latestHishamMsg.senderCompany || 'Industri Rakan WBL',
+            'coordinator_guzairy': 'FPTT UTeM',
+            'coordinator': 'Penyelaras WBL FPTT'
+          },
+          lastMessageSnippet: latestHishamMsg.content.slice(0, 80),
+          lastMessageAt: latestHishamMsg.createdAt || now,
+          lastSenderName: latestHishamMsg.senderName,
+          createdAt: hishamMsgs[0]?.createdAt || now,
+          updatedAt: latestHishamMsg.createdAt || now
+        };
+        convs.unshift(hishamConv);
+        convsModified = true;
+      }
+
+      // Check each Hisham message: if it is pointing to a conversation that is associated with "Amirul" or "Razali", or is in a trio/group where it got stuck
+      msgs.forEach(m => {
+        const isFromHisham = m.senderName && m.senderName.toLowerCase().includes('hisham');
+        if (isFromHisham && m.conversationId !== hishamConv?.id) {
+          const parentConv = convs.find(c => c.id === m.conversationId);
+          const isStuckWithAmirul = parentConv && (
+            (parentConv.title && (parentConv.title.includes('Amirul') || parentConv.title.includes('Razali'))) ||
+            (parentConv.relatedStudentName && (parentConv.relatedStudentName.includes('Amirul') || parentConv.relatedStudentName.includes('Razali')))
+          );
+          if (isStuckWithAmirul || parentConv?.id === 'conv_trio_faris') {
+            m.conversationId = hishamConv!.id;
+            msgsModified = true;
+          }
+        }
+      });
+    }
+
+    // 2. Clean up any conversation that had "aaron" or broken substitutions
+    convs.forEach(c => {
+      if (c.relatedStudentName === 'aaron') {
+        c.relatedStudentName = 'Muhammad Faris bin Rosli';
+        convsModified = true;
+      }
+      // If a Direct conversation has relatedStudentName, remove it (direct chats must not show "Pelatih: ...")
+      if (c.type === 'direct' && c.relatedStudentName) {
+        c.relatedStudentName = undefined;
+        c.relatedStudentId = undefined;
+        c.relatedStudentMatric = undefined;
+        convsModified = true;
+      }
+      // If a conversation is titled or involves Hisham, ensure it doesn't have relatedStudentName of Amirul
+      const mentionsHisham = (c.title && c.title.toLowerCase().includes('hisham')) ||
+        Object.values(c.participantNames || {}).some(n => n.toLowerCase().includes('hisham'));
+      if (mentionsHisham && c.relatedStudentName && (c.relatedStudentName.includes('Amirul') || c.relatedStudentName.includes('Razali'))) {
+        c.relatedStudentName = undefined;
+        c.type = 'direct';
+        c.title = 'En. Hisham & Penyelaras WBL';
+        convsModified = true;
+      }
+    });
+
+    if (convsModified) {
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, convs);
+      inMemoryConversations = convs;
+    }
+    if (msgsModified) {
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, msgs);
+      inMemoryMessages = msgs;
+    }
+  } catch (e) {
+    console.warn('Disentangle Hisham and Amirul messages error:', e);
+  }
+
   try {
     const rawActs = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
     if (rawActs) {
@@ -391,6 +498,12 @@ const setupRealtimeListeners = () => {
           safeSaveLocalStorage(storageKey, data);
         } else if (colName === 'weekly_logbooks') {
           inMemoryLogbooks = data as WeeklyLogbook[];
+          safeSaveLocalStorage(storageKey, data);
+        } else if (colName === 'wbl_conversations') {
+          inMemoryConversations = data as WBLConversation[];
+          safeSaveLocalStorage(storageKey, data);
+        } else if (colName === 'wbl_messages') {
+          inMemoryMessages = data as WBLMessage[];
           safeSaveLocalStorage(storageKey, data);
         } else {
           safeSaveLocalStorage(storageKey, data);
@@ -3300,6 +3413,62 @@ export const StorageService = {
             updatedAt: d1
           },
           {
+            id: 'conv_direct_hisham',
+            type: 'direct',
+            title: 'En. Hisham & Dr. Mohd Guzairy',
+            participantIds: ['hisham_trainer', 'coordinator_guzairy', 'coordinator'],
+            participantRoles: {
+              'hisham_trainer': UserRole.TRAINER,
+              'coordinator_guzairy': UserRole.COORDINATOR,
+              'coordinator': UserRole.COORDINATOR
+            },
+            participantNames: {
+              'hisham_trainer': 'En. Hisham bin Ahmad',
+              'coordinator_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani',
+              'coordinator': 'Penyelaras WBL FPTT'
+            },
+            participantCompanies: {
+              'hisham_trainer': 'CTRM Aerostructures Sdn Bhd',
+              'coordinator_guzairy': 'FPTT UTeM',
+              'coordinator': 'Penyelaras WBL FPTT'
+            },
+            lastMessageSnippet: 'Salam Dr. Guzairy, saya telah menyemak perkembangan modul latihan industri minggu ini. Penilaian rubrik akan dikemukakan hari ini.',
+            lastMessageAt: d1,
+            lastSenderName: 'En. Hisham bin Ahmad',
+            createdAt: d3,
+            updatedAt: d1
+          },
+          {
+            id: 'conv_trio_amirul',
+            type: 'student_trio',
+            title: 'Perbincangan Pelatih - Muhamad Amirul bin Razali (PETRONAS Digital)',
+            participantIds: ['trainer_azman', 'coordinator', 'supervisor_guzairy'],
+            participantRoles: {
+              'trainer_azman': UserRole.TRAINER,
+              'coordinator': UserRole.COORDINATOR,
+              'supervisor_guzairy': UserRole.SUPERVISOR
+            },
+            participantNames: {
+              'trainer_azman': 'En. Azman bin Khalid',
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani'
+            },
+            participantCompanies: {
+              'trainer_azman': 'PETRONAS Digital Sdn Bhd',
+              'coordinator': 'Penyelaras WBL FPTT',
+              'supervisor_guzairy': 'FPTT UTeM'
+            },
+            relatedStudentId: 'student_amirul',
+            relatedStudentName: 'Muhamad Amirul bin Razali',
+            relatedStudentMatric: 'B032110099',
+            relatedCourseCode: 'BTMT 3273(i)',
+            lastMessageSnippet: 'Buku log latihan amali industri Muhamad Amirul bagi minggu ke-4 telah disahkan oleh jurulatih syarikat.',
+            lastMessageAt: d2,
+            lastSenderName: 'En. Azman bin Khalid',
+            createdAt: d4,
+            updatedAt: d2
+          },
+          {
             id: 'conv_direct_infineon',
             type: 'direct',
             title: 'Pn. Norhafizah (Infineon) & Dr. Mohd Guzairy',
@@ -3316,7 +3485,6 @@ export const StorageService = {
               'trainer_norhafizah': 'Infineon Technologies (Malaysia) Sdn Bhd',
               'coordinator': 'FPTT UTeM'
             },
-            relatedStudentName: 'Nur Aina Farhana binti Zulkifli',
             relatedCourseCode: 'BTMT 3283(i)',
             lastMessageSnippet: 'Markah rubrik 88% telah saya sahkan dalam sistem dan slip rasmi telah dijana.',
             lastMessageAt: d2,
@@ -3497,6 +3665,28 @@ export const StorageService = {
             content: 'Terima kasih Pn. Norhafizah. Markah rubrik 88% telah saya sahkan dalam sistem dan slip rasmi telah dijana.',
             createdAt: t2,
             readBy: [{ userId: 'coordinator', readAt: t2 }]
+          },
+          {
+            id: 'msg_hisham_1',
+            conversationId: 'conv_direct_hisham',
+            senderId: 'hisham_trainer',
+            senderName: 'En. Hisham bin Ahmad',
+            senderRole: UserRole.TRAINER,
+            senderCompany: 'CTRM Aerostructures Sdn Bhd',
+            content: 'Salam Dr. Guzairy, saya telah menyemak perkembangan modul latihan industri minggu ini. Penilaian rubrik akan dikemukakan hari ini.',
+            createdAt: t1,
+            readBy: [{ userId: 'hisham_trainer', readAt: t1 }]
+          },
+          {
+            id: 'msg_amirul_1',
+            conversationId: 'conv_trio_amirul',
+            senderId: 'trainer_azman',
+            senderName: 'En. Azman bin Khalid',
+            senderRole: UserRole.TRAINER,
+            senderCompany: 'PETRONAS Digital Sdn Bhd',
+            content: 'Salam Dr. Guzairy, buku log latihan amali industri Muhamad Amirul bagi minggu ke-4 telah disahkan oleh pihak pengurusan.',
+            createdAt: t2,
+            readBy: [{ userId: 'trainer_azman', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
           }
         ];
         safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, all);
@@ -3594,16 +3784,19 @@ export const StorageService = {
 
     const now = new Date().toISOString();
     let hasChanges = false;
+    const modifiedMsgs: WBLMessage[] = [];
 
     const updated = all.map(m => {
       if (m.conversationId === conversationId && m.senderId !== userId) {
         const alreadyRead = (m.readBy || []).some(r => r.userId === userId);
         if (!alreadyRead) {
           hasChanges = true;
-          return {
+          const up: WBLMessage = {
             ...m,
             readBy: [...(m.readBy || []), { userId, readAt: now }]
           };
+          modifiedMsgs.push(up);
+          return up;
         }
       }
       return m;
@@ -3613,7 +3806,301 @@ export const StorageService = {
       inMemoryMessages = updated;
       safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, updated);
       notifyListeners();
+
+      if (db) {
+        for (const m of modifiedMsgs) {
+          try {
+            await setDoc(doc(db, 'wbl_messages', m.id), sanitizeForFirebase(m), { merge: true });
+          } catch (e) {
+            console.warn('Firebase sync read status notice:', e);
+          }
+        }
+      }
     }
+  },
+
+  markConversationAsUnread: async (conversationId: string, userId: string): Promise<void> => {
+    const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let all: WBLMessage[] = [];
+    if (raw) {
+      try { all = JSON.parse(raw); } catch {}
+    }
+    if (all.length === 0) all = inMemoryMessages;
+
+    let hasChanges = false;
+    const modifiedMsgs: WBLMessage[] = [];
+
+    const updated = all.map(m => {
+      if (m.conversationId === conversationId && m.senderId !== userId) {
+        const hasMyRead = (m.readBy || []).some(r => r.userId === userId);
+        if (hasMyRead) {
+          hasChanges = true;
+          const up: WBLMessage = {
+            ...m,
+            readBy: (m.readBy || []).filter(r => r.userId !== userId)
+          };
+          modifiedMsgs.push(up);
+          return up;
+        }
+      }
+      return m;
+    });
+
+    if (hasChanges) {
+      inMemoryMessages = updated;
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, updated);
+      notifyListeners();
+
+      if (db) {
+        for (const m of modifiedMsgs) {
+          try {
+            await setDoc(doc(db, 'wbl_messages', m.id), sanitizeForFirebase(m), { merge: true });
+          } catch {}
+        }
+      }
+    }
+  },
+
+  markMessageAsRead: async (messageId: string, userId: string): Promise<void> => {
+    const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let all: WBLMessage[] = [];
+    if (raw) {
+      try { all = JSON.parse(raw); } catch {}
+    }
+    if (all.length === 0) all = inMemoryMessages;
+
+    const now = new Date().toISOString();
+    let hasChanges = false;
+    let targetMsg: WBLMessage | null = null;
+
+    const updated = all.map(m => {
+      if (m.id === messageId) {
+        const alreadyRead = (m.readBy || []).some(r => r.userId === userId);
+        if (!alreadyRead) {
+          hasChanges = true;
+          targetMsg = {
+            ...m,
+            readBy: [...(m.readBy || []), { userId, readAt: now }]
+          };
+          return targetMsg;
+        }
+      }
+      return m;
+    });
+
+    if (hasChanges && targetMsg) {
+      inMemoryMessages = updated;
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, updated);
+      notifyListeners();
+
+      if (db) {
+        try {
+          await setDoc(doc(db, 'wbl_messages', (targetMsg as WBLMessage).id), sanitizeForFirebase(targetMsg), { merge: true });
+        } catch {}
+      }
+    }
+  },
+
+  markMessageAsUnread: async (messageId: string, userId: string): Promise<void> => {
+    const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let all: WBLMessage[] = [];
+    if (raw) {
+      try { all = JSON.parse(raw); } catch {}
+    }
+    if (all.length === 0) all = inMemoryMessages;
+
+    let hasChanges = false;
+    let targetMsg: WBLMessage | null = null;
+
+    const updated = all.map(m => {
+      if (m.id === messageId) {
+        const hasMyRead = (m.readBy || []).some(r => r.userId === userId);
+        if (hasMyRead) {
+          hasChanges = true;
+          targetMsg = {
+            ...m,
+            readBy: (m.readBy || []).filter(r => r.userId !== userId)
+          };
+          return targetMsg;
+        }
+      }
+      return m;
+    });
+
+    if (hasChanges && targetMsg) {
+      inMemoryMessages = updated;
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, updated);
+      notifyListeners();
+
+      if (db) {
+        try {
+          await setDoc(doc(db, 'wbl_messages', (targetMsg as WBLMessage).id), sanitizeForFirebase(targetMsg), { merge: true });
+        } catch {}
+      }
+    }
+  },
+
+  disentangleHishamMessages: async (): Promise<{ count: number; conversationId: string }> => {
+    const rawConvs = localStorage.getItem(STORAGE_KEYS.WBL_CONVERSATIONS);
+    const rawMsgs = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let convs: WBLConversation[] = rawConvs ? JSON.parse(rawConvs) : inMemoryConversations;
+    let msgs: WBLMessage[] = rawMsgs ? JSON.parse(rawMsgs) : inMemoryMessages;
+    let movedCount = 0;
+
+    // Find dedicated Hisham conversation or create one
+    let hishamConv = convs.find(c => c.id === 'conv_direct_hisham' || (
+      c.type === 'direct' && Object.values(c.participantNames || {}).some(n => n.toLowerCase().includes('hisham'))
+    ));
+
+    const now = new Date().toISOString();
+    if (!hishamConv) {
+      hishamConv = {
+        id: 'conv_direct_hisham',
+        type: 'direct',
+        title: 'En. Hisham & Dr. Mohd Guzairy',
+        participantIds: ['hisham_trainer', 'coordinator_guzairy', 'coordinator'],
+        participantRoles: {
+          'hisham_trainer': UserRole.TRAINER,
+          'coordinator_guzairy': UserRole.COORDINATOR,
+          'coordinator': UserRole.COORDINATOR
+        },
+        participantNames: {
+          'hisham_trainer': 'En. Hisham bin Ahmad',
+          'coordinator_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani',
+          'coordinator': 'Penyelaras WBL FPTT'
+        },
+        participantCompanies: {
+          'hisham_trainer': 'CTRM Aerostructures Sdn Bhd',
+          'coordinator_guzairy': 'FPTT UTeM',
+          'coordinator': 'Penyelaras WBL FPTT'
+        },
+        lastMessageSnippet: 'Salam Dr. Guzairy, saya telah menyemak perkembangan modul latihan industri minggu ini.',
+        lastMessageAt: now,
+        lastSenderName: 'En. Hisham bin Ahmad',
+        createdAt: now,
+        updatedAt: now
+      };
+      convs = [hishamConv, ...convs];
+    } else {
+      // Ensure Hisham's conversation has clean direct properties
+      hishamConv.type = 'direct';
+      hishamConv.relatedStudentName = undefined;
+      hishamConv.relatedStudentId = undefined;
+      hishamConv.relatedStudentMatric = undefined;
+    }
+
+    // Identify messages from Hisham that are wrongly assigned
+    const modifiedMsgs: WBLMessage[] = [];
+    msgs = msgs.map(m => {
+      const isFromHisham = m.senderName && m.senderName.toLowerCase().includes('hisham');
+      if (isFromHisham && m.conversationId !== hishamConv!.id) {
+        movedCount++;
+        const updatedMsg: WBLMessage = {
+          ...m,
+          conversationId: hishamConv!.id
+        };
+        modifiedMsgs.push(updatedMsg);
+        return updatedMsg;
+      }
+      return m;
+    });
+
+    if (movedCount > 0 || !rawConvs) {
+      // Update Hisham conversation snippet with its latest message
+      const hishamAllMsgs = msgs.filter(m => m.conversationId === hishamConv!.id);
+      if (hishamAllMsgs.length > 0) {
+        const lastM = hishamAllMsgs[hishamAllMsgs.length - 1];
+        hishamConv.lastMessageSnippet = lastM.content.slice(0, 80);
+        hishamConv.lastMessageAt = lastM.createdAt;
+        hishamConv.lastSenderName = lastM.senderName;
+        hishamConv.updatedAt = lastM.createdAt;
+      }
+
+      inMemoryConversations = [...convs];
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, convs);
+      inMemoryMessages = [...msgs];
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, msgs);
+      notifyListeners();
+
+      if (db) {
+        try {
+          await setDoc(doc(db, 'wbl_conversations', hishamConv.id), sanitizeForFirebase(hishamConv), { merge: true });
+          for (const m of modifiedMsgs) {
+            await setDoc(doc(db, 'wbl_messages', m.id), sanitizeForFirebase(m), { merge: true });
+          }
+        } catch (e) {
+          console.warn('Firebase disentangle sync notice:', e);
+        }
+      }
+    }
+
+    return { count: movedCount, conversationId: hishamConv.id };
+  },
+
+  reassignConversation: async (conversationId: string, updates: Partial<WBLConversation>): Promise<void> => {
+    const convs = StorageService.getWBLConversations();
+    const idx = convs.findIndex(c => c.id === conversationId);
+    if (idx !== -1) {
+      const updated = {
+        ...convs[idx],
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+      convs[idx] = updated;
+      inMemoryConversations = [...convs];
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, convs);
+      notifyListeners();
+
+      if (db) {
+        try {
+          await setDoc(doc(db, 'wbl_conversations', conversationId), sanitizeForFirebase(updated), { merge: true });
+        } catch {}
+      }
+    }
+  },
+
+  markAllConversationsAsRead: async (userId: string): Promise<number> => {
+    const raw = localStorage.getItem(STORAGE_KEYS.WBL_MESSAGES);
+    let all: WBLMessage[] = [];
+    if (raw) {
+      try { all = JSON.parse(raw); } catch {}
+    }
+    if (all.length === 0) all = inMemoryMessages;
+
+    const now = new Date().toISOString();
+    let readCount = 0;
+    const modifiedMsgs: WBLMessage[] = [];
+
+    const updated = all.map(m => {
+      if (m.senderId !== userId) {
+        const alreadyRead = (m.readBy || []).some(r => r.userId === userId);
+        if (!alreadyRead) {
+          readCount++;
+          const up: WBLMessage = {
+            ...m,
+            readBy: [...(m.readBy || []), { userId, readAt: now }]
+          };
+          modifiedMsgs.push(up);
+          return up;
+        }
+      }
+      return m;
+    });
+
+    if (readCount > 0) {
+      inMemoryMessages = updated;
+      safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, updated);
+      notifyListeners();
+
+      if (db) {
+        for (const m of modifiedMsgs) {
+          try {
+            await setDoc(doc(db, 'wbl_messages', m.id), sanitizeForFirebase(m), { merge: true });
+          } catch {}
+        }
+      }
+    }
+    return readCount;
   },
 
   getUnreadWBLMessagesCount: (userId: string): number => {
