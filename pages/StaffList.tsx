@@ -125,22 +125,26 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
   };
 
   const handleResetPassword = async () => {
-    if (!resettingUser || !newPassword.trim()) {
+    const cleanPass = newPassword.trim();
+    if (!resettingUser || !cleanPass) {
       toast.error(language === 'ms' ? 'Sila masukkan kata laluan baharu' : 'Please enter new password');
       return;
     }
     setIsResetting(true);
+    const loadingToast = toast.loading(language === 'ms' ? 'Menetapkan semula kata laluan...' : 'Resetting password...');
     try {
-      const updated = await StorageService.resetUserPassword(resettingUser.id, newPassword.trim());
-      await onUpdateUser(updated);
-      toast.success(language === 'ms' 
-        ? `Kata laluan bagi ${resettingUser.name} (${resettingUser.username}) berjaya direset!` 
-        : 'Password reset successfully');
+      await StorageService.resetUserPassword(resettingUser.id, cleanPass);
+      toast.success(
+        language === 'ms' 
+          ? `Kata laluan bagi ${resettingUser.name} (${resettingUser.username}) berjaya direset kepada: ${cleanPass}!` 
+          : `Password for ${resettingUser.name} (${resettingUser.username}) reset to: ${cleanPass}!`,
+        { id: loadingToast }
+      );
       setIsPasswordModalOpen(false);
       setNewPassword('');
       setResettingUser(null);
     } catch (e: any) {
-      toast.error(e.message || 'Gagal reset kata laluan');
+      toast.error(e.message || 'Gagal reset kata laluan', { id: loadingToast });
     } finally {
       setIsResetting(false);
     }

@@ -70,7 +70,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   const [weeklyDeliverableNotes, setWeeklyDeliverableNotes] = useState<string>('');
   const [studentWeeklyLogbook, setStudentWeeklyLogbook] = useState<WeeklyLogbook | null>(null);
   const [isViewingLogbookModalOpen, setIsViewingLogbookModalOpen] = useState(false);
-  const [selectedIndustrySector, setSelectedIndustrySector] = useState<'all' | 'perkhidmatan' | 'pembarangan' | 'perdagangan' | 'pembuatan'>('all');
+  const [selectedIndustrySector, setSelectedIndustrySector] = useState<'all' | 'universal' | 'perkhidmatan' | 'pembarangan' | 'perdagangan' | 'pembuatan'>('all');
 
   // Official UTeM Rubrics View State (matching lampiran)
   const [selectedRubricCourseCode, setSelectedRubricCourseCode] = useState<string>('BTMT 3273(i)');
@@ -445,7 +445,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         courseCode: selectedWeeklyCourseCode,
         courseName: evaluatingWeekConfig.courseName,
         evaluationType: 'weekly',
-        industrySector: selectedIndustrySector,
+        industrySector: selectedIndustrySector === 'all' ? 'universal' : selectedIndustrySector,
         weekNumber: evaluatingWeekConfig.week,
         startDate: evaluatingWeekConfig.startDate,
         endDate: evaluatingWeekConfig.endDate,

@@ -415,15 +415,25 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
   };
 
   const handleResetPassword = async () => {
-    if (!resettingUser || !newPassword) return;
+    const cleanPass = newPassword.trim();
+    if (!resettingUser || !cleanPass) {
+      toast.error(language === 'ms' ? 'Sila masukkan kata laluan baharu' : 'Please enter new password');
+      return;
+    }
+    const loadingToast = toast.loading(language === 'ms' ? 'Mengemaskini kata laluan...' : 'Updating password...');
     try {
-      await onUpdateUser({ ...resettingUser, password: newPassword });
-      toast.success(language === 'ms' ? 'Kata laluan berjaya dikemaskini' : 'Password updated successfully');
+      await StorageService.resetUserPassword(resettingUser.id, cleanPass);
+      toast.success(
+        language === 'ms' 
+          ? `Kata laluan bagi ${resettingUser.name} (${resettingUser.matric_no || resettingUser.username}) berjaya direset kepada: ${cleanPass}!` 
+          : `Password reset to: ${cleanPass}!`,
+        { id: loadingToast }
+      );
       setIsPasswordModalOpen(false);
       setNewPassword('');
       setResettingUser(null);
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || 'Gagal reset kata laluan', { id: loadingToast });
     }
   };
 
@@ -729,7 +739,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
                           )}
                           {isCoordinator && (
                               <>
-                                  <button onClick={() => { setResettingUser({...item}); setIsPasswordModalOpen(true); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title={t(language, 'resetPassword')}>
+                                  <button onClick={() => { setResettingUser({...item}); setNewPassword('Utem@2026'); setIsPasswordModalOpen(true); }} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title={t(language, 'resetPassword')}>
                                       <Key size={18} />
                                   </button>
                                   <button onClick={() => { setEditingStudent({...item}); setIsEditModalOpen(true); }} className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100" title={t(language, 'editUser')}>
@@ -774,27 +784,72 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
 
       <Modal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} title={t(language, 'resetPassword')}>
         <div className="space-y-4">
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="text-sm text-slate-600">{t(language, 'fullName')}: <strong>{resettingUser?.name}</strong></p>
-                <p className="text-xs text-slate-500">{t(language, 'username')}: {resettingUser?.username}</p>
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+                <p className="text-slate-600">{t(language, 'fullName')}: <strong className="text-slate-900">{resettingUser?.name}</strong></p>
+                <div className="flex gap-4">
+                  <p className="text-slate-500">{t(language, 'username')}: <strong className="font-mono text-blue-700">{resettingUser?.username}</strong></p>
+                  {resettingUser?.matric_no && (
+                    <p className="text-slate-500">{t(language, 'matricNo')}: <strong className="font-mono text-indigo-700">{resettingUser?.matric_no}</strong></p>
+                  )}
+                </div>
             </div>
+
+            {/* Quick Presets */}
             <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'newPassword')}</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                {language === 'ms' ? 'Pilihan Kata Laluan Cepat:' : 'Quick Presets:'}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNewPassword('Utem@2026')}
+                  className="p-2 border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 rounded-xl text-xs font-bold text-slate-800 transition-colors text-left flex items-center justify-between"
+                >
+                  <span>Lalai: Utem@2026</span>
+                  <Key size={12} className="text-amber-600" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewPassword(resettingUser?.matric_no || resettingUser?.username || '123456')}
+                  className="p-2 border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 rounded-xl text-xs font-bold text-slate-800 transition-colors text-left flex items-center justify-between"
+                >
+                  <span>{resettingUser?.matric_no ? 'No. Matrik' : 'Username'}</span>
+                  <Key size={12} className="text-amber-600" />
+                </button>
+              </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t(language, 'newPassword')}</label>
                 <input 
                   type="text" 
-                  className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900" 
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white text-slate-900 font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" 
                   value={newPassword} 
                   onChange={(e) => setNewPassword(e.target.value)} 
-                  placeholder="********"
+                  placeholder="Masukkan kata laluan baharu..."
                 />
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  {language === 'ms' ? 'Kata laluan sekurang-kurangnya 4 aksara.' : 'Minimum 4 characters.'}
+                </span>
             </div>
-            <button 
-              onClick={handleResetPassword} 
-              disabled={!newPassword} 
-              className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:bg-slate-300"
-            >
-                {t(language, 'save')}
-            </button>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsPasswordModalOpen(false)}
+                className="flex-1 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                {language === 'ms' ? 'Batal' : 'Cancel'}
+              </button>
+              <button 
+                type="button"
+                onClick={handleResetPassword} 
+                disabled={!newPassword.trim()} 
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <Key size={14} />
+                <span>{language === 'ms' ? 'Sahkan Reset' : 'Confirm Reset'}</span>
+              </button>
+            </div>
         </div>
       </Modal>
 

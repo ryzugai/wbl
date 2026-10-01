@@ -180,7 +180,7 @@ export const translations = {
     // Login & Register
     loginTitle: "Log Masuk",
     registerTitle: "Daftar Akaun Baru",
-    username: "Username",
+    username: "Username / No. Matrik / Emel",
     password: "Password",
     fullName: "Nama Penuh",
     role: "Peranan",
@@ -385,7 +385,7 @@ export const translations = {
     // Login & Register
     loginTitle: "Login",
     registerTitle: "Register New Account",
-    username: "Username",
+    username: "Username / Matric No / Email",
     password: "Password",
     fullName: "Full Name",
     role: "Role",

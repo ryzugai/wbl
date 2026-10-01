@@ -17,6 +17,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Forgot password modal
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
@@ -27,15 +28,30 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanUser = username.trim();
+    const cleanPass = password.trim();
+
+    if (!cleanUser || !cleanPass) {
+      toast.error(language === 'ms' ? 'Sila masukkan maklumat log masuk anda.' : 'Please enter your login credentials.');
+      return;
+    }
+
+    setIsLoggingIn(true);
     try {
-        const user = await StorageService.login(username, password);
+        const user = await StorageService.login(cleanUser, cleanPass);
         if (user) {
             onLoginSuccess(user);
         } else {
-            toast.error(language === 'ms' ? 'Username atau password salah' : 'Invalid username or password');
+            toast.error(
+              language === 'ms' 
+                ? 'Akaun tidak ditemui. Sila semak Username, No. Matrik atau Emel anda.' 
+                : 'Account not found. Please verify your Username, Matric No or Email.'
+            );
         }
     } catch (e: any) {
-        toast.error(e.message || 'Error logging in');
+        toast.error(e.message || (language === 'ms' ? 'Ralat semasa log masuk' : 'Error logging in'));
+    } finally {
+        setIsLoggingIn(false);
     }
   };
 
@@ -92,7 +108,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
             <input
               type="text"
               required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              autoCapitalize="none"
+              autoComplete="username"
+              placeholder={language === 'ms' ? 'cth: B032110045 / faris / emel' : 'e.g. B032110045 / faris / email'}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white placeholder:text-slate-400 placeholder:text-xs text-sm"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -116,7 +135,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
               <input
                 type={showPassword ? "text" : "password"}
                 required
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white pr-10"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white pr-10 text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -131,9 +152,17 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
           </div>
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+            disabled={isLoggingIn}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
           >
-            {t(language, 'login')}
+            {isLoggingIn ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>{language === 'ms' ? 'Sedang Log Masuk...' : 'Logging in...'}</span>
+              </>
+            ) : (
+              <span>{t(language, 'login')}</span>
+            )}
           </button>
         </form>
 

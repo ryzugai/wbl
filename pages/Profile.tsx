@@ -180,7 +180,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
     try {
       let updatedUser = { 
         ...formData, 
-        password,
+        password: (password || '').trim(),
         resume_education: JSON.stringify(eduHistory),
         resume_projects: JSON.stringify(projHistory),
         resume_work_experience: JSON.stringify(workHistory),

@@ -2,7 +2,7 @@
 import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus, CourseAnnouncement, CourseAnnouncementReadReceipt, WBLMessage, WBLConversation } from '../types';
 import { COORDINATOR_ACCOUNT, DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { IDBDocStorage } from './idbStorage';
 
 const STORAGE_KEYS = {
@@ -337,13 +337,25 @@ const setupRealtimeListeners = () => {
       if (!snapshot.empty || snapshot.metadata.fromCache === false) {
         if (colName === 'users') {
           const firestoreUsers = data as User[];
-          inMemoryUsers = firestoreUsers.map(fUser => {
-            const localUser = inMemoryUsers.find(u => u.id === fUser.id);
-            return {
-              ...fUser,
-              profile_image: (fUser.profile_image && fUser.profile_image !== 'idb_stored') ? fUser.profile_image : localUser?.profile_image,
-            };
+          const userMap = new Map<string, User>();
+          // Preserve local inMemoryUsers
+          inMemoryUsers.forEach(u => {
+            if (u && u.id) userMap.set(u.id, u);
           });
+          // Merge with Firestore data
+          firestoreUsers.forEach(fUser => {
+            if (!fUser || !fUser.id) return;
+            const localUser = userMap.get(fUser.id);
+            userMap.set(fUser.id, {
+              ...localUser,
+              ...fUser,
+              password: fUser.password || localUser?.password || '123456',
+              profile_image: (fUser.profile_image && fUser.profile_image !== 'idb_stored') ? fUser.profile_image : localUser?.profile_image,
+              is_active: fUser.is_active !== undefined ? fUser.is_active : (localUser?.is_active ?? true),
+              is_approved: fUser.is_approved !== undefined ? fUser.is_approved : (localUser?.is_approved ?? true),
+            });
+          });
+          inMemoryUsers = Array.from(userMap.values());
           safeSaveLocalStorage(storageKey, inMemoryUsers);
         } else if (colName === 'applications') {
           const firestoreApps = data as Application[];
@@ -572,7 +584,17 @@ export const StorageService = {
   },
 
   login: async (username: string, password: string): Promise<User | null> => {
-    if (username === COORDINATOR_ACCOUNT.username && password === COORDINATOR_ACCOUNT.password) {
+    const cleanInput = (username || '').trim();
+    const cleanPass = (password || '').trim();
+
+    if (!cleanInput || !cleanPass) return null;
+
+    // 1. Coordinator account check
+    const isCoordUser = 
+      cleanInput.toLowerCase() === COORDINATOR_ACCOUNT.username.toLowerCase() ||
+      cleanInput.toLowerCase() === COORDINATOR_ACCOUNT.email.toLowerCase();
+    
+    if (isCoordUser && cleanPass === COORDINATOR_ACCOUNT.password) {
       const user = {
         ...COORDINATOR_ACCOUNT,
         last_login_at: new Date().toISOString(),
@@ -596,44 +618,125 @@ export const StorageService = {
       
       return user;
     }
-    const users = StorageService.getUsers();
-    const userIdx = users.findIndex((u: User) => u.username === username && u.password === password);
-    if (userIdx !== -1) {
-      const user = users[userIdx];
-      if (user.is_approved === false) throw new Error('Akaun masih menunggu kelulusan.');
-      
-      user.last_login_at = new Date().toISOString();
-      user.last_activity_at = new Date().toISOString();
-      inMemoryUsers[userIdx] = user;
-      safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
-      safeSaveLocalStorage(STORAGE_KEYS.SESSION, stripHeavyFields(user));
-      
-      if (db) {
-        try {
-          await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(stripHeavyFields(user)), { merge: true });
-        } catch (e) {
-          console.warn('Firebase login sync notice:', e);
-        }
-      }
-      
+
+    const cleanId = cleanInput.toLowerCase();
+    const cleanDigits = cleanInput.replace(/[^0-9]/g, '');
+
+    const isUserMatch = (u: User) => {
+      if (!u) return false;
+      if (u.username && u.username.trim().toLowerCase() === cleanId) return true;
+      if (u.matric_no && u.matric_no.trim().toLowerCase() === cleanId) return true;
+      if (u.email && u.email.trim().toLowerCase() === cleanId) return true;
+      if (u.staff_id && u.staff_id.trim().toLowerCase() === cleanId) return true;
+      if (cleanDigits.length >= 6 && u.ic_no && u.ic_no.replace(/[^0-9]/g, '') === cleanDigits) return true;
+      return false;
+    };
+
+    const isPasswordMatch = (userPass: string | undefined, inputPass: string) => {
+      if (!userPass) return false;
+      const uP = userPass.trim();
+      const iP = inputPass.trim();
+      if (uP === iP) return true;
+      // Case-insensitive tolerance for common reset patterns (e.g. Utem@2026 vs utem@2026)
+      if (uP.toLowerCase() === iP.toLowerCase()) return true;
+      return false;
+    };
+
+    // 2. Check local users
+    let users = StorageService.getUsers();
+    let user = users.find(u => isUserMatch(u));
+
+    // 3. Cloud fallback: If user not found locally OR password does not match locally, check Firestore live!
+    if ((!user || !isPasswordMatch(user.password, cleanPass)) && db) {
       try {
-        await StorageService.logActivity(
-          user.id,
-          user.username,
-          user.role,
-          user.name,
-          'login',
-          'Telah log masuk ke dalam sistem.',
-          'Logged into the system.'
-        );
-      } catch (e) {
-        console.warn('Failed to log user login:', e);
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const cloudUsers: User[] = [];
+        usersSnapshot.forEach(docSnap => {
+          cloudUsers.push({ ...(docSnap.data() as User), id: docSnap.id });
+        });
+
+        const cloudMatch = cloudUsers.find(u => isUserMatch(u));
+        if (cloudMatch) {
+          user = cloudMatch;
+          // Synchronize in-memory & local storage
+          const userMap = new Map<string, User>();
+          inMemoryUsers.forEach(u => userMap.set(u.id, u));
+          cloudUsers.forEach(u => {
+            const prev = userMap.get(u.id);
+            userMap.set(u.id, {
+              ...prev,
+              ...u,
+              password: u.password || prev?.password || '123456',
+              profile_image: (u.profile_image && u.profile_image !== 'idb_stored') ? u.profile_image : prev?.profile_image,
+              is_active: u.is_active !== undefined ? u.is_active : (prev?.is_active ?? true),
+              is_approved: u.is_approved !== undefined ? u.is_approved : (prev?.is_approved ?? true),
+            });
+          });
+          inMemoryUsers = Array.from(userMap.values());
+          safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
+          users = inMemoryUsers;
+          notifyListeners();
+        }
+      } catch (cloudErr) {
+        console.warn('Live Cloud auth check notice:', cloudErr);
       }
-      
-      notifyListeners();
-      return user;
     }
-    return null;
+
+    if (!user) {
+      return null;
+    }
+
+    // Verify Password
+    if (!isPasswordMatch(user.password, cleanPass)) {
+      throw new Error('Kata laluan tidak sah. Sila semak semula huruf besar/kecil atau hubungi Penyelaras WBL.');
+    }
+
+    // Verify Account Status
+    if (user.is_approved === false) {
+      throw new Error('Akaun masih menunggu kelulusan daripada Penyelaras WBL.');
+    }
+
+    if (user.is_active === false) {
+      throw new Error('Akaun anda telah dinyahaktifkan/digantung. Sila hubungi Penyelaras WBL.');
+    }
+
+    // Successful login: update timestamps
+    user.last_login_at = new Date().toISOString();
+    user.last_activity_at = new Date().toISOString();
+
+    const uIdx = inMemoryUsers.findIndex(u => u.id === user!.id);
+    if (uIdx !== -1) {
+      inMemoryUsers[uIdx] = user;
+    } else {
+      inMemoryUsers.push(user);
+    }
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
+    safeSaveLocalStorage(STORAGE_KEYS.SESSION, stripHeavyFields(user));
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'users', user.id), sanitizeForFirebase(stripHeavyFields(user)), { merge: true });
+      } catch (e) {
+        console.warn('Firebase login sync notice:', e);
+      }
+    }
+
+    try {
+      await StorageService.logActivity(
+        user.id,
+        user.username,
+        user.role,
+        user.name,
+        'login',
+        'Telah log masuk ke dalam sistem.',
+        'Logged into the system.'
+      );
+    } catch (e) {
+      console.warn('Failed to log user login:', e);
+    }
+
+    notifyListeners();
+    return user;
   },
 
   logout: () => localStorage.removeItem(STORAGE_KEYS.SESSION),
@@ -759,18 +862,39 @@ export const StorageService = {
   resetUserPassword: async (userId: string, newPassword: string): Promise<User> => {
     const cur = getCurrentUser();
     if (!hasSystemAccess()) throw new Error('Hanya Penyelaras WBL yang berkuasa menetapkan semula kata laluan pengguna.');
-    if (!newPassword || newPassword.trim().length < 4) {
+    const cleanPass = (newPassword || '').trim();
+    if (!cleanPass || cleanPass.length < 4) {
       throw new Error('Kata laluan baharu mestilah sekurang-kurangnya 4 aksara.');
     }
 
-    const users = StorageService.getUsers();
-    const idx = users.findIndex(u => u.id === userId);
+    let users = StorageService.getUsers();
+    let idx = users.findIndex(u => u.id === userId || u.username === userId || u.matric_no === userId);
+
+    if (idx === -1 && db) {
+      try {
+        const docSnap = await getDoc(doc(db, 'users', userId));
+        if (docSnap.exists()) {
+          const cloudU = { ...(docSnap.data() as User), id: docSnap.id };
+          users.push(cloudU);
+          idx = users.length - 1;
+        }
+      } catch (e) {
+        console.warn('Could not fetch user by doc ID from Firestore:', e);
+      }
+    }
+
     if (idx === -1) throw new Error('Pengguna tidak ditemui.');
 
-    const targetUser = { ...users[idx], password: newPassword.trim(), is_active: true };
+    const targetUser: User = { 
+      ...users[idx], 
+      password: cleanPass, 
+      is_active: true, 
+      is_approved: true, // Resetting password by coordinator immediately authorizes and activates account
+      last_activity_at: new Date().toISOString()
+    };
     users[idx] = targetUser;
     inMemoryUsers = [...users];
-    safeSaveLocalStorage(STORAGE_KEYS.USERS, users);
+    safeSaveLocalStorage(STORAGE_KEYS.USERS, inMemoryUsers);
     notifyListeners();
 
     if (db) {
@@ -789,8 +913,8 @@ export const StorageService = {
         sender_name: cur?.name || 'Penyelaras WBL',
         title_ms: 'Kata Laluan Akaun Anda Telah Ditetapkan Semula',
         title_en: 'Your Account Password Has Been Reset',
-        message_ms: `Penyelaras WBL (${cur?.name || 'Penyelaras'}) telah menetapkan semula kata laluan akaun anda (${targetUser.username}). Kata laluan baharu: ${newPassword.trim()}`,
-        message_en: `WBL Coordinator has reset your account password (${targetUser.username}). New password: ${newPassword.trim()}`,
+        message_ms: `Penyelaras WBL (${cur?.name || 'Penyelaras'}) telah menetapkan semula kata laluan akaun anda (${targetUser.username}). Kata laluan baharu: ${cleanPass}`,
+        message_en: `WBL Coordinator has reset your account password (${targetUser.username}). New password: ${cleanPass}`,
         is_read: false,
         created_at: now
       });
@@ -803,8 +927,8 @@ export const StorageService = {
         cur.role,
         cur.name,
         'user_password_reset',
-        `Penyelaras menetapkan semula kata laluan akaun untuk ${targetUser.name} (${targetUser.username} - ${targetUser.role}).`,
-        `Coordinator reset password for user ${targetUser.name} (${targetUser.username} - ${targetUser.role}).`
+        `Penyelaras menetapkan semula kata laluan akaun untuk ${targetUser.name} (${targetUser.username} - ${targetUser.role}). Kata laluan baharu: ${cleanPass}`,
+        `Coordinator reset password for user ${targetUser.name} (${targetUser.username} - ${targetUser.role}). New password: ${cleanPass}`
       );
     }
 
