@@ -5,6 +5,7 @@ import { Users, Building2, Clock, CheckCircle2, GraduationCap, BookOpen, Briefca
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
 import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
+import { MalaysiaStudentMap } from '../components/MalaysiaStudentMap';
 
 interface DashboardProps {
   applications: Application[];
@@ -12,9 +13,10 @@ interface DashboardProps {
   users: User[];
   currentUser?: User;
   language: Language;
+  onNavigate?: (view: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users, currentUser, language }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, users, currentUser, language, onNavigate }) => {
   const [adConfig, setAdConfig] = useState<AdConfig>(StorageService.getAdConfig());
   const [showAd, setShowAd] = useState(true);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
@@ -339,6 +341,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ applications, companies, u
           <StatCard label={language === 'ms' ? 'Menunggu' : 'Pending'} value={pending} icon={Clock} colorClass="text-yellow-600" bgClass="bg-yellow-50" />
           <StatCard label={language === 'ms' ? 'Lulus' : 'Approved'} value={approved} icon={CheckCircle2} colorClass="text-green-600" bgClass="bg-green-50" />
       </div>
+
+      {/* INTERACTIVE MALAYSIA MAP WITH FLOATING PLACED STUDENTS & DAILY LOGBOOK MONITORING */}
+      <MalaysiaStudentMap
+        applications={applications}
+        companies={companies}
+        users={users}
+        currentUser={currentUser}
+        language={language}
+        onNavigate={onNavigate}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">

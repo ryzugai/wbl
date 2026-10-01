@@ -161,11 +161,6 @@ const cleanAndMigrateLocalStorage = async () => {
       let modified = false;
       const filteredUsers = users.filter(u => {
         if (!u.name) return true;
-        // Clean out any unrelated dummy users
-        if (u.name.includes('Amirul') && (u.name.includes('Razak') || u.name.includes('Razali'))) {
-          modified = true;
-          return false;
-        }
         return true;
       });
       for (const u of filteredUsers) {
@@ -188,49 +183,7 @@ const cleanAndMigrateLocalStorage = async () => {
     console.warn('cleanAndMigrateLocalStorage error:', e);
   }
 
-  // Sanitize stored evaluations removing/updating unrelated Amirul/Razali names
-  try {
-    const rawEvals = localStorage.getItem(STORAGE_KEYS.EVALUATIONS);
-    if (rawEvals) {
-      const evals: any[] = JSON.parse(rawEvals);
-      let modified = false;
-      evals.forEach(e => {
-        if (e.studentName && (e.studentName.includes('Amirul') || e.studentName.includes('Razak') || e.studentName.includes('Razali'))) {
-          e.studentName = 'Muhammad Faris bin Rosli';
-          e.studentMatric = 'B032110045';
-          e.studentId = 'student_1';
-          e.studentProgram = 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)';
-          modified = true;
-        }
-      });
-      if (modified) {
-        safeSaveLocalStorage(STORAGE_KEYS.EVALUATIONS, evals);
-        inMemoryEvaluations = evals;
-      }
-    }
-  } catch {}
-
-  // Sanitize stored logbooks removing/updating unrelated Amirul/Razali names
-  try {
-    const rawLogs = localStorage.getItem(STORAGE_KEYS.LOGBOOKS);
-    if (rawLogs) {
-      const logs: any[] = JSON.parse(rawLogs);
-      let modified = false;
-      logs.forEach(l => {
-        if (l.studentName && (l.studentName.includes('Amirul') || l.studentName.includes('Razak') || l.studentName.includes('Razali'))) {
-          l.studentName = 'Muhammad Faris bin Rosli';
-          l.studentMatric = 'B032110045';
-          l.studentId = 'student_1';
-          l.studentProgram = 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)';
-          modified = true;
-        }
-      });
-      if (modified) {
-        safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, logs);
-        inMemoryLogbooks = logs;
-      }
-    }
-  } catch {}
+  // Keep evaluations and logbooks clean and consistent
 
   // Disentangle and fix any messages from Hisham that were linked to Muhamad Amirul bin Razali
   try {
