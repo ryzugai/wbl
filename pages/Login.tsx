@@ -110,7 +110,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
               required
               autoCapitalize="none"
               autoComplete="username"
-              placeholder={language === 'ms' ? 'cth: B032110045 / faris / emel' : 'e.g. B032110045 / faris / email'}
+              placeholder={language === 'ms' ? 'cth: B062310215 / aaron / emel' : 'e.g. B062310215 / aaron / email'}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white placeholder:text-slate-400 placeholder:text-xs text-sm"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -261,7 +261,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, la
                     <input
                       type="text"
                       required
-                      placeholder="cth: B032110045 atau username anda"
+                      placeholder="cth: B062310215 atau username anda"
                       value={forgotIdentifier}
                       onChange={(e) => setForgotIdentifier(e.target.value)}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 bg-white"

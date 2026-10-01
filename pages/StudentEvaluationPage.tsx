@@ -272,9 +272,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       return [{
         studentId: currentUser.id,
         studentName: currentUser.name,
-        studentMatric: currentUser.matric_no || 'B032110045',
-        studentProgram: currentUser.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-        companyName: currentUser.company_affiliation || 'PETRONAS Digital Sdn Bhd',
+        studentMatric: currentUser.matric_no || '',
+        studentProgram: currentUser.academic_level || 'Sarjana Muda Teknousahawanan (WBL)',
+        companyName: currentUser.company_affiliation || 'Syarikat Penempatan Industri',
         companyDistrict: 'Kuala Lumpur',
         companyState: 'W.P. Kuala Lumpur'
       }];
@@ -286,8 +286,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         return {
           studentId: u?.id || app.student_id || 'student',
           studentName: app.student_name || u?.name || 'Pelajar WBL',
-          studentMatric: app.student_id || (app as any).studentMatric || u?.matric_no || 'B032110045',
-          studentProgram: app.student_program || u?.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+          studentMatric: app.student_id || (app as any).studentMatric || u?.matric_no || '',
+          studentProgram: app.student_program || u?.academic_level || 'Sarjana Muda Teknousahawanan (WBL)',
           companyName: app.company_name || currentUser.company_affiliation || 'Syarikat Penempatan Industri',
           companyDistrict: app.company_district || '',
           companyState: app.company_state || ''
@@ -298,11 +298,11 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     return stUsers.map(u => ({
       studentId: u.id,
       studentName: u.name,
-      studentMatric: u.matric_no || 'B032110045',
-      studentProgram: u.academic_level || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-      companyName: u.company_affiliation || currentUser.company_affiliation || 'PETRONAS Digital Sdn Bhd',
-      companyDistrict: 'Kuala Lumpur',
-      companyState: 'W.P. Kuala Lumpur'
+      studentMatric: u.matric_no || '',
+      studentProgram: u.academic_level || 'Sarjana Muda Teknousahawanan (WBL)',
+      companyName: u.company_affiliation || currentUser.company_affiliation || 'Syarikat Penempatan Industri',
+      companyDistrict: 'Melaka',
+      companyState: 'Melaka'
     }));
   }, [isStudent, currentUser, myCompanyStudents, applications, users]);
 

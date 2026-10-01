@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Application, Company, User, UserRole, AdConfig } from '../types';
+import { Application, Company, User, UserRole, AdConfig, WeeklyLogbook, DailyLogEntry } from '../types';
 import { 
   Building2, 
   Clock, 
@@ -20,14 +20,15 @@ import {
   Send, 
   AlertCircle, 
   ChevronRight, 
-  FileSpreadsheet
+  FileSpreadsheet,
+  Search
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
 import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
 import { MalaysiaStudentMap } from '../components/MalaysiaStudentMap';
 import { WBL_COURSE_SEQUENCE, UTEM_WEEKLY_ASSESSMENTS } from '../constants/utemWblRubrics';
-import { DEFAULT_PLACED_STUDENTS, StudentPlacementPoint } from '../constants/wblPlacementData';
+import { StudentPlacementPoint, getStudentCoordinatesByState, DEFAULT_PLACED_STUDENTS } from '../constants/wblPlacementData';
 import { toast } from 'react-hot-toast';
 
 interface DashboardProps {
@@ -51,10 +52,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showAd, setShowAd] = useState(true);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [rosterFilter, setRosterFilter] = useState<'all' | 'filled' | 'pending'>('all');
+  const [rosterSearch, setRosterSearch] = useState<string>('');
+
+  const [liveLogs, setLiveLogs] = useState<WeeklyLogbook[]>(() => {
+    try {
+      return StorageService.getWeeklyLogbooks();
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const unsubscribe = StorageService.subscribe(() => {
       setAdConfig(StorageService.getAdConfig());
+      try {
+        setLiveLogs(StorageService.getWeeklyLogbooks());
+      } catch {}
     });
     return () => unsubscribe();
   }, []);
@@ -145,72 +159,231 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const activeAd = adConfig.isEnabled && adConfig.items.length > 0 ? adConfig.items[currentAdIndex] : null;
 
-  // Real Cohort Metrics (Strictly 5 registered students undergoing WBL)
-  const actualCohortStudents = 5;
-  const approvedPlacedStudents = 5;
-  const totalLecturers = Math.max(1, users.filter(u => u.role === UserRole.LECTURER).length);
-  const totalIndustryStaff = Math.max(2, users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR).length);
-
-  // 5 Real Placed Students Data with Live Logbook State
+  // Derive real active students from users and applications without fabricating any dummy records
   const cohortStudentsList = useMemo<StudentPlacementPoint[]>(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    let liveLogs: any[] = [];
-    try {
-      liveLogs = StorageService.getWeeklyLogbooks();
-    } catch {
-      liveLogs = [];
-    }
 
-    return DEFAULT_PLACED_STUDENTS.map(defaultStudent => {
-      // Find matching live application
-      const matchedApp = applications.find(a => 
-        (a.student_id && a.student_id.toLowerCase().trim() === defaultStudent.matricNo.toLowerCase().trim()) ||
-        (a.student_name && a.student_name.toLowerCase().trim() === defaultStudent.name.toLowerCase().trim())
-      );
+    const normMatric = (m?: string) => (m || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const normName = (n?: string) => (n || '').replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
 
-      // Find matching user profile
-      const studentUser = users.find(u => 
-        (u.matric_no && u.matric_no.toLowerCase().trim() === defaultStudent.matricNo.toLowerCase().trim()) ||
-        (u.name && u.name.toLowerCase().trim() === defaultStudent.name.toLowerCase().trim())
-      );
+    // Map applications by student clean matric and clean name
+    const approvedAppMap = new Map<string, Application>();
+    const anyAppMap = new Map<string, Application>();
 
-      // Check live logbooks
-      const userLogs = liveLogs.filter(l => 
-        l.studentId === defaultStudent.studentId || 
-        l.studentMatric === defaultStudent.matricNo
-      );
+    applications.forEach(app => {
+      const mKey = normMatric(app.student_id);
+      const nKey = normName(app.student_name);
+      const uKey = (app.created_by || '').toLowerCase().trim();
 
-      let hasFilledToday = defaultStudent.hasFilledTodayLog;
-      let logSummary = defaultStudent.todayLogSummary;
-      let logStatus = defaultStudent.todayLogStatus;
+      [mKey, nKey, uKey].filter(Boolean).forEach(k => {
+        if (!anyAppMap.has(k)) anyAppMap.set(k, app);
+        if (app.application_status === 'Diluluskan') {
+          approvedAppMap.set(k, app);
+        }
+      });
+    });
 
-      if (userLogs.length > 0) {
-        const allEntries = userLogs.flatMap((l: any) => l.entries || []);
-        const todayEntry = allEntries.find((e: any) => e.date === todayStr);
-        if (todayEntry) {
-          hasFilledToday = true;
-          logSummary = todayEntry.tasks;
-          logStatus = 'verified';
+    // Extract active student users from users list
+    const activeStudentUsers = users.filter(u => 
+      u.role === UserRole.STUDENT && 
+      u.is_active !== false
+    );
+
+    // Map of unique students
+    const uniqueStudentsMap = new Map<string, { user?: User; app?: Application; name: string; matricNo: string }>();
+
+    // 1. Add all active registered student users with deduplication
+    activeStudentUsers.forEach(u => {
+      const mKey = normMatric(u.matric_no);
+      const nKey = normName(u.name);
+      const uKey = (u.username || '').toLowerCase().trim();
+      const primaryKey = mKey || nKey || uKey;
+      if (!primaryKey) return;
+
+      let existingKey = '';
+      if (mKey && uniqueStudentsMap.has(mKey)) existingKey = mKey;
+      else if (nKey && uniqueStudentsMap.has(nKey)) existingKey = nKey;
+      else {
+        for (const [k, v] of uniqueStudentsMap.entries()) {
+          if (mKey && normMatric(v.user?.matric_no) === mKey) { existingKey = k; break; }
+          if (nKey && normName(v.user?.name) === nKey) { existingKey = k; break; }
+          if (uKey && v.user?.username && v.user.username.toLowerCase().trim() === uKey) { existingKey = k; break; }
         }
       }
 
+      const matchedApp = 
+        (mKey ? approvedAppMap.get(mKey) || anyAppMap.get(mKey) : undefined) ||
+        (nKey ? approvedAppMap.get(nKey) || anyAppMap.get(nKey) : undefined) ||
+        (uKey ? approvedAppMap.get(uKey) || anyAppMap.get(uKey) : undefined);
+
+      if (existingKey) {
+        const item = uniqueStudentsMap.get(existingKey)!;
+        item.user = {
+          ...item.user,
+          ...u,
+          name: item.user?.name || u.name,
+          matric_no: item.user?.matric_no || u.matric_no,
+          faculty_supervisor_name: u.faculty_supervisor_name || item.user?.faculty_supervisor_name,
+          faculty_supervisor_id: u.faculty_supervisor_id || item.user?.faculty_supervisor_id,
+          company_affiliation: u.company_affiliation || item.user?.company_affiliation,
+          profile_image: (u.profile_image && u.profile_image !== 'idb_stored') ? u.profile_image : item.user?.profile_image,
+        };
+        if (!item.app && matchedApp) item.app = matchedApp;
+      } else {
+        uniqueStudentsMap.set(primaryKey, {
+          user: u,
+          app: matchedApp,
+          name: u.name,
+          matricNo: u.matric_no || u.username || ''
+        });
+      }
+    });
+
+    // 2. Incorporate any students with applications not already in the map
+    applications.forEach(app => {
+      const mKey = normMatric(app.student_id);
+      const nKey = normName(app.student_name);
+      if (!mKey && !nKey) return;
+
+      let matchedKey = '';
+      for (const [k, v] of uniqueStudentsMap.entries()) {
+        if (mKey && normMatric(v.user?.matric_no || v.matricNo) === mKey) { matchedKey = k; break; }
+        if (nKey && normName(v.user?.name || v.name) === nKey) { matchedKey = k; break; }
+        if (app.created_by && v.user?.username && v.user.username.toLowerCase().trim() === app.created_by.toLowerCase().trim()) {
+          matchedKey = k;
+          break;
+        }
+      }
+
+      if (matchedKey) {
+        const item = uniqueStudentsMap.get(matchedKey)!;
+        if (!item.app || (app.application_status === 'Diluluskan' && item.app.application_status !== 'Diluluskan')) {
+          item.app = app;
+        }
+      } else if (app.student_name) {
+        uniqueStudentsMap.set(mKey || nKey, {
+          app,
+          name: app.student_name,
+          matricNo: app.student_id || app.created_by || ''
+        });
+      }
+    });
+
+    const realStudents = Array.from(uniqueStudentsMap.values());
+    if (realStudents.length === 0) {
+      return DEFAULT_PLACED_STUDENTS;
+    }
+
+    return realStudents.map((item, index) => {
+      const u = item.user;
+      const app = item.app;
+
+      const studentName = (u?.name || app?.student_name || item.name || '').trim();
+      const studentMatric = (u?.matric_no || app?.student_id || item.matricNo || 'Pelajar WBL').trim();
+      const studentProgram = u?.program || u?.academic_level || app?.student_program || 'Sarjana Muda Teknousahawanan (WBL)';
+
+      const comp = app ? companies.find(c => 
+        c.company_name.toLowerCase().trim() === app.company_name.toLowerCase().trim()
+      ) : undefined;
+
+      const companyName = app?.company_name || u?.company_affiliation || 'Belum Ditetapkan';
+      const state = app?.company_state || comp?.company_state || (u as any)?.state || 'Melaka';
+      const district = app?.company_district || comp?.company_district || (u as any)?.district || '';
+      const companyAddress = comp?.company_address || (app as any)?.company_address || '';
+      const trainerName = u?.industry_trainer_name || (app as any)?.industry_trainer_name || 'Jurulatih Industri';
+      const supervisorName = u?.faculty_supervisor_name || app?.faculty_supervisor_name || 'Belum Dilantik';
+
+      // Check real weekly logbooks
+      const cleanM = normMatric(studentMatric);
+      const cleanN = normName(studentName);
+
+      const userLogs = liveLogs.filter(l => {
+        const lM = normMatric(l.studentMatric);
+        const lN = normName(l.studentName);
+        const matchMatric = cleanM && cleanM !== 'pelajarwbl' && cleanM.length > 2 && lM === cleanM;
+        const matchName = cleanN && cleanN !== 'pelajar wbl' && cleanN.length > 2 && lN === cleanN;
+        const matchId = u && u.id && l.studentId && l.studentId === u.id;
+        return matchMatric || matchName || matchId;
+      });
+
+      const allEntries: DailyLogEntry[] = userLogs.flatMap((l: WeeklyLogbook) => l.entries || []);
+      const entriesWithTasks = allEntries.filter((e: DailyLogEntry) => e.tasks && e.tasks.trim().length > 0);
+      const todayEntry = allEntries.find((e: DailyLogEntry) => e.date === todayStr && e.tasks && e.tasks.trim().length > 0);
+      const latestEntry = entriesWithTasks.length > 0 ? entriesWithTasks[entriesWithTasks.length - 1] : null;
+      const matchingLog = userLogs.find((l: WeeklyLogbook) => (l.entries || []).some((e: DailyLogEntry) => e.tasks && e.tasks.trim().length > 0));
+
+      const hasFilledTodayLog = !!todayEntry || entriesWithTasks.length > 0;
+      const todayLogDate = todayEntry ? todayEntry.date : (latestEntry ? latestEntry.date : '');
+      const todayLogStatus: 'verified' | 'submitted' | 'pending' = matchingLog
+        ? (matchingLog.status === 'verified' ? 'verified' : matchingLog.status === 'submitted' ? 'submitted' : 'pending')
+        : 'pending';
+      const todayLogSummary = todayEntry ? todayEntry.tasks : (latestEntry ? `Entri harian terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 100)}` : 'Belum mengemukakan entri logbook.');
+      const todayLogHours = todayEntry ? 8 : (latestEntry ? 8 : 0);
+      const todayDept = todayEntry ? todayEntry.department : (latestEntry ? latestEntry.department : '');
+      const todayTools = todayEntry ? todayEntry.toolsUsed : (latestEntry ? latestEntry.toolsUsed : '');
+      const totalLogbookHours = entriesWithTasks.length * 8;
+      const totalWeeksLogged = new Set(userLogs.map(l => l.weekNumber)).size;
+
+      const mapCoordinates = getStudentCoordinatesByState(state, district, index);
+
+      const avatarUrl = (u?.profile_image && u.profile_image !== 'idb_stored') 
+        ? u.profile_image 
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=0284c7&color=fff&bold=true`;
+
       return {
-        ...defaultStudent,
-        companyName: matchedApp?.company_name || defaultStudent.companyName,
-        industryTrainerName: studentUser?.industry_trainer_name || defaultStudent.industryTrainerName,
-        facultySupervisorName: matchedApp?.faculty_supervisor_name || studentUser?.faculty_supervisor_name || defaultStudent.facultySupervisorName,
-        hasFilledTodayLog: hasFilledToday,
-        todayLogStatus: logStatus,
-        todayLogSummary: logSummary,
-        avatarUrl: studentUser?.profile_image && studentUser.profile_image !== 'idb_stored'
-          ? studentUser.profile_image
-          : defaultStudent.avatarUrl
+        id: u?.id || app?.id || `student_${index}`,
+        studentId: u?.id || app?.student_id || `student_${index}`,
+        name: studentName,
+        matricNo: studentMatric,
+        program: studentProgram,
+        email: u?.email || app?.student_email || '',
+        phone: u?.phone || '',
+        avatarUrl,
+        companyName,
+        companyAddress,
+        state,
+        district,
+        industry: comp?.company_industry || 'Industri WBL',
+        industryTrainerName: trainerName,
+        facultySupervisorName: supervisorName,
+        mapCoordinates,
+        hasFilledTodayLog,
+        todayLogDate,
+        todayLogStatus,
+        todayLogSummary,
+        todayLogHours,
+        todayDepartment: todayDept,
+        todayTools: todayTools,
+        totalLogbookHours,
+        totalWeeksLogged
       };
     });
-  }, [applications, users]);
+  }, [applications, companies, users, liveLogs]);
 
+  // Filtered cohort roster for the monitoring section
+  const filteredCohortRoster = useMemo(() => {
+    return cohortStudentsList.filter(student => {
+      if (rosterFilter === 'filled' && !student.hasFilledTodayLog) return false;
+      if (rosterFilter === 'pending' && student.hasFilledTodayLog) return false;
+      if (rosterSearch.trim()) {
+        const q = rosterSearch.toLowerCase();
+        const matchName = student.name.toLowerCase().includes(q);
+        const matchMatric = student.matricNo.toLowerCase().includes(q);
+        const matchCompany = student.companyName.toLowerCase().includes(q);
+        const matchState = student.state.toLowerCase().includes(q);
+        if (!matchName && !matchMatric && !matchCompany && !matchState) return false;
+      }
+      return true;
+    });
+  }, [cohortStudentsList, rosterFilter, rosterSearch]);
+
+  // Real Cohort Metrics derived strictly from real active students
+  const actualCohortStudents = cohortStudentsList.length;
+  const approvedPlacedStudents = cohortStudentsList.filter(s => s.companyName && s.companyName !== 'Belum Ditetapkan').length;
+  const totalLecturers = Math.max(1, users.filter(u => u.role === UserRole.LECTURER).length);
+  const totalIndustryStaff = Math.max(1, users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR).length);
   const filledLogTodayCount = cohortStudentsList.filter(s => s.hasFilledTodayLog).length;
-  const pendingLogTodayCount = actualCohortStudents - filledLogTodayCount;
+  const pendingLogTodayCount = Math.max(0, actualCohortStudents - filledLogTodayCount);
 
   // Send Reminder Handler
   const handleSendReminder = (student: StudentPlacementPoint) => {
@@ -259,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               PORTAL PEMANTAUAN WBL UTeM
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-              KOHORT 2026/2027 (5 PELAJAR)
+              KOHORT WBL 2026/2027 ({actualCohortStudents} PELAJAR AKTIF)
             </span>
           </div>
           <h2 className="text-2xl font-black text-slate-900 mt-1">{t(language, 'dashboard')}</h2>
@@ -665,29 +838,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. RINGKASAN STATISTIK KOHORT WBL (5 ORANG PELAJAR SEBENAR)                */}
+      {/* 2. RINGKASAN STATISTIK KOHORT WBL (PELAJAR SEBENAR AKTIF)                  */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard 
-          label={language === 'ms' ? 'Pelajar WBL (Kohort Rasmi)' : 'WBL Students (Cohort)'} 
+          label={language === 'ms' ? 'Pelajar WBL (Kohort Aktif)' : 'Active WBL Students'} 
           value={`${actualCohortStudents} Orang Pelajar`} 
-          subtext={language === 'ms' ? 'Rekod Sebenar: 5 Orang Pelajar Berdaftar' : 'Actual Registered: 5 Students'}
+          subtext={language === 'ms' ? `Rekod Rasmi: ${actualCohortStudents} Pelajar Aktif` : `Official: ${actualCohortStudents} Active Students`}
           icon={GraduationCap} 
           colorClass="text-indigo-600" 
           bgClass="bg-indigo-50" 
         />
         <StatCard 
           label={language === 'ms' ? 'Penempatan Industri Rasmi' : 'Official Placements'} 
-          value={`${approvedPlacedStudents} / 5 Pelajar (100%)`} 
-          subtext={language === 'ms' ? 'Semua Pelajar Telah Ditempatkan' : 'All Students Placed in Companies'}
+          value={`${approvedPlacedStudents} / ${actualCohortStudents} Pelajar (${Math.round((approvedPlacedStudents / Math.max(1, actualCohortStudents)) * 100)}%)`} 
+          subtext={approvedPlacedStudents === actualCohortStudents ? '100% Selesai Ditempatkan' : `${approvedPlacedStudents} Pelajar Mempunyai Penempatan`}
           icon={CheckCircle2} 
           colorClass="text-emerald-600" 
           bgClass="bg-emerald-50" 
         />
         <StatCard 
           label={language === 'ms' ? 'Status Pengisian Buku Log' : 'Daily Logbook Submission'} 
-          value={`${filledLogTodayCount} / 5 Pelajar (${Math.round((filledLogTodayCount/actualCohortStudents)*100)}%)`} 
-          subtext={language === 'ms' ? `${pendingLogTodayCount} Pelajar Belum Mengisi Hari Ini` : `${pendingLogTodayCount} Pending Today`}
+          value={`${filledLogTodayCount} Orang Telah Merekod`} 
+          subtext={language === 'ms' ? `Rekod Sebenar: ${filledLogTodayCount} Pelajar Telah Mengisi (${pendingLogTodayCount} Belum Mengisi daripada ${actualCohortStudents} Pelajar Kohort)` : `${filledLogTodayCount} Recorded Logbooks (${pendingLogTodayCount} Pending of ${actualCohortStudents})`}
           icon={Clock} 
           colorClass="text-amber-600" 
           bgClass="bg-amber-50" 
@@ -697,8 +870,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard 
           label={t(language, 'companies')} 
-          value={`${companies.length || 5} Syarikat Rakan`} 
-          subtext="CTRM, PETRONAS, Infineon, Intel, Inari"
+          value={`${companies.length} Syarikat Rakan`} 
+          subtext={language === 'ms' ? 'Rakan Industri Berdaftar' : 'Registered Partner Companies'}
           icon={Building2} 
           colorClass="text-purple-600" 
           bgClass="bg-purple-50" 
@@ -734,10 +907,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 4. ROSTER PEMANTAUAN BUKU LOG HARIAN (5 ORANG PELAJAR KOHORT SEBENAR)     */}
+      {/* 4. ROSTER PEMANTAUAN BUKU LOG HARIAN PELAJAR AKTIF                         */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
@@ -745,32 +918,69 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span>PEMANTAUAN BUKU LOG HARIAN</span>
               </span>
               <span className="text-[10px] font-bold text-slate-500">
-                5 Pelajar Berdaftar (Kohort WBL 2026/2027)
+                {actualCohortStudents} Pelajar Aktif (Kohort WBL 2026/2027)
               </span>
             </div>
             <h3 className="text-lg font-black text-slate-900 mt-1">
-              Status Pengisian Buku Log Harian (5 Orang Pelajar Kohort)
+              Status Pengisian Buku Log Harian (Rekod Sebenar: {filledLogTodayCount} Pelajar Telah Mengisi)
             </h3>
             <p className="text-xs text-slate-500">
-              Semakan rekod log latihan harian semasa untuk setiap pelajar industri. Klik pada mana-mana pelajar untuk membuka buku log penuh.
+              Semakan rekod buku log latihan harian semasa: <strong className="text-emerald-700 font-bold">{filledLogTodayCount} orang pelajar sebenar</strong> telah mengemukakan entri latihan, manakala <strong className="text-amber-700 font-bold">{pendingLogTodayCount} orang pelajar</strong> belum merekodkan logbook. Klik pada mana-mana pelajar untuk membuka buku log penuh.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-emerald-600" />
-              <span>{filledLogTodayCount} Telah Isi Hari Ini</span>
-            </span>
-            <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
-              <AlertCircle size={13} className="text-amber-600" />
-              <span>{pendingLogTodayCount} Belum Hantar</span>
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRosterFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                rosterFilter === 'all'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Semua ({actualCohortStudents})
+            </button>
+            <button
+              type="button"
+              onClick={() => setRosterFilter('filled')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                rosterFilter === 'filled'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+              }`}
+            >
+              <CheckCircle2 size={13} />
+              <span>Telah Isi ({filledLogTodayCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRosterFilter('pending')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                rosterFilter === 'pending'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+              }`}
+            >
+              <AlertCircle size={13} />
+              <span>Belum Isi ({pendingLogTodayCount})</span>
+            </button>
+            <div className="relative min-w-[180px]">
+              <input
+                type="text"
+                value={rosterSearch}
+                onChange={(e) => setRosterSearch(e.target.value)}
+                placeholder="Cari nama / no. matrik..."
+                className="w-full pl-7 pr-3 py-1.5 bg-slate-50 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
           </div>
         </div>
 
-        {/* 5 STUDENTS ROSTER CARDS */}
+        {/* COHORT STUDENTS ROSTER CARDS */}
         <div className="grid grid-cols-1 gap-3">
-          {cohortStudentsList.map((student) => {
+          {filteredCohortRoster.map((student) => {
             const isFilled = student.hasFilledTodayLog;
 
             return (

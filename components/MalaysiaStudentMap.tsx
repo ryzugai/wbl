@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Application, Company, User, UserRole, WeeklyLogbook, DailyLogEntry } from '../types';
 import { 
   MALAYSIA_STATE_PATHS, 
@@ -59,100 +59,220 @@ export const MalaysiaStudentMap: React.FC<MalaysiaStudentMapProps> = ({
   const [mapZoomZone, setMapZoomZone] = useState<'all' | 'west' | 'east'>('all');
 
   // Load live weekly logbooks to get real-time daily log entries
-  const allWeeklyLogbooks = useMemo(() => {
+  const [allWeeklyLogbooks, setAllWeeklyLogbooks] = useState<WeeklyLogbook[]>(() => {
     try {
       return StorageService.getWeeklyLogbooks();
     } catch {
       return [];
     }
+  });
+
+  useEffect(() => {
+    const unsub = StorageService.subscribe(() => {
+      try {
+        setAllWeeklyLogbooks(StorageService.getWeeklyLogbooks());
+      } catch {}
+    });
+    return () => unsub();
   }, []);
 
-  // Compute merged students list from applications/users OR default fallback placed students
-  // Guaranteed to represent strictly the 5 actual registered students cohort
+  // Derive real active students from users and applications without fabricating any dummy records
   const studentPlacementPoints = useMemo<StudentPlacementPoint[]>(() => {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Deduplicate applications by unique student matric / username
-    const studentAppMap = new Map<string, Application>();
+    const normMatric = (m?: string) => (m || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const normName = (n?: string) => (n || '').replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+
+    // Map applications by student clean matric and clean name
+    const approvedAppMap = new Map<string, Application>();
+    const anyAppMap = new Map<string, Application>();
+
     applications.forEach(app => {
-      const studentKey = (app.student_id || app.created_by || app.student_name).toLowerCase().trim();
-      const existing = studentAppMap.get(studentKey);
-      if (!existing) {
-        studentAppMap.set(studentKey, app);
-      } else if (app.application_status === 'Diluluskan' && existing.application_status !== 'Diluluskan') {
-        studentAppMap.set(studentKey, app);
+      const mKey = normMatric(app.student_id);
+      const nKey = normName(app.student_name);
+      const uKey = (app.created_by || '').toLowerCase().trim();
+
+      [mKey, nKey, uKey].filter(Boolean).forEach(k => {
+        if (!anyAppMap.has(k)) anyAppMap.set(k, app);
+        if (app.application_status === 'Diluluskan') {
+          approvedAppMap.set(k, app);
+        }
+      });
+    });
+
+    // Extract active student users from the users list
+    const activeStudentUsers = users.filter(u => 
+      u.role === UserRole.STUDENT && 
+      u.is_active !== false
+    );
+
+    // Map of unique students
+    const uniqueStudentsMap = new Map<string, { user?: User; app?: Application; name: string; matricNo: string }>();
+
+    // 1. Add all active registered student users with deduplication
+    activeStudentUsers.forEach(u => {
+      const mKey = normMatric(u.matric_no);
+      const nKey = normName(u.name);
+      const uKey = (u.username || '').toLowerCase().trim();
+      const primaryKey = mKey || nKey || uKey;
+      if (!primaryKey) return;
+
+      let existingKey = '';
+      if (mKey && uniqueStudentsMap.has(mKey)) existingKey = mKey;
+      else if (nKey && uniqueStudentsMap.has(nKey)) existingKey = nKey;
+      else {
+        for (const [k, v] of uniqueStudentsMap.entries()) {
+          if (mKey && normMatric(v.user?.matric_no) === mKey) { existingKey = k; break; }
+          if (nKey && normName(v.user?.name) === nKey) { existingKey = k; break; }
+          if (uKey && v.user?.username && v.user.username.toLowerCase().trim() === uKey) { existingKey = k; break; }
+        }
+      }
+
+      const matchedApp = 
+        (mKey ? approvedAppMap.get(mKey) || anyAppMap.get(mKey) : undefined) ||
+        (nKey ? approvedAppMap.get(nKey) || anyAppMap.get(nKey) : undefined) ||
+        (uKey ? approvedAppMap.get(uKey) || anyAppMap.get(uKey) : undefined);
+
+      if (existingKey) {
+        const item = uniqueStudentsMap.get(existingKey)!;
+        item.user = {
+          ...item.user,
+          ...u,
+          name: item.user?.name || u.name,
+          matric_no: item.user?.matric_no || u.matric_no,
+          faculty_supervisor_name: u.faculty_supervisor_name || item.user?.faculty_supervisor_name,
+          faculty_supervisor_id: u.faculty_supervisor_id || item.user?.faculty_supervisor_id,
+          company_affiliation: u.company_affiliation || item.user?.company_affiliation,
+          profile_image: (u.profile_image && u.profile_image !== 'idb_stored') ? u.profile_image : item.user?.profile_image,
+        };
+        if (!item.app && matchedApp) item.app = matchedApp;
+      } else {
+        uniqueStudentsMap.set(primaryKey, {
+          user: u,
+          app: matchedApp,
+          name: u.name,
+          matricNo: u.matric_no || u.username || ''
+        });
       }
     });
 
-    // Start with the 5 official real student records
-    return DEFAULT_PLACED_STUDENTS.map((defaultPoint) => {
-      // Check if student has an actual application in storage
-      const app = Array.from(studentAppMap.values()).find(a => 
-        (a.student_id && a.student_id.toLowerCase().trim() === defaultPoint.matricNo.toLowerCase().trim()) ||
-        (a.student_name && a.student_name.toLowerCase().trim() === defaultPoint.name.toLowerCase().trim()) ||
-        (a.created_by && defaultPoint.matricNo.toLowerCase().includes(a.created_by.toLowerCase()))
-      );
+    // 2. Incorporate any students with applications not already in the map
+    applications.forEach(app => {
+      const mKey = normMatric(app.student_id);
+      const nKey = normName(app.student_name);
+      if (!mKey && !nKey) return;
 
-      const studentUser = users.find(u => 
-        (u.matric_no && u.matric_no.toLowerCase().trim() === defaultPoint.matricNo.toLowerCase().trim()) ||
-        (u.name && u.name.toLowerCase().trim() === defaultPoint.name.toLowerCase().trim())
-      );
+      let matchedKey = '';
+      for (const [k, v] of uniqueStudentsMap.entries()) {
+        if (mKey && normMatric(v.user?.matric_no || v.matricNo) === mKey) { matchedKey = k; break; }
+        if (nKey && normName(v.user?.name || v.name) === nKey) { matchedKey = k; break; }
+        if (app.created_by && v.user?.username && v.user.username.toLowerCase().trim() === app.created_by.toLowerCase().trim()) {
+          matchedKey = k;
+          break;
+        }
+      }
+
+      if (matchedKey) {
+        const item = uniqueStudentsMap.get(matchedKey)!;
+        if (!item.app || (app.application_status === 'Diluluskan' && item.app.application_status !== 'Diluluskan')) {
+          item.app = app;
+        }
+      } else if (app.student_name) {
+        uniqueStudentsMap.set(mKey || nKey, {
+          app,
+          name: app.student_name,
+          matricNo: app.student_id || app.created_by || ''
+        });
+      }
+    });
+
+    const realStudents = Array.from(uniqueStudentsMap.values());
+    if (realStudents.length === 0) {
+      return DEFAULT_PLACED_STUDENTS;
+    }
+
+    return realStudents.map((item, index) => {
+      const u = item.user;
+      const app = item.app;
+
+      const studentName = (u?.name || app?.student_name || item.name || '').trim();
+      const studentMatric = (u?.matric_no || app?.student_id || item.matricNo || 'Pelajar WBL').trim();
+      const studentProgram = u?.program || u?.academic_level || app?.student_program || 'Sarjana Muda Teknousahawanan (WBL)';
 
       const comp = app ? companies.find(c => 
         c.company_name.toLowerCase().trim() === app.company_name.toLowerCase().trim()
       ) : undefined;
 
-      // Check live weekly logbook entries
-      const liveLogs = allWeeklyLogbooks.filter(l => 
-        l.studentId === defaultPoint.studentId || 
-        l.studentMatric === defaultPoint.matricNo ||
-        (studentUser && l.studentId === studentUser.id)
-      );
+      const companyName = app?.company_name || u?.company_affiliation || 'Belum Ditetapkan';
+      const state = app?.company_state || comp?.company_state || 'Melaka';
+      const district = app?.company_district || comp?.company_district || '';
+      const companyAddress = comp?.company_address || (app as any)?.company_address || '';
+      const trainerName = u?.industry_trainer_name || 'Jurulatih Industri';
+      const supervisorName = u?.faculty_supervisor_name || app?.faculty_supervisor_name || 'Belum Dilantik';
 
-      let hasTodayLog = defaultPoint.hasFilledTodayLog;
-      let todayLogDate = defaultPoint.todayLogDate;
-      let todayLogStatus = defaultPoint.todayLogStatus;
-      let todayLogSummary = defaultPoint.todayLogSummary;
-      let todayDept = defaultPoint.todayDepartment;
-      let todayTools = defaultPoint.todayTools;
-      let todayLogHours = defaultPoint.todayLogHours;
+      // Check real weekly logbooks
+      const cleanM = normMatric(studentMatric);
+      const cleanN = normName(studentName);
 
-      if (liveLogs.length > 0) {
-        const allEntries: DailyLogEntry[] = liveLogs.flatMap(l => l.entries || []);
-        const todayEntry = allEntries.find(e => e.date === todayStr);
-        const latestEntry = allEntries.length > 0 ? allEntries[allEntries.length - 1] : null;
+      const liveLogs = allWeeklyLogbooks.filter(l => {
+        const lM = normMatric(l.studentMatric);
+        const lN = normName(l.studentName);
+        const matchMatric = cleanM && cleanM !== 'pelajarwbl' && cleanM.length > 2 && lM === cleanM;
+        const matchName = cleanN && cleanN !== 'pelajar wbl' && cleanN.length > 2 && lN === cleanN;
+        const matchId = u && u.id && l.studentId && l.studentId === u.id;
+        return matchMatric || matchName || matchId;
+      });
 
-        if (todayEntry) {
-          hasTodayLog = true;
-          todayLogDate = todayEntry.date;
-          todayLogStatus = 'verified';
-          todayLogSummary = todayEntry.tasks;
-          todayDept = todayEntry.department;
-          todayTools = todayEntry.toolsUsed;
-          todayLogHours = 8;
-        } else if (latestEntry) {
-          todayLogSummary = `Entri harian terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 100)}`;
-        }
-      }
+      const allEntries: DailyLogEntry[] = liveLogs.flatMap(l => l.entries || []);
+      const entriesWithTasks = allEntries.filter(e => e.tasks && e.tasks.trim().length > 0);
+      const todayEntry = allEntries.find(e => e.date === todayStr && e.tasks && e.tasks.trim().length > 0);
+      const latestEntry = entriesWithTasks.length > 0 ? entriesWithTasks[entriesWithTasks.length - 1] : null;
+      const matchingLog = liveLogs.find(l => (l.entries || []).some(e => e.tasks && e.tasks.trim().length > 0));
+
+      const hasFilledTodayLog = !!todayEntry || entriesWithTasks.length > 0;
+      const todayLogDate = todayEntry ? todayEntry.date : (latestEntry ? latestEntry.date : '');
+      const todayLogStatus: 'verified' | 'submitted' | 'pending' = matchingLog
+        ? (matchingLog.status === 'verified' ? 'verified' : matchingLog.status === 'submitted' ? 'submitted' : 'pending')
+        : 'pending';
+      const todayLogSummary = todayEntry ? todayEntry.tasks : (latestEntry ? `Entri harian terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 100)}` : 'Belum mengemukakan entri logbook.');
+      const todayLogHours = todayEntry ? 8 : (latestEntry ? 8 : 0);
+      const todayDept = todayEntry ? todayEntry.department : (latestEntry ? latestEntry.department : '');
+      const todayTools = todayEntry ? todayEntry.toolsUsed : (latestEntry ? latestEntry.toolsUsed : '');
+      const totalLogbookHours = entriesWithTasks.length * 8;
+      const totalWeeksLogged = new Set(liveLogs.map(l => l.weekNumber)).size;
+
+      const mapCoordinates = getStudentCoordinatesByState(state, district, index);
+
+      const avatarUrl = (u?.profile_image && u.profile_image !== 'idb_stored') 
+        ? u.profile_image 
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=0284c7&color=fff&bold=true`;
 
       return {
-        ...defaultPoint,
-        companyName: app?.company_name || defaultPoint.companyName,
-        companyAddress: comp?.company_address || defaultPoint.companyAddress,
-        state: app?.company_state || comp?.company_state || defaultPoint.state,
-        district: app?.company_district || comp?.company_district || defaultPoint.district,
-        industryTrainerName: studentUser?.industry_trainer_name || defaultPoint.industryTrainerName,
-        facultySupervisorName: app?.faculty_supervisor_name || studentUser?.faculty_supervisor_name || defaultPoint.facultySupervisorName,
-        hasFilledTodayLog: hasTodayLog,
-        todayLogDate: todayLogDate,
-        todayLogStatus: todayLogStatus,
-        todayLogSummary: todayLogSummary,
+        id: u?.id || app?.id || `student_${index}`,
+        studentId: u?.id || app?.student_id || `student_${index}`,
+        name: studentName,
+        matricNo: studentMatric,
+        program: studentProgram,
+        email: u?.email || app?.student_email || '',
+        phone: u?.phone || '',
+        avatarUrl,
+        companyName,
+        companyAddress,
+        state,
+        district,
+        industry: comp?.company_industry || 'Industri WBL',
+        industryTrainerName: trainerName,
+        facultySupervisorName: supervisorName,
+        mapCoordinates,
+        hasFilledTodayLog,
+        todayLogDate,
+        todayLogStatus,
+        todayLogSummary,
+        todayLogHours,
         todayDepartment: todayDept,
         todayTools: todayTools,
-        todayLogHours: todayLogHours,
-        avatarUrl: studentUser?.profile_image && studentUser.profile_image !== 'idb_stored' 
-          ? studentUser.profile_image 
-          : defaultPoint.avatarUrl
+        totalLogbookHours,
+        totalWeeksLogged
       };
     });
   }, [applications, companies, users, allWeeklyLogbooks]);

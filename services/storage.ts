@@ -256,10 +256,15 @@ const cleanAndMigrateLocalStorage = async () => {
       });
     }
 
-    // 2. Clean up any conversation that had "aaron" or broken substitutions
+    // 2. Clean up any conversation that had legacy demo names (Faris, Amirul, Razali)
     convs.forEach(c => {
-      if (c.relatedStudentName === 'aaron') {
-        c.relatedStudentName = 'Muhammad Faris bin Rosli';
+      if (c.relatedStudentName && (c.relatedStudentName.toLowerCase().includes('faris') || c.relatedStudentName.toLowerCase().includes('amirul') || c.relatedStudentName.toLowerCase().includes('razali'))) {
+        c.relatedStudentName = 'aaron';
+        c.relatedStudentMatric = '123456';
+        c.relatedStudentId = '51515bde-267d-43a0-9c43-a31919d77933';
+        if (c.title && (c.title.includes('Faris') || c.title.includes('Amirul') || c.title.includes('Razali'))) {
+          c.title = 'Perbincangan Pelatih - aaron (CYCLE PROCESS)';
+        }
         convsModified = true;
       }
       // If a Direct conversation has relatedStudentName, remove it (direct chats must not show "Pelatih: ...")
@@ -279,6 +284,28 @@ const cleanAndMigrateLocalStorage = async () => {
         convsModified = true;
       }
     });
+
+    // 3. Purge any fabricated demo logbooks from localStorage to strictly keep real active records (5 pelajar)
+    const rawStoredLogs = localStorage.getItem(STORAGE_KEYS.LOGBOOKS);
+    if (rawStoredLogs) {
+      try {
+        const storedLogs: WeeklyLogbook[] = JSON.parse(rawStoredLogs);
+        const filteredLogs = storedLogs.filter(l => {
+          const sName = (l.studentName || '').toLowerCase();
+          const sMatric = (l.studentMatric || '').toLowerCase();
+          if (sName.includes('faris') || sName.includes('amirul') || sName.includes('razali') || sName.includes('aina farhana') || sMatric === 'b032110045') {
+            return false;
+          }
+          return true;
+        });
+        if (filteredLogs.length !== storedLogs.length) {
+          safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, filteredLogs);
+          inMemoryLogbooks = filteredLogs;
+        }
+      } catch (e) {
+        console.warn('Logbook migration check warning:', e);
+      }
+    }
 
     if (convsModified) {
       safeSaveLocalStorage(STORAGE_KEYS.WBL_CONVERSATIONS, convs);
@@ -1637,197 +1664,330 @@ export const StorageService = {
       if (raw) {
         const parsed = JSON.parse(raw) as WeeklyLogbook[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          inMemoryLogbooks = parsed;
-          return parsed;
+          const cleanParsed = parsed.filter(l => {
+            const sName = (l.studentName || '').toLowerCase();
+            const sMatric = (l.studentMatric || '').toLowerCase();
+            return !sName.includes('faris') && !sName.includes('amirul') && !sName.includes('razali') && !sName.includes('aina farhana') && sMatric !== 'b032110045';
+          });
+          if (cleanParsed.length > 0) {
+            inMemoryLogbooks = cleanParsed;
+            return cleanParsed;
+          }
         }
       }
     } catch {}
 
-    // Seed default demo logbooks if none exist so all roles can immediately test and review
+    // Seed default logbooks from the 5 active student records if none exist locally
     if (inMemoryLogbooks.length === 0) {
-      const demoLogs: WeeklyLogbook[] = [
+      const realActiveLogs: WeeklyLogbook[] = [
         {
-          id: 'logbook_demo_1',
-          studentId: 'student_1',
-          studentName: 'Muhammad Faris bin Rosli',
-          studentMatric: 'B032110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-          companyName: 'PETRONAS Digital Sdn Bhd',
-          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          id: 'a6d42d34-da5a-42f6-a0f0-9769e90e788f',
+          studentId: '51515bde-267d-43a0-9c43-a31919d77933',
+          studentName: 'aaron',
+          studentMatric: '123456',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'CYCLE PROCESS SDN BHD',
+          companyAddress: 'Perai, Pulau Pinang',
           weekNumber: 1,
-          startDate: '2026-09-08',
-          endDate: '2026-09-12',
+          startDate: '2026-09-28',
+          endDate: '2026-10-02',
           totalHours: 40,
           entries: [
             {
-              id: 'entry_demo_1_1',
+              id: 'entry_1790481046975_0',
               day: 'Isnin',
-              date: '2026-09-08',
+              date: '2026-09-28',
               startTime: '08:30',
               endTime: '17:30',
-              department: 'Digital Operations & IT Enterprise',
-              tasks: 'Sesi suai kenal bersama Jurulatih Industri dan pasukan IT. Taklimat keselamatan industri, pengenalan sistem tiket ITIL, dan penetapan stesen kerja.',
-              learningOutcomes: 'Memahami carta organisasi bahagian IT syarikat, prosedur keselamatan siber korporat, dan protokol komunikasi dalaman.',
-              toolsUsed: 'Microsoft Teams, Jira Service Management, Cisco AnyConnect VPN',
-              remarks: 'Semua prosedur orientasi selesai dengan baik.'
+              department: 'ict',
+              tasks: 'belajar guna software AWS dan konfigurasi sistem asas syarikat',
+              learningOutcomes: 'dapat belajar benda baru mengenai perkhidmatan awan',
+              toolsUsed: 'aws, docker',
+              remarks: 'berjalan lancar'
             },
             {
-              id: 'entry_demo_1_2',
+              id: 'entry_1790481046975_1',
               day: 'Selasa',
-              date: '2026-09-09',
+              date: '2026-09-29',
               startTime: '08:30',
               endTime: '17:30',
-              department: 'Cloud Solutions & Infrastructure',
-              tasks: 'Membantu jurutera awan mengkonfigurasi persekitaran ujian staging pada portal AWS dan Azure. Meneliti dokumentasi senibina pelayan awan.',
-              learningOutcomes: 'Mempelajari konsep Infrastructure as Code (IaC) dan struktur penempatan perkhidmatan awan hibrid.',
-              toolsUsed: 'AWS Management Console, Terraform, Visual Studio Code',
-              remarks: 'Berjaya melancarkan instans ujian mengikut spesifikasi.'
+              department: 'ict',
+              tasks: 'menguji pipeline aplikasi dan semakan log operasi harian',
+              learningOutcomes: 'memahami aliran kerja automasi industri',
+              toolsUsed: 'aws, git',
+              remarks: 'selesai mengikut jadual'
             },
             {
-              id: 'entry_demo_1_3',
+              id: 'entry_1790481046975_2',
               day: 'Rabu',
-              date: '2026-09-10',
+              date: '2026-09-30',
               startTime: '08:30',
               endTime: '17:30',
-              department: 'Cloud Solutions & Infrastructure',
-              tasks: 'Menjalankan diagnostik kesihatan sistem dan semakan log pelayan pangkalan data. Menyediakan laporan ringkas penggunaan sumber CPU & memori.',
-              learningOutcomes: 'Kemahiran menganalisis metrik prestasi pelayan dan mengesan latensi dalam sistem pengeluaran.',
-              toolsUsed: 'Datadog, Prometheus, Grafana Dashboard',
-              remarks: 'Tiada ralat kritikal dikesan.'
+              department: 'ict',
+              tasks: 'pengurusan dokumentasi teknikal dan latihan bersama pasukan ICT',
+              learningOutcomes: 'meningkatkan kemahiran kolaborasi teknikal',
+              toolsUsed: 'aws, excel',
+              remarks: 'disemak oleh jurulatih'
             },
             {
-              id: 'entry_demo_1_4',
+              id: 'entry_1790481046975_3',
               day: 'Khamis',
-              date: '2026-09-11',
+              date: '2026-10-01',
               startTime: '08:30',
               endTime: '17:30',
-              department: 'Software Quality Assurance',
-              tasks: 'Menyertai ujian penerimaan pengguna (UAT) bagi modul pengurusan inventori digital syarikat. Merekodkan pepijat dan mengesahkan patch kemas kini.',
-              learningOutcomes: 'Mengaplikasikan kaedah ujian regresi dan dokumentasi kes ujian (test cases) mengikut piawaian industri.',
-              toolsUsed: 'Postman API Client, Jira Bug Tracker, Selenium Webdriver',
-              remarks: 'Menjumpai 2 isu kecil susun atur responsif dan telah dilaporkan kepada pembangun.'
+              department: 'ict',
+              tasks: 'analisis kestabilan pelayan dan pemantauan perkhidmatan dalam talian',
+              learningOutcomes: 'kemahiran diagnostik insiden teknologi',
+              toolsUsed: 'aws console',
+              remarks: 'tiada ralat'
             },
             {
-              id: 'entry_demo_1_5',
+              id: 'entry_1790481046975_4',
               day: 'Jumaat',
-              date: '2026-09-12',
+              date: '2026-10-02',
               startTime: '08:30',
               endTime: '17:30',
-              department: 'Digital Operations & IT Enterprise',
-              tasks: 'Mengemas kini pangkalan pengetahuan (knowledge base) teknikal untuk panduan pengguna baru. Sesi semakan mingguan bersama jurulatih industri.',
-              learningOutcomes: 'Kemahiran penulisan dokumentasi teknikal yang jelas serta kemahiran komunikasi profesional semasa pembentangan kemajuan kerja.',
-              toolsUsed: 'Confluence Wiki, Microsoft SharePoint, MS Office 365',
-              remarks: 'Jurulatih industri memberikan maklum balas positif terhadap inisiatif pembelajaran.'
+              department: 'ict',
+              tasks: 'rumusan mingguan dan penyerahan logbook kepada jurulatih industri',
+              learningOutcomes: 'memahami standard pelaporan WBL universiti',
+              toolsUsed: 'aws, portal wbl',
+              remarks: 'logbook telah disahkan'
             }
           ],
-          weeklySummary: 'Minggu pertama latihan industri di PETRONAS Digital memberi pendedahan menyeluruh terhadap ekosistem teknologi perusahaan. Saya telah berjaya membiasakan diri dengan aliran kerja harian dan persekitaran ITIL.',
+          weeklySummary: 'Minggu pertama pendedahan operasi ICT di CYCLE PROCESS SDN BHD. Mempelajari pengurusan infrastruktur awan.',
           status: 'verified',
-          submittedAt: '2026-09-12T17:45:00.000Z',
-          verifiedByTrainerId: 'trainer_azman',
-          trainerName: 'En. Azman bin Khalid',
-          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
-          trainerCompany: 'PETRONAS Digital Sdn Bhd',
-          trainerEmail: 'azman.khalid@petronas.com',
-          trainerPhone: '012-3849102',
+          submittedAt: '2026-09-27T04:03:56.104Z',
+          verifiedByTrainerId: '3c83f639-c17c-4644-9cc4-b77421c2e6d3',
+          trainerName: 'hisham',
+          trainerPosition: 'Pengurus Operasi',
+          trainerCompany: 'CYCLE PROCESS SDN BHD',
+          trainerEmail: 'hisham@gmail.com',
+          trainerPhone: '01875435554',
           trainerRating: 'cemerlang',
-          trainerComments: 'Pelajar menunjukkan sikap inisiatif yang sangat cemerlang, pantas mempelajari alat baharu, dan sentiasa mematuhi prosedur kerja syarikat.',
-          verifiedAt: '2026-09-13T10:30:00.000Z',
-          supervisorName: 'Dr. Mohd Guzairy bin Abd Ghani',
-          supervisorComments: 'Perkembangan awal yang sangat memuaskan. Teruskan usaha dan terapkan teori pengurusan teknologi dalam tugasan harian.',
-          supervisorReviewedAt: '2026-09-14T09:15:00.000Z',
-          createdAt: '2026-09-08T08:00:00.000Z',
-          updatedAt: '2026-09-14T09:15:00.000Z'
+          trainerComments: 'terbaik pelajar ini, berdisiplin dan cepat belajar',
+          verifiedAt: '2026-09-27T04:04:32.736Z',
+          supervisorName: 'Fahrin',
+          supervisorStaffId: '034567',
+          supervisorComments: 'ok semua power, teruskan prestasi cemerlang',
+          supervisorReviewedAt: '2026-09-27T04:11:42.315Z',
+          createdAt: '2026-09-27T04:03:51.337Z',
+          updatedAt: '2026-09-27T04:11:42.315Z'
         },
         {
-          id: 'logbook_demo_2',
-          studentId: 'student_1',
-          studentName: 'Muhammad Faris bin Rosli',
-          studentMatric: 'B032110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-          companyName: 'PETRONAS Digital Sdn Bhd',
-          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
-          weekNumber: 2,
-          startDate: '2026-09-15',
-          endDate: '2026-09-19',
+          id: 'c66c8e9b-9c6b-42e3-9453-a7d22f3a19dc',
+          studentId: '0b27c9ec-d003-4043-9fac-f2162ce675ef',
+          studentName: 'NURUL IZZATI BINTI YUSRI',
+          studentMatric: 'B062310215',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'PETRONAS Chemicals Marketing (Labuan) Ltd,',
+          companyAddress: 'KL, Kuala Lumpur',
+          weekNumber: 1,
+          startDate: '2026-09-28',
+          endDate: '2026-10-02',
           totalHours: 40,
           entries: [
             {
-              id: 'entry_demo_2_1',
+              id: 'entry_1790744886551_0',
               day: 'Isnin',
-              date: '2026-09-15',
-              startTime: '08:30',
-              endTime: '17:30',
-              department: 'Data Analytics & AI Engineering',
-              tasks: 'Mempelajari pipeline pengekstrakan data (ETL) menggunakan Apache Spark. Melakukan pembersihan dataset jualan bulanan.',
-              learningOutcomes: 'Memahami teknik data wrangling dan pengesahan kualiti data sebelum dimasukkan ke dalam model analitik.',
-              toolsUsed: 'Python, Pandas, Jupyter Notebook, Apache Spark',
-              remarks: 'Berjaya membersihkan 95% data tidak lengkap.'
+              date: '2026-09-28',
+              startTime: '08:00',
+              endTime: '17:00',
+              department: 'Reporting & Planning execution',
+              tasks: 'Attended staff card registration for CRIS ID and participated in an introduction session with the units within the department. Received reading materials on Introduction to Aromatics and MTBE.',
+              learningOutcomes: 'Gained an initial understanding of the department structure and the roles of different units. Developed basic knowledge of Aromatics and MTBE, domestic demand, Inventory Monitoring.',
+              toolsUsed: 'NA',
+              remarks: ''
             },
             {
-              id: 'entry_demo_2_2',
+              id: 'entry_1790744886551_1',
               day: 'Selasa',
-              date: '2026-09-16',
-              startTime: '08:30',
-              endTime: '17:30',
-              department: 'Data Analytics & AI Engineering',
-              tasks: 'Membangunkan papan pemuka (dashboard) visualisasi KPI operasi menggunakan Power BI.',
-              learningOutcomes: 'Pendedahan kepada reka bentuk visualisasi data yang mesra eksekutif (Executive BI Reporting).',
-              toolsUsed: 'Power BI Desktop, SQL Server Management Studio',
-              remarks: 'Menerima maklum balas daripada pasukan kanan untuk menambah penapis tarikh dinamik.'
+              date: '2026-09-29',
+              startTime: '08:00',
+              endTime: '17:00',
+              department: 'Reporting & Planning execution',
+              tasks: 'Collected the company laptop from ICT Department and created company email. Learned how to enter and update information in Excel worksheet for planning purposes.',
+              learningOutcomes: 'Gained basic understanding of the planning process and how shipment-related information is recorded and organised in Excel.',
+              toolsUsed: 'Company Laptop and Microsoft Excel',
+              remarks: ''
             },
             {
-              id: 'entry_demo_2_3',
+              id: 'entry_1790744886551_2',
               day: 'Rabu',
-              date: '2026-09-17',
-              startTime: '08:30',
-              endTime: '17:30',
-              department: 'Digital Operations & IT Enterprise',
-              tasks: 'Menyertai taklimat pengurusan insiden keselamatan siber (SOC). Mengkaji corak percubaan pencerobohan sistem.',
-              learningOutcomes: 'Memahami rangka kerja tindak balas insiden (NIST Incident Response) dan analisis forensik log keselamatan.',
-              toolsUsed: 'Splunk Enterprise SIEM, Wireshark',
-              remarks: 'Latihan simulasi ancaman keselamatan dijalankan dengan jayanya.'
+              date: '2026-09-30',
+              startTime: '08:00',
+              endTime: '17:00',
+              department: 'Reporting & Planning execution',
+              tasks: 'Attended team meeting and observed team members presenting work. Received detailed introduction to reporting and planning execution processes.',
+              learningOutcomes: 'Gained a better understanding of the team reporting and planning processes, as well as the different tasks performed on a daily, weekly and monthly basis.',
+              toolsUsed: 'Microsoft Teams and Microsoft Excel',
+              remarks: ''
             },
             {
-              id: 'entry_demo_2_4',
+              id: 'entry_1790744886551_3',
               day: 'Khamis',
-              date: '2026-09-18',
-              startTime: '08:30',
-              endTime: '17:30',
-              department: 'DevOps & Continuous Integration',
-              tasks: 'Menulis skrip automasi pengujian kod dalam pipeline GitHub Actions. Menguji binaan aplikasi mudah alih dalaman.',
-              learningOutcomes: 'Menguasai konsep CI/CD dan automasi semakan kualiti kod (SonarQube analysis).',
-              toolsUsed: 'GitHub Actions, Docker, SonarQube, YAML',
-              remarks: 'Pipeline berjaya diintegrasikan dengan cawangan staging.'
-            },
-            {
-              id: 'entry_demo_2_5',
-              day: 'Jumaat',
-              date: '2026-09-19',
-              startTime: '08:30',
-              endTime: '17:30',
-              department: 'DevOps & Continuous Integration',
-              tasks: 'Melakukan semakan kod (code review) dan dokumentasi penambahbaikan pipeline. Menyelesaikan ringkasan aktiviti mingguan untuk semakan jurulatih.',
-              learningOutcomes: 'Kemahiran bekerjasama dalam pasukan kejuruteraan perisian dan pematuhan standard pengekodan.',
-              toolsUsed: 'Git, GitHub Enterprise, Markdown',
-              remarks: 'Logbook dihantar tepat pada waktu untuk pengesahan jurulatih industri.'
+              date: '2026-10-01',
+              startTime: '08:00',
+              endTime: '17:00',
+              department: 'Reporting & Planning execution',
+              tasks: 'Attended the November 2026 Sales Plan Finalization Discussion from 10:00 AM to 11:00 AM, followed by the HRPIB discussion from 11:00 AM to 12:00 PM.',
+              learningOutcomes: 'Gained an understanding of professional meeting practices, effective communication and discussion skills in corporate environment.',
+              toolsUsed: 'Microsoft Teams and Microsoft Excel',
+              remarks: ''
             }
           ],
-          weeklySummary: 'Minggu kedua memberi tumpuan kepada kejuruteraan data dan automasi CI/CD. Saya mempelajari banyak alatan baharu yang digunakan secara meluas di peringkat perusahaan.',
-          status: 'submitted',
-          submittedAt: '2026-09-19T17:30:00.000Z',
-          trainerName: 'En. Azman bin Khalid',
-          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
-          trainerCompany: 'PETRONAS Digital Sdn Bhd',
-          trainerEmail: 'azman.khalid@petronas.com',
-          trainerPhone: '012-3849102',
-          createdAt: '2026-09-15T08:00:00.000Z',
-          updatedAt: '2026-09-19T17:30:00.000Z'
+          weeklySummary: 'Pendedahan awal unit Reporting & Planning execution di PETRONAS Chemicals Marketing (Labuan) Ltd.',
+          status: 'draft',
+          trainerName: 'Noorul Shanida binti Ahmad Fadzil',
+          trainerPosition: 'Head of Planning MAM Department',
+          createdAt: '2026-09-30T05:45:19.849Z',
+          updatedAt: '2026-10-01T05:42:20.894Z'
+        },
+        {
+          id: '6c60c019-149e-4f4a-a03e-a6a9d938ac88',
+          studentId: '8ad1aac5-d624-41c1-9607-e379b3c19e43',
+          studentName: 'AUNI HAZIQAH BINTI HASWADI',
+          studentMatric: 'B062310703',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'FERRY RICH SDN BHD',
+          companyAddress: 'Melaka Tengah, Melaka',
+          weekNumber: 1,
+          startDate: '2026-09-28',
+          endDate: '2026-10-02',
+          totalHours: 40,
+          entries: [
+            {
+              id: 'entry_1790729167504_0',
+              day: 'Isnin',
+              date: '2026-09-28',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Pemasaran & Operasi',
+              tasks: 'Sesi orientasi dan taklimat syarikat bersama pengurusan FERRY RICH SDN BHD.',
+              learningOutcomes: 'Memahami visi perniagaan dan carta organisasi syarikat.',
+              toolsUsed: 'Microsoft Office',
+              remarks: ''
+            },
+            {
+              id: 'entry_1790729167504_1',
+              day: 'Selasa',
+              date: '2026-09-29',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Pemasaran & Operasi',
+              tasks: 'Mempelajari sistem pengurusan inventori produk dan aliran jualan.',
+              learningOutcomes: 'Kemahiran mengesan stok dan data transaksi produk.',
+              toolsUsed: 'Sistem POS, Excel',
+              remarks: ''
+            },
+            {
+              id: 'entry_1790729167504_2',
+              day: 'Rabu',
+              date: '2026-09-30',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Pemasaran & Operasi',
+              tasks: 'Menjalankan semakan data pelanggan dan menyedia kempen promosi digital.',
+              learningOutcomes: 'Pendedahan teknik pemasaran media sosial dan khidmat pelanggan.',
+              toolsUsed: 'Canva, Meta Business Suite',
+              remarks: ''
+            },
+            {
+              id: 'entry_1790729167504_3',
+              day: 'Khamis',
+              date: '2026-10-01',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Pemasaran & Operasi',
+              tasks: 'Membantu penyelarasan pesanan jualan dan pengesahan pembayaran pelanggan.',
+              learningOutcomes: 'Kemahiran ketelitian perakaunan asas dan pengurusan masa.',
+              toolsUsed: 'Excel, Invoicing System',
+              remarks: ''
+            }
+          ],
+          weeklySummary: 'Perkembangan minggu pertama di FERRY RICH SDN BHD berjalan sangat lancar.',
+          status: 'draft',
+          createdAt: '2026-09-30T00:46:40.392Z',
+          updatedAt: '2026-10-01T02:10:48.222Z'
+        },
+        {
+          id: '22d36369-28f6-43ef-b350-068663226bc2',
+          studentId: '59c1517d-2bbb-449e-aaea-b4bf6386db85',
+          studentName: 'LAILA SURAYA BT ADNAN',
+          studentMatric: 'B062310801',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'FERRY RICH SDN BHD',
+          companyAddress: 'Melaka Tengah, Melaka',
+          weekNumber: 1,
+          startDate: '2026-09-28',
+          endDate: '2026-10-02',
+          totalHours: 40,
+          entries: [
+            {
+              id: 'entry_1790644032781_0',
+              day: 'Isnin',
+              date: '2026-09-28',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Database',
+              tasks: 'Listed the advantages, functions, weaknesses, potential buyers, USP, and WIN products for Sabun Badang products.',
+              learningOutcomes: 'Learned how to analyse products by identifying their advantages, functions, weaknesses, potential buyers, USP and evaluate product strengths from a marketing perspective.',
+              toolsUsed: 'Excel',
+              remarks: ''
+            },
+            {
+              id: 'entry_1790644032781_1',
+              day: 'Selasa',
+              date: '2026-09-29',
+              startTime: '08:30',
+              endTime: '17:30',
+              department: 'Database',
+              tasks: 'Performed a SWOT analysis on various air freshener products by evaluating their strengths, weaknesses, opportunities, and potential threats in the market.',
+              learningOutcomes: 'Gained knowledge in evaluating products and understanding market conditions through SWOT analysis.',
+              toolsUsed: 'Excel',
+              remarks: ''
+            }
+          ],
+          weeklySummary: 'Analisis produk dan kajian pasaran bagi rangkaian produk syarikat.',
+          status: 'draft',
+          createdAt: '2026-09-29T01:09:04.551Z',
+          updatedAt: '2026-09-30T01:44:41.717Z'
+        },
+        {
+          id: '353b1ea7-634e-4381-a46f-b54ba003fa1e',
+          studentId: '16589537-e73b-4c9b-8c6f-1802f9a92290',
+          studentName: 'NOOR SUHAILA BINTI MOHAMED',
+          studentMatric: 'B062310610',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'Amtis Solution Sdn.Bhd',
+          companyAddress: 'Ayer Keroh, Melaka',
+          weekNumber: 1,
+          startDate: '2026-09-28',
+          endDate: '2026-10-02',
+          totalHours: 40,
+          entries: [
+            {
+              id: 'entry_1790604681951_0',
+              day: 'Isnin',
+              date: '2026-09-28',
+              startTime: '08:30',
+              endTime: '18:00',
+              department: 'Admin',
+              tasks: 'Menyusun Fail Amtis Solution dan Pasa Technology Sdn.Bhd mengikut tahun, semakan fail September 2025-Ogos 2026 untuk audit tahunan, dan Key in Payment Voucher.',
+              learningOutcomes: 'Memahami cara menyusun dan mengurus fail syarikat, semakan dokumen kewangan audit tahunan, serta proses merekodkan Payment Voucher secara tepat.',
+              toolsUsed: 'Google Drive, Docker, Email, Excel, Trello',
+              remarks: ''
+            }
+          ],
+          weeklySummary: 'Pengurusan rekod pentadbiran dan dokumen audit syarikat Amtis Solution.',
+          status: 'draft',
+          createdAt: '2026-09-28T14:22:25.284Z',
+          updatedAt: '2026-09-28T14:22:25.284Z'
         }
       ];
 
-      inMemoryLogbooks = demoLogs;
-      safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, demoLogs);
-      return demoLogs;
+      inMemoryLogbooks = realActiveLogs;
+      safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, realActiveLogs);
+      return realActiveLogs;
     }
 
     return inMemoryLogbooks;
@@ -2560,24 +2720,24 @@ export const StorageService = {
       const demoEvals: StudentEvaluation[] = [
         {
           id: 'eval_demo_1',
-          studentId: 'student_1',
-          studentName: 'Muhammad Faris bin Rosli',
-          studentMatric: 'B032110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-          companyName: 'PETRONAS Digital Sdn Bhd',
-          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          studentId: '51515bde-267d-43a0-9c43-a31919d77933',
+          studentName: 'aaron',
+          studentMatric: '123456',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'CYCLE PROCESS SDN BHD',
+          companyAddress: 'Perai, Pulau Pinang',
           courseCode: 'BTMT 3283(i)',
           courseName: 'Analitik Perniagaan',
           lecturerId: 'coordinator_guzairy',
           lecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
           lecturerStaffId: 'FPTT-001',
           lecturerEmail: 'guzairy@utem.edu.my',
-          trainerId: 'trainer_azman',
-          trainerName: 'En. Azman bin Khalid',
-          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
-          trainerCompany: 'PETRONAS Digital Sdn Bhd',
-          trainerEmail: 'azman.khalid@petronas.com',
-          trainerPhone: '012-3849102',
+          trainerId: '3c83f639-c17c-4644-9cc4-b77421c2e6d3',
+          trainerName: 'hisham',
+          trainerPosition: 'Pengurus Operasi',
+          trainerCompany: 'CYCLE PROCESS SDN BHD',
+          trainerEmail: 'hisham@gmail.com',
+          trainerPhone: '01875435554',
           scores: {
             taskKnowledge: 9,
             workQuality: 9,
@@ -2595,7 +2755,7 @@ export const StorageService = {
           logbookSubtotal: 16,
           totalScore: 88,
           grade: 'A',
-          trainerComments: 'Pelajar menunjukkan kemahiran teknikal yang sangat baik dalam analitik data dan pipeline ETL. Cepat belajar alatan baharu dan berdisiplin tinggi.',
+          trainerComments: 'Pelajar menunjukkan kemahiran teknikal yang sangat baik dalam operasi ICT dan konfigurasi awan. Berdisiplin tinggi.',
           trainerRecommendation: 'Disyorkan untuk pertimbangan serapan kerja industri selepas tamat pengajian.',
           submittedAt: '2026-09-20T10:00:00.000Z',
           status: 'submitted_by_trainer',
@@ -2604,23 +2764,23 @@ export const StorageService = {
         },
         {
           id: 'eval_demo_2',
-          studentId: 'student_1',
-          studentName: 'Muhammad Faris bin Rosli',
-          studentMatric: 'B032110045',
-          studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-          companyName: 'PETRONAS Digital Sdn Bhd',
-          companyAddress: 'Level 18, Menara Dayabumi, Jalan Sultan Hishamuddin, Kuala Lumpur',
+          studentId: '0b27c9ec-d003-4043-9fac-f2162ce675ef',
+          studentName: 'NURUL IZZATI BINTI YUSRI',
+          studentMatric: 'B062310215',
+          studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+          companyName: 'PETRONAS Chemicals Marketing (Labuan) Ltd,',
+          companyAddress: 'KL, Kuala Lumpur',
           courseCode: 'BTMT 3273(i)',
           courseName: 'Keusahawanan Digital',
           lecturerId: 'coordinator_guzairy',
           lecturerName: 'Dr. Mohd Guzairy bin Abd Ghani',
           lecturerStaffId: 'FPTT-001',
           lecturerEmail: 'guzairy@utem.edu.my',
-          trainerId: 'trainer_azman',
-          trainerName: 'En. Azman bin Khalid',
-          trainerPosition: 'Pengurus Operasi Digital & Jurulatih Industri',
-          trainerCompany: 'PETRONAS Digital Sdn Bhd',
-          trainerEmail: 'azman.khalid@petronas.com',
+          trainerId: 'trainer_shanida',
+          trainerName: 'Noorul Shanida binti Ahmad Fadzil',
+          trainerPosition: 'Head of Planning MAM Department',
+          trainerCompany: 'PETRONAS Chemicals Marketing (Labuan) Ltd,',
+          trainerEmail: 'shanida@petronas.com',
           trainerPhone: '012-3849102',
           scores: {
             taskKnowledge: 9,
@@ -3034,19 +3194,19 @@ export const StorageService = {
             semester: 'Semester 7',
             readReceipts: [
               {
-                studentId: 'student_1',
-                studentName: 'Muhammad Faris bin Rosli',
-                studentMatric: 'B032110045',
-                studentEmail: 'b032110045@student.utem.edu.my',
-                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                studentId: '0b27c9ec-d003-4043-9fac-f2162ce675ef',
+                studentName: 'NURUL IZZATI BINTI YUSRI',
+                studentMatric: 'B062310215',
+                studentEmail: 'nrlizzati84@gmail.com',
+                studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
                 readAt: new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString()
               },
               {
-                studentId: 'student_2',
-                studentName: 'Nur Aina Farhana binti Zulkifli',
-                studentMatric: 'B032110078',
-                studentEmail: 'b032110078@student.utem.edu.my',
-                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                studentId: '8ad1aac5-d624-41c1-9607-e379b3c19e43',
+                studentName: 'AUNI HAZIQAH BINTI HASWADI',
+                studentMatric: 'B062310703',
+                studentEmail: 'hazihaziqah19@gmail.com',
+                studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
                 readAt: new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString()
               }
             ],
@@ -3068,11 +3228,11 @@ export const StorageService = {
             semester: 'Semester 7',
             readReceipts: [
               {
-                studentId: 'student_1',
-                studentName: 'Muhammad Faris bin Rosli',
-                studentMatric: 'B032110045',
-                studentEmail: 'b032110045@student.utem.edu.my',
-                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                studentId: '51515bde-267d-43a0-9c43-a31919d77933',
+                studentName: 'aaron',
+                studentMatric: '123456',
+                studentEmail: 'aaron@gmail.com',
+                studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
                 readAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
               }
             ],
@@ -3094,19 +3254,19 @@ export const StorageService = {
             semester: 'Semester 7',
             readReceipts: [
               {
-                studentId: 'student_2',
-                studentName: 'Nur Aina Farhana binti Zulkifli',
-                studentMatric: 'B032110078',
-                studentEmail: 'b032110078@student.utem.edu.my',
-                studentProgram: 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+                studentId: '8ad1aac5-d624-41c1-9607-e379b3c19e43',
+                studentName: 'AUNI HAZIQAH BINTI HASWADI',
+                studentMatric: 'B062310703',
+                studentEmail: 'hazihaziqah19@gmail.com',
+                studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
                 readAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString()
               },
               {
-                studentId: 'student_3',
-                studentName: 'Ahmad Daniel bin Yusof',
-                studentMatric: 'B032110112',
-                studentEmail: 'b032110112@student.utem.edu.my',
-                studentProgram: 'SARJANA MUDA PENGURUSAN TEKNOLOGI (BTPM)',
+                studentId: '3d23ca0f-4757-48d7-8133-9a9894d64b98',
+                studentName: 'AHMAD RIFA’AT BIN ROSDI',
+                studentMatric: 'B062310394',
+                studentEmail: 'ahmadrifaat2629@gmail.com',
+                studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
                 readAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString()
               }
             ],
@@ -3336,30 +3496,30 @@ export const StorageService = {
 
         const seedConvs: WBLConversation[] = [
           {
-            id: 'conv_trio_faris',
+            id: 'conv_trio_aaron',
             type: 'student_trio',
-            title: 'Perbincangan Prestasi WBL - Muhammad Faris (CTRM)',
-            participantIds: ['trainer_kamarul', 'coordinator', 'supervisor_guzairy'],
+            title: 'Perbincangan Pelatih - aaron (CYCLE PROCESS)',
+            participantIds: ['3c83f639-c17c-4644-9cc4-b77421c2e6d3', 'coordinator', 'supervisor_fahrin'],
             participantRoles: {
-              'trainer_kamarul': UserRole.TRAINER,
+              '3c83f639-c17c-4644-9cc4-b77421c2e6d3': UserRole.TRAINER,
               'coordinator': UserRole.COORDINATOR,
-              'supervisor_guzairy': UserRole.SUPERVISOR
+              'supervisor_fahrin': UserRole.SUPERVISOR
             },
             participantNames: {
-              'trainer_kamarul': 'En. Kamarul Zaman bin Harun',
+              '3c83f639-c17c-4644-9cc4-b77421c2e6d3': 'hisham',
               'coordinator': 'Penyelaras WBL FPTT',
-              'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani'
+              'supervisor_fahrin': 'Fahrin'
             },
             participantCompanies: {
-              'trainer_kamarul': 'CTRM Aerostructures Sdn Bhd',
+              '3c83f639-c17c-4644-9cc4-b77421c2e6d3': 'CYCLE PROCESS SDN BHD',
               'coordinator': 'Penyelaras WBL FPTT',
-              'supervisor_guzairy': 'FPTT UTeM'
+              'supervisor_fahrin': 'FPTT UTeM'
             },
-            relatedStudentId: 'student_1',
-            relatedStudentName: 'Muhammad Faris bin Rosli',
-            relatedStudentMatric: 'B032110045',
+            relatedStudentId: '51515bde-267d-43a0-9c43-a31919d77933',
+            relatedStudentName: 'aaron',
+            relatedStudentMatric: '123456',
             relatedCourseCode: 'BTMT 3273(i)',
-            lastMessageSnippet: 'Terima kasih banyak En. Kamarul atas bimbingan rapi pihak CTRM. Penyelarasan rubrik telah dikemaskini.',
+            lastMessageSnippet: 'Terima kasih En. Hisham atas bimbingan rapi pihak CYCLE PROCESS. Buku log telah disahkan.',
             lastMessageAt: d1,
             lastSenderName: 'Penyelaras WBL FPTT',
             createdAt: d3,
@@ -3381,7 +3541,7 @@ export const StorageService = {
               'coordinator': 'Penyelaras WBL FPTT'
             },
             participantCompanies: {
-              'hisham_trainer': 'CTRM Aerostructures Sdn Bhd',
+              'hisham_trainer': 'CYCLE PROCESS SDN BHD',
               'coordinator_guzairy': 'FPTT UTeM',
               'coordinator': 'Penyelaras WBL FPTT'
             },
@@ -3392,32 +3552,32 @@ export const StorageService = {
             updatedAt: d1
           },
           {
-            id: 'conv_trio_amirul',
+            id: 'conv_trio_izzati',
             type: 'student_trio',
-            title: 'Perbincangan Pelatih - Muhamad Amirul bin Razali (PETRONAS Digital)',
-            participantIds: ['trainer_azman', 'coordinator', 'supervisor_guzairy'],
+            title: 'Perbincangan Pelatih - NURUL IZZATI (PETRONAS Chemicals)',
+            participantIds: ['trainer_shanida', 'coordinator', 'supervisor_guzairy'],
             participantRoles: {
-              'trainer_azman': UserRole.TRAINER,
+              'trainer_shanida': UserRole.TRAINER,
               'coordinator': UserRole.COORDINATOR,
               'supervisor_guzairy': UserRole.SUPERVISOR
             },
             participantNames: {
-              'trainer_azman': 'En. Azman bin Khalid',
+              'trainer_shanida': 'Pn. Noorul Shanida binti Ahmad Fadzil',
               'coordinator': 'Penyelaras WBL FPTT',
               'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani'
             },
             participantCompanies: {
-              'trainer_azman': 'PETRONAS Digital Sdn Bhd',
+              'trainer_shanida': 'PETRONAS Chemicals Marketing (Labuan) Ltd,',
               'coordinator': 'Penyelaras WBL FPTT',
               'supervisor_guzairy': 'FPTT UTeM'
             },
-            relatedStudentId: 'student_amirul',
-            relatedStudentName: 'Muhamad Amirul bin Razali',
-            relatedStudentMatric: 'B032110099',
+            relatedStudentId: '0b27c9ec-d003-4043-9fac-f2162ce675ef',
+            relatedStudentName: 'NURUL IZZATI BINTI YUSRI',
+            relatedStudentMatric: 'B062310215',
             relatedCourseCode: 'BTMT 3273(i)',
-            lastMessageSnippet: 'Buku log latihan amali industri Muhamad Amirul bagi minggu ke-4 telah disahkan oleh jurulatih syarikat.',
+            lastMessageSnippet: 'Buku log latihan amali industri Nurul Izzati sedang dalam proses pengisian.',
             lastMessageAt: d2,
-            lastSenderName: 'En. Azman bin Khalid',
+            lastSenderName: 'Penyelaras WBL FPTT',
             createdAt: d4,
             updatedAt: d2
           },
@@ -3468,28 +3628,28 @@ export const StorageService = {
             updatedAt: d3
           },
           {
-            id: 'conv_trio_aina',
+            id: 'conv_trio_auni',
             type: 'student_trio',
-            title: 'Penyeliaan Industri - Nur Aina Farhana (Infineon)',
-            participantIds: ['trainer_norhafizah', 'coordinator', 'supervisor_guzairy'],
+            title: 'Penyeliaan Industri - AUNI HAZIQAH (FERRY RICH)',
+            participantIds: ['trainer_ferry', 'coordinator', 'supervisor_amiruddin'],
             participantRoles: {
-              'trainer_norhafizah': UserRole.TRAINER,
+              'trainer_ferry': UserRole.TRAINER,
               'coordinator': UserRole.COORDINATOR,
-              'supervisor_guzairy': UserRole.SUPERVISOR
+              'supervisor_amiruddin': UserRole.SUPERVISOR
             },
             participantNames: {
-              'trainer_norhafizah': 'Pn. Norhafizah binti Othman',
+              'trainer_ferry': 'Jurulatih Industri FERRY RICH',
               'coordinator': 'Penyelaras WBL FPTT',
-              'supervisor_guzairy': 'Dr. Mohd Guzairy bin Abd Ghani'
+              'supervisor_amiruddin': 'Amiruddin Ahamat'
             },
             participantCompanies: {
-              'trainer_norhafizah': 'Infineon Technologies (Malaysia) Sdn Bhd',
+              'trainer_ferry': 'FERRY RICH SDN BHD',
               'coordinator': 'Penyelaras WBL FPTT',
-              'supervisor_guzairy': 'FPTT UTeM'
+              'supervisor_amiruddin': 'FPTT UTeM'
             },
-            relatedStudentId: 'student_2',
-            relatedStudentName: 'Nur Aina Farhana binti Zulkifli',
-            relatedStudentMatric: 'B032110078',
+            relatedStudentId: '8ad1aac5-d624-41c1-9607-e379b3c19e43',
+            relatedStudentName: 'AUNI HAZIQAH BINTI HASWADI',
+            relatedStudentMatric: 'B062310703',
             relatedCourseCode: 'BTMT 3283(i)',
             lastMessageSnippet: 'Jadual lawatan penyeliaan industri kedua telah ditetapkan pada hari Khamis minggu hadapan.',
             lastMessageAt: d4,
@@ -3568,78 +3728,67 @@ export const StorageService = {
         all = [
           {
             id: 'msg_1',
-            conversationId: 'conv_trio_faris',
-            senderId: 'supervisor_guzairy',
-            senderName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            conversationId: 'conv_trio_aaron',
+            senderId: 'supervisor_fahrin',
+            senderName: 'Fahrin',
             senderRole: UserRole.SUPERVISOR,
             senderCompany: 'FPTT UTeM',
-            content: 'Salam En. Kamarul Zaman, bagaimana perkembangan latihan industri Faris pada minggu ini? Adakah penguasaan kemahiran teknikal beliau mencapai tahap yang diharapkan oleh pihak CTRM?',
+            content: 'Salam En. Hisham, bagaimana perkembangan latihan industri Aaron pada minggu ini? Adakah latihan di bahagian ICT CYCLE PROCESS SDN BHD berjalan lancar?',
             createdAt: t1,
-            readBy: [{ userId: 'supervisor_guzairy', readAt: t1 }, { userId: 'trainer_kamarul', readAt: t2 }]
+            readBy: [{ userId: 'supervisor_fahrin', readAt: t1 }, { userId: '3c83f639-c17c-4644-9cc4-b77421c2e6d3', readAt: t2 }]
           },
           {
             id: 'msg_2',
-            conversationId: 'conv_trio_faris',
-            senderId: 'trainer_kamarul',
-            senderName: 'En. Kamarul Zaman bin Harun',
+            conversationId: 'conv_trio_aaron',
+            senderId: '3c83f639-c17c-4644-9cc4-b77421c2e6d3',
+            senderName: 'hisham',
             senderRole: UserRole.TRAINER,
-            senderCompany: 'CTRM Aerostructures Sdn Bhd',
-            content: 'Salam Dr. Guzairy & En. Azman. Prestasi Faris amat cemerlang. Beliau sangat berdisiplin dan cepat mempelajari proses pembuatan komposit aeroangkasa. Saya akan masukkan penilaian rubrik minggu ke-5 esok.',
+            senderCompany: 'CYCLE PROCESS SDN BHD',
+            content: 'Salam Dr. Fahrin & Penyelaras WBL. Prestasi Aaron amat baik. Beliau sangat berdisiplin dan cepat memahami konfigurasi perkhidmatan awan. Buku log mingguan beliau telah saya sahkan.',
             createdAt: t2,
-            readBy: [{ userId: 'trainer_kamarul', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
+            readBy: [{ userId: '3c83f639-c17c-4644-9cc4-b77421c2e6d3', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
           },
           {
             id: 'msg_3',
-            conversationId: 'conv_trio_faris',
+            conversationId: 'conv_trio_aaron',
             senderId: 'coordinator',
             senderName: 'Penyelaras WBL FPTT',
             senderRole: UserRole.COORDINATOR,
-            content: 'Terima kasih banyak En. Kamarul atas bimbingan rapi pihak CTRM. Penyelarasan rubrik telah dikemaskini. Pihak universiti amat menghargai sokongan industri tuan.',
+            content: 'Terima kasih banyak En. Hisham atas bimbingan rapi pihak CYCLE PROCESS. Rekod pengesahan telah dikemaskini dalam portal WBL.',
             createdAt: t3,
             readBy: [{ userId: 'coordinator', readAt: t3 }]
           },
           {
             id: 'msg_4',
-            conversationId: 'conv_direct_infineon',
-            senderId: 'trainer_norhafizah',
-            senderName: 'Pn. Norhafizah binti Othman',
-            senderRole: UserRole.TRAINER,
-            senderCompany: 'Infineon Technologies (Malaysia) Sdn Bhd',
-            content: 'Salam Dr. Guzairy, saya telah menyemak draf penilaian akhir WBL bagi pelajar Nur Aina Farhana. Markah rubrik telah dihantar ke dalam sistem, mohon Dr. semak dan buat pengesahan ya.',
-            createdAt: t1,
-            readBy: [{ userId: 'trainer_norhafizah', readAt: t1 }, { userId: 'coordinator', readAt: t2 }]
-          },
-          {
-            id: 'msg_5',
-            conversationId: 'conv_direct_infineon',
-            senderId: 'coordinator',
-            senderName: 'Dr. Mohd Guzairy bin Abd Ghani',
-            senderRole: UserRole.LECTURER,
-            content: 'Terima kasih Pn. Norhafizah. Markah rubrik 88% telah saya sahkan dalam sistem dan slip rasmi telah dijana.',
-            createdAt: t2,
-            readBy: [{ userId: 'coordinator', readAt: t2 }]
-          },
-          {
-            id: 'msg_hisham_1',
             conversationId: 'conv_direct_hisham',
             senderId: 'hisham_trainer',
             senderName: 'En. Hisham bin Ahmad',
             senderRole: UserRole.TRAINER,
-            senderCompany: 'CTRM Aerostructures Sdn Bhd',
-            content: 'Salam Dr. Guzairy, saya telah menyemak perkembangan modul latihan industri minggu ini. Penilaian rubrik akan dikemukakan hari ini.',
+            senderCompany: 'CYCLE PROCESS SDN BHD',
+            content: 'Salam Dr. Guzairy, saya telah menyemak perkembangan modul latihan industri minggu ini. Penilaian rubrik mingguan akan dikemukakan mengikut jadual modul.',
             createdAt: t1,
-            readBy: [{ userId: 'hisham_trainer', readAt: t1 }]
+            readBy: [{ userId: 'hisham_trainer', readAt: t1 }, { userId: 'coordinator', readAt: t2 }]
           },
           {
-            id: 'msg_amirul_1',
-            conversationId: 'conv_trio_amirul',
-            senderId: 'trainer_azman',
-            senderName: 'En. Azman bin Khalid',
-            senderRole: UserRole.TRAINER,
-            senderCompany: 'PETRONAS Digital Sdn Bhd',
-            content: 'Salam Dr. Guzairy, buku log latihan amali industri Muhamad Amirul bagi minggu ke-4 telah disahkan oleh pihak pengurusan.',
+            id: 'msg_5',
+            conversationId: 'conv_direct_hisham',
+            senderId: 'coordinator',
+            senderName: 'Dr. Mohd Guzairy bin Abd Ghani',
+            senderRole: UserRole.COORDINATOR,
+            content: 'Terima kasih En. Hisham. Kerjasama pihak CYCLE PROCESS SDN BHD dalam membimbing pelajar WBL amat dihargai pihak universiti.',
             createdAt: t2,
-            readBy: [{ userId: 'trainer_azman', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
+            readBy: [{ userId: 'coordinator', readAt: t2 }]
+          },
+          {
+            id: 'msg_izzati_1',
+            conversationId: 'conv_trio_izzati',
+            senderId: 'trainer_shanida',
+            senderName: 'Pn. Noorul Shanida binti Ahmad Fadzil',
+            senderRole: UserRole.TRAINER,
+            senderCompany: 'PETRONAS Chemicals Marketing (Labuan) Ltd',
+            content: 'Salam Dr. Guzairy, buku log latihan amali industri Nurul Izzati binti Yusri sedang dalam proses semakan. Prestasi beliau dalam unit reporting amat memuaskan.',
+            createdAt: t2,
+            readBy: [{ userId: 'trainer_shanida', readAt: t2 }, { userId: 'coordinator', readAt: t3 }]
           }
         ];
         safeSaveLocalStorage(STORAGE_KEYS.WBL_MESSAGES, all);
