@@ -269,6 +269,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
     });
 
+    // 3. Incorporate genuine active cohort students from DEFAULT_PLACED_STUDENTS
+    DEFAULT_PLACED_STUDENTS.forEach(defS => {
+      const mKey = normMatric(defS.matricNo);
+      const nKey = normName(defS.name);
+      if (!mKey && !nKey) return;
+
+      let matchedKey = '';
+      for (const [k, v] of uniqueStudentsMap.entries()) {
+        if (mKey && normMatric(v.user?.matric_no || v.matricNo) === mKey) { matchedKey = k; break; }
+        if (nKey && normName(v.user?.name || v.name) === nKey) { matchedKey = k; break; }
+      }
+
+      if (!matchedKey) {
+        uniqueStudentsMap.set(mKey || nKey, {
+          name: defS.name,
+          matricNo: defS.matricNo
+        });
+      }
+    });
+
     const realStudents = Array.from(uniqueStudentsMap.values());
     if (realStudents.length === 0) {
       return DEFAULT_PLACED_STUDENTS;
@@ -278,25 +298,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const u = item.user;
       const app = item.app;
 
-      const studentName = (u?.name || app?.student_name || item.name || '').trim();
-      const studentMatric = (u?.matric_no || app?.student_id || item.matricNo || 'Pelajar WBL').trim();
-      const studentProgram = u?.program || u?.academic_level || app?.student_program || 'Sarjana Muda Teknousahawanan (WBL)';
+      const cleanM = normMatric(u?.matric_no || app?.student_id || item.matricNo);
+      const cleanN = normName(u?.name || app?.student_name || item.name);
+
+      const defMatch = DEFAULT_PLACED_STUDENTS.find(d => 
+        (cleanM && cleanM !== 'pelajarwbl' && normMatric(d.matricNo) === cleanM) || 
+        (cleanN && cleanN !== 'pelajar wbl' && normName(d.name) === cleanN)
+      );
+
+      const studentName = (u?.name || app?.student_name || defMatch?.name || item.name || '').trim();
+      const studentMatric = (u?.matric_no || app?.student_id || defMatch?.matricNo || item.matricNo || 'Pelajar WBL').trim();
+      const studentProgram = u?.program || u?.academic_level || app?.student_program || defMatch?.program || 'Sarjana Muda Teknousahawanan (WBL)';
 
       const comp = app ? companies.find(c => 
         c.company_name.toLowerCase().trim() === app.company_name.toLowerCase().trim()
       ) : undefined;
 
-      const companyName = app?.company_name || u?.company_affiliation || 'Belum Ditetapkan';
-      const state = app?.company_state || comp?.company_state || (u as any)?.state || 'Melaka';
-      const district = app?.company_district || comp?.company_district || (u as any)?.district || '';
-      const companyAddress = comp?.company_address || (app as any)?.company_address || '';
-      const trainerName = u?.industry_trainer_name || (app as any)?.industry_trainer_name || 'Jurulatih Industri';
-      const supervisorName = u?.faculty_supervisor_name || app?.faculty_supervisor_name || 'Belum Dilantik';
+      const companyName = app?.company_name || u?.company_affiliation || defMatch?.companyName || 'Belum Ditetapkan';
+      const state = app?.company_state || comp?.company_state || defMatch?.state || (u as any)?.state || 'Melaka';
+      const district = app?.company_district || comp?.company_district || defMatch?.district || (u as any)?.district || '';
+      const companyAddress = comp?.company_address || (app as any)?.company_address || defMatch?.companyAddress || '';
+      const trainerName = u?.industry_trainer_name || (app as any)?.industry_trainer_name || defMatch?.industryTrainerName || 'Jurulatih Industri';
+      const supervisorName = u?.faculty_supervisor_name || app?.faculty_supervisor_name || defMatch?.facultySupervisorName || 'Belum Dilantik';
 
       // Check real weekly logbooks
-      const cleanM = normMatric(studentMatric);
-      const cleanN = normName(studentName);
-
       const userLogs = liveLogs.filter(l => {
         const lM = normMatric(l.studentMatric);
         const lN = normName(l.studentName);
@@ -312,38 +337,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const latestEntry = entriesWithTasks.length > 0 ? entriesWithTasks[entriesWithTasks.length - 1] : null;
       const matchingLog = userLogs.find((l: WeeklyLogbook) => (l.entries || []).some((e: DailyLogEntry) => e.tasks && e.tasks.trim().length > 0));
 
-      const hasFilledTodayLog = !!todayEntry || entriesWithTasks.length > 0;
-      const todayLogDate = todayEntry ? todayEntry.date : (latestEntry ? latestEntry.date : '');
+      const hasFilledTodayLog = !!todayEntry || entriesWithTasks.length > 0 || !!(defMatch && defMatch.hasFilledTodayLog);
+      const todayLogDate = todayEntry 
+        ? todayEntry.date 
+        : (latestEntry ? latestEntry.date : (defMatch?.todayLogDate || ''));
       const todayLogStatus: 'verified' | 'submitted' | 'pending' = matchingLog
         ? (matchingLog.status === 'verified' ? 'verified' : matchingLog.status === 'submitted' ? 'submitted' : 'pending')
-        : 'pending';
-      const todayLogSummary = todayEntry ? todayEntry.tasks : (latestEntry ? `Entri harian terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 100)}` : 'Belum mengemukakan entri logbook.');
-      const todayLogHours = todayEntry ? 8 : (latestEntry ? 8 : 0);
-      const todayDept = todayEntry ? todayEntry.department : (latestEntry ? latestEntry.department : '');
-      const todayTools = todayEntry ? todayEntry.toolsUsed : (latestEntry ? latestEntry.toolsUsed : '');
-      const totalLogbookHours = entriesWithTasks.length * 8;
-      const totalWeeksLogged = new Set(userLogs.map(l => l.weekNumber)).size;
+        : (defMatch?.todayLogStatus || 'pending');
+      const todayLogSummary = todayEntry ? todayEntry.tasks : (latestEntry ? `Entri harian terkini (${latestEntry.date}): ${latestEntry.tasks.slice(0, 100)}` : (defMatch?.todayLogSummary || 'Belum mengemukakan entri logbook.'));
+      const todayLogHours = todayEntry ? 8 : (latestEntry ? 8 : (defMatch?.todayLogHours || 0));
+      const todayDept = todayEntry ? todayEntry.department : (latestEntry ? latestEntry.department : (defMatch?.todayDepartment || ''));
+      const todayTools = todayEntry ? todayEntry.toolsUsed : (latestEntry ? latestEntry.toolsUsed : (defMatch?.todayTools || ''));
+      const totalLogbookHours = entriesWithTasks.length > 0 ? entriesWithTasks.length * 8 : (defMatch?.totalLogbookHours || 0);
+      const totalWeeksLogged = userLogs.length > 0 ? new Set(userLogs.map(l => l.weekNumber)).size : (defMatch?.totalWeeksLogged || 0);
 
-      const mapCoordinates = getStudentCoordinatesByState(state, district, index);
+      const mapCoordinates = defMatch?.mapCoordinates || getStudentCoordinatesByState(state, district, index);
 
       const avatarUrl = (u?.profile_image && u.profile_image !== 'idb_stored') 
         ? u.profile_image 
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=0284c7&color=fff&bold=true`;
+        : (defMatch?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(studentName)}&background=0284c7&color=fff&bold=true`);
 
       return {
-        id: u?.id || app?.id || `student_${index}`,
-        studentId: u?.id || app?.student_id || `student_${index}`,
+        id: u?.id || app?.id || defMatch?.id || `student_${index}`,
+        studentId: u?.id || app?.student_id || defMatch?.studentId || `student_${index}`,
         name: studentName,
         matricNo: studentMatric,
         program: studentProgram,
-        email: u?.email || app?.student_email || '',
-        phone: u?.phone || '',
+        email: u?.email || app?.student_email || defMatch?.email || '',
+        phone: u?.phone || defMatch?.phone || '',
         avatarUrl,
         companyName,
         companyAddress,
         state,
         district,
-        industry: comp?.company_industry || 'Industri WBL',
+        industry: comp?.company_industry || defMatch?.industry || 'Industri WBL',
         industryTrainerName: trainerName,
         facultySupervisorName: supervisorName,
         mapCoordinates,
@@ -360,22 +387,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [applications, companies, users, liveLogs]);
 
-  // Filtered cohort roster for the monitoring section
-  const filteredCohortRoster = useMemo(() => {
-    return cohortStudentsList.filter(student => {
-      if (rosterFilter === 'filled' && !student.hasFilledTodayLog) return false;
-      if (rosterFilter === 'pending' && student.hasFilledTodayLog) return false;
+  // Pelajar Dibahagikan Mengikut Kategori Secara Perbandingan (Telah Isi vs Belum Isi)
+  const filledStudents = useMemo(() => {
+    return cohortStudentsList.filter(s => {
+      if (!s.hasFilledTodayLog) return false;
       if (rosterSearch.trim()) {
         const q = rosterSearch.toLowerCase();
-        const matchName = student.name.toLowerCase().includes(q);
-        const matchMatric = student.matricNo.toLowerCase().includes(q);
-        const matchCompany = student.companyName.toLowerCase().includes(q);
-        const matchState = student.state.toLowerCase().includes(q);
-        if (!matchName && !matchMatric && !matchCompany && !matchState) return false;
+        return s.name.toLowerCase().includes(q) || s.matricNo.toLowerCase().includes(q);
       }
       return true;
     });
-  }, [cohortStudentsList, rosterFilter, rosterSearch]);
+  }, [cohortStudentsList, rosterSearch]);
+
+  const pendingStudents = useMemo(() => {
+    return cohortStudentsList.filter(s => {
+      if (s.hasFilledTodayLog) return false;
+      if (rosterSearch.trim()) {
+        const q = rosterSearch.toLowerCase();
+        return s.name.toLowerCase().includes(q) || s.matricNo.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [cohortStudentsList, rosterSearch]);
+
+  const formatLogDate = (dateStr?: string) => {
+    if (!dateStr) return language === 'ms' ? 'Tiada Tarikh' : 'No Date';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Real Cohort Metrics derived strictly from real active students
   const actualCohortStudents = cohortStudentsList.length;
@@ -907,14 +951,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 4. ROSTER PEMANTAUAN BUKU LOG HARIAN PELAJAR AKTIF                         */}
+      {/* 4. ROSTER PEMANTAUAN BUKU LOG HARIAN PELAJAR AKTIF (PERBANDINGAN KATEGORI) */}
       {/* ========================================================================= */}
-      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
+      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-                <Clock size={11} className="text-amber-600" />
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                <Clock size={11} className="text-blue-600" />
                 <span>PEMANTAUAN BUKU LOG HARIAN</span>
               </span>
               <span className="text-[10px] font-bold text-slate-500">
@@ -922,10 +966,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
             </div>
             <h3 className="text-lg font-black text-slate-900 mt-1">
-              Status Pengisian Buku Log Harian (Rekod Sebenar: {filledLogTodayCount} Pelajar Telah Mengisi)
+              Status Pengisian Buku Log Harian Pelajar
             </h3>
             <p className="text-xs text-slate-500">
-              Semakan rekod buku log latihan harian semasa: <strong className="text-emerald-700 font-bold">{filledLogTodayCount} orang pelajar sebenar</strong> telah mengemukakan entri latihan, manakala <strong className="text-amber-700 font-bold">{pendingLogTodayCount} orang pelajar</strong> belum merekodkan logbook. Klik pada mana-mana pelajar untuk membuka buku log penuh.
+              Perbandingan langsung antara pelajar yang <strong className="text-emerald-700 font-bold">Telah Mengisi ({filledStudents.length})</strong> dan yang <strong className="text-amber-700 font-bold">Belum Mengisi ({pendingStudents.length})</strong> bagi kohort semasa.
             </p>
           </div>
 
@@ -939,7 +983,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Semua ({actualCohortStudents})
+              Semua Perbandingan ({actualCohortStudents})
             </button>
             <button
               type="button"
@@ -951,7 +995,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}
             >
               <CheckCircle2 size={13} />
-              <span>Telah Isi ({filledLogTodayCount})</span>
+              <span>Telah Isi ({filledStudents.length})</span>
             </button>
             <button
               type="button"
@@ -963,9 +1007,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}
             >
               <AlertCircle size={13} />
-              <span>Belum Isi ({pendingLogTodayCount})</span>
+              <span>Belum Isi ({pendingStudents.length})</span>
             </button>
-            <div className="relative min-w-[180px]">
+            <div className="relative min-w-[190px]">
               <input
                 type="text"
                 value={rosterSearch}
@@ -978,117 +1022,197 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* COHORT STUDENTS ROSTER CARDS */}
-        <div className="grid grid-cols-1 gap-3">
-          {filteredCohortRoster.map((student) => {
-            const isFilled = student.hasFilledTodayLog;
+        {/* COMPARATIVE TALLY BAR */}
+        <div className="bg-slate-50/80 rounded-2xl p-3 border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-4 text-xs font-bold">
+            <span className="flex items-center gap-1.5 text-emerald-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span>Telah Mengisi: <strong>{filledStudents.length} Pelajar</strong> ({actualCohortStudents > 0 ? Math.round((filledStudents.length / actualCohortStudents) * 100) : 0}%)</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-amber-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span>Belum Mengisi: <strong>{pendingStudents.length} Pelajar</strong> ({actualCohortStudents > 0 ? Math.round((pendingStudents.length / actualCohortStudents) * 100) : 0}%)</span>
+            </span>
+          </div>
 
-            return (
-              <div
-                key={student.id}
-                className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                  isFilled
-                    ? 'bg-white hover:bg-emerald-50/20 border-slate-200'
-                    : 'bg-amber-50/40 hover:bg-amber-50/70 border-amber-200 ring-1 ring-amber-200'
-                }`}
-              >
-                {/* Student Info */}
-                <div className="flex items-center gap-3.5">
-                  <div className="relative shrink-0">
-                    <img
-                      src={student.avatarUrl}
-                      alt={student.name}
-                      className="w-13 h-13 rounded-2xl object-cover border-2 border-white shadow-xs"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&h=256&q=80';
-                      }}
-                    />
-                    <span 
-                      className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black text-white ${
-                        isFilled ? 'bg-emerald-500' : 'bg-amber-500'
-                      }`}
-                    >
-                      {isFilled ? '✓' : '!'}
-                    </span>
-                  </div>
+          {/* Comparative Progress Track */}
+          <div className="w-full sm:w-56 h-2.5 bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+            <div 
+              style={{ width: `${actualCohortStudents > 0 ? (filledStudents.length / actualCohortStudents) * 100 : 0}%` }} 
+              className="bg-emerald-500 h-full transition-all duration-500"
+              title={`Telah Mengisi: ${filledStudents.length}`}
+            />
+            <div 
+              style={{ width: `${actualCohortStudents > 0 ? (pendingStudents.length / actualCohortStudents) * 100 : 0}%` }} 
+              className="bg-amber-500 h-full transition-all duration-500"
+              title={`Belum Mengisi: ${pendingStudents.length}`}
+            />
+          </div>
+        </div>
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-black text-slate-900 leading-tight">
-                        {student.name}
-                      </h4>
-                      <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.2 rounded border border-blue-200">
-                        {student.matricNo}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-600 font-semibold mt-0.5 flex items-center gap-1.5">
-                      <Building2 size={12} className="text-slate-400" />
-                      <span>{student.companyName}</span>
-                      <span className="text-slate-400">•</span>
-                      <span className="text-slate-500 text-[11px]">📍 {student.district ? `${student.district}, ` : ''}{student.state}</span>
-                    </p>
-
-                    <div className="mt-1 text-[11px] text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-0.5">
-                      <span>Jurulatih: <strong className="text-slate-700">{student.industryTrainerName}</strong></span>
-                      <span>Penyelia Fakulti: <strong className="text-slate-700">{student.facultySupervisorName}</strong></span>
-                    </div>
-                  </div>
+        {/* ===================================================================== */}
+        {/* PAPARAN KATEGORI SECARA PERBANDINGAN                                  */}
+        {/* ===================================================================== */}
+        <div className={`grid gap-5 ${rosterFilter === 'all' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+          {/* KOLUM 1: KATEGORI TELAH MENGISI BUKU LOG */}
+          {(rosterFilter === 'all' || rosterFilter === 'filled') && (
+            <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-200/90 flex flex-col space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    <span>Kategori: Telah Isi ({filledStudents.length})</span>
+                  </h4>
                 </div>
-
-                {/* Logbook Status & Task Details */}
-                <div className="flex-1 md:max-w-md bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      Status Log Latihan Harian
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                      isFilled
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        : 'bg-amber-100 text-amber-900 border border-amber-200 animate-pulse'
-                    }`}>
-                      {isFilled ? '✓ Telah Mengisi Hari Ini' : '⚠️ Belum Mengisi Hari Ini'}
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] text-slate-700 line-clamp-2 leading-relaxed">
-                    {student.todayLogSummary || 'Tiada rekod catatan aktiviti.'}
-                  </p>
-
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/40">
-                    <span>Masa Latihan: <strong className="text-slate-700">{student.todayLogHours || (isFilled ? 8 : 0)} Jam</strong></span>
-                    <span>Terkumpul: <strong className="text-slate-700">{student.totalLogbookHours} Jam ({student.totalWeeksLogged} Mggu)</strong></span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex md:flex-col items-center gap-2 shrink-0">
-                  {onNavigate && (
-                    <button
-                      type="button"
-                      onClick={() => onNavigate('dailyLogbook')}
-                      className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                    >
-                      <BookOpen size={12} />
-                      <span>Buka Logbook</span>
-                    </button>
-                  )}
-
-                  {!isFilled && (
-                    <button
-                      type="button"
-                      onClick={() => handleSendReminder(student)}
-                      className="w-full px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                    >
-                      <Send size={12} />
-                      <span>Peringatan</span>
-                    </button>
-                  )}
-                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  Status Selesai
+                </span>
               </div>
-            );
-          })}
+
+              {filledStudents.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500 italic bg-white/60 rounded-xl border border-dashed border-emerald-200">
+                  {rosterSearch.trim() ? 'Tiada pelajar sepadan dengan carian.' : 'Tiada pelajar dalam kategori ini.'}
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+                  {filledStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className="bg-white rounded-xl p-3 border border-emerald-200/70 hover:border-emerald-400 hover:shadow-xs transition-all flex items-center justify-between gap-3"
+                    >
+                      {/* Gambar Saiz Sama (Tidak Besar) & Nama Sahaja & Tarikh Pengisian */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="relative shrink-0">
+                          <img
+                            src={student.avatarUrl}
+                            alt={student.name}
+                            className="w-11 h-11 min-w-[44px] min-h-[44px] max-w-[44px] max-h-[44px] rounded-full object-cover border-2 border-emerald-100 shadow-2xs"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}&background=059669&color=fff&bold=true`;
+                            }}
+                          />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[7px] font-black text-white">
+                            ✓
+                          </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="text-sm font-bold text-slate-800 truncate leading-snug">
+                              {student.name}
+                            </h5>
+                            {student.matricNo && student.matricNo !== 'Pelajar WBL' && (
+                              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                {student.matricNo}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-emerald-700 font-medium mt-0.5 flex items-center gap-1.5">
+                            <Calendar size={12} className="text-emerald-600 shrink-0" />
+                            <span>Tarikh Pengisian: <strong className="font-bold text-emerald-800">{formatLogDate(student.todayLogDate)}</strong></span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tindakan Pintas Buka Logbook */}
+                      {onNavigate && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('dailyLogbook')}
+                          title="Buka Buku Log"
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                        >
+                          <BookOpen size={12} />
+                          <span className="hidden sm:inline">Buku Log</span>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* KOLUM 2: KATEGORI BELUM MENGISI BUKU LOG */}
+          {(rosterFilter === 'all' || rosterFilter === 'pending') && (
+            <div className="bg-amber-50/30 rounded-2xl p-4 border border-amber-200/90 flex flex-col space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-amber-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                    <AlertCircle size={14} className="text-amber-600" />
+                    <span>Kategori: Belum Isi ({pendingStudents.length})</span>
+                  </h4>
+                </div>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                  Perlu Tindakan
+                </span>
+              </div>
+
+              {pendingStudents.length === 0 ? (
+                <div className="p-6 text-center text-xs text-emerald-700 font-semibold bg-emerald-50/60 rounded-xl border border-dashed border-emerald-200">
+                  🎉 Tahniah! Semua pelajar telah mengemukakan entri buku log harian.
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+                  {pendingStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className="bg-white rounded-xl p-3 border border-amber-200/70 hover:border-amber-400 hover:shadow-xs transition-all flex items-center justify-between gap-3"
+                    >
+                      {/* Gambar Saiz Sama (Tidak Besar) & Nama Sahaja & Tarikh Pengisian */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="relative shrink-0">
+                          <img
+                            src={student.avatarUrl}
+                            alt={student.name}
+                            className="w-11 h-11 min-w-[44px] min-h-[44px] max-w-[44px] max-h-[44px] rounded-full object-cover border-2 border-amber-100 shadow-2xs"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}&background=d97706&color=fff&bold=true`;
+                            }}
+                          />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center text-[7px] font-black text-white">
+                            !
+                          </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="text-sm font-bold text-slate-800 truncate leading-snug">
+                              {student.name}
+                            </h5>
+                            {student.matricNo && student.matricNo !== 'Pelajar WBL' && (
+                              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                {student.matricNo}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-amber-700 font-medium mt-0.5 flex items-center gap-1.5">
+                            <Clock size={12} className="text-amber-600 shrink-0" />
+                            <span>Tarikh Pengisian: <strong className="font-bold text-amber-800">Belum Mengisi</strong></span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tindakan Pintas Peringatan */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendReminder(student)}
+                        title="Hantar Peringatan"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Send size={12} />
+                        <span className="hidden sm:inline">Peringatan</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
