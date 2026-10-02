@@ -329,6 +329,27 @@ const cleanAndMigrateLocalStorage = async () => {
     }
   } catch {}
 
+  // Initialize intake for student users if missing
+  try {
+    const rawUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+    if (rawUsers) {
+      const uList = JSON.parse(rawUsers);
+      if (Array.isArray(uList)) {
+        let uModified = false;
+        uList.forEach((u: any) => {
+          if (u.role === UserRole.STUDENT && !u.intake) {
+            u.intake = 'Ambilan 1';
+            uModified = true;
+          }
+        });
+        if (uModified) {
+          safeSaveLocalStorage(STORAGE_KEYS.USERS, uList);
+          inMemoryUsers = uList;
+        }
+      }
+    }
+  } catch {}
+
   try {
     const rawNotifs = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
     if (rawNotifs) {

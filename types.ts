@@ -7,6 +7,9 @@ export enum UserRole {
   STUDENT = 'student'
 }
 
+export type StudentIntake = 'Ambilan 1' | 'Ambilan 2' | 'Ambilan 3';
+export const INTAKE_OPTIONS: StudentIntake[] = ['Ambilan 1', 'Ambilan 2', 'Ambilan 3'];
+
 export interface User {
   id: string;
   username: string;
@@ -20,6 +23,7 @@ export interface User {
   matric_no?: string;
   ic_no?: string;
   address?: string;
+  intake?: string; // 'Ambilan 1' | 'Ambilan 2' | 'Ambilan 3'
   staff_id?: string;
   company_affiliation?: string;
   company_position?: string;

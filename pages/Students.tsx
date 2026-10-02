@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Application, UserRole, Company } from '../types';
-import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity, Mail, Phone, MapPin, GraduationCap, Briefcase, Code, Globe, Languages, Star, BookOpen, Building2, FileCheck2 } from 'lucide-react';
+import { UserPlus, UserMinus, UserCheck, Edit, Trash2, FileText, Download, FileSpreadsheet, Clock, Key, Handshake, ShieldCheck, CheckCircle2, Infinity, Mail, Phone, MapPin, GraduationCap, Briefcase, Code, Globe, Languages, Star, BookOpen, Building2, FileCheck2, Search, Filter, Tag } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { generateResume } from '../utils/resumeGenerator';
 import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
@@ -29,6 +29,10 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
   const [supervisorId, setSupervisorId] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<User | null>(null);
+  
+  // Intake Filter & Search
+  const [intakeFilter, setIntakeFilter] = useState<'all' | 'Ambilan 1' | 'Ambilan 2' | 'Ambilan 3'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Password Reset State
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -256,6 +260,7 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
         [t(language, 'fullName')]: s.name,
         [t(language, 'matricNo')]: s.matric_no,
         [t(language, 'icNo')]: s.ic_no,
+        'Sesi Ambilan': s.intake || 'Ambilan 1',
         [t(language, 'program')]: s.program,
         'Email': s.email,
         'Phone': s.phone,
@@ -270,6 +275,32 @@ export const Students: React.FC<StudentsProps> = ({ users, applications, compani
       toast.success(language === 'ms' ? 'Eksport Berjaya!' : 'Export Success!');
     } catch (error) {
       toast.error('Export failed');
+    }
+  };
+
+  const handleUpdateStudentIntake = async (student: any, newIntake: string) => {
+    if (!isCoordinator) {
+      toast.error(language === 'ms' ? 'Hanya Penyelaras yang mempunyai kuasa melabelkan ambilan pelajar.' : 'Only Coordinators can label student intake.');
+      return;
+    }
+    const { placement, studentApps, isAllDocsVerified, ...cleanStudent } = student;
+    const loadingToast = toast.loading(language === 'ms' ? `Menetapkan ${newIntake} untuk ${student.name}...` : `Updating ${newIntake}...`);
+    try {
+      await onUpdateUser({
+        ...cleanStudent,
+        intake: newIntake
+      });
+      if (viewingStudent && viewingStudent.id === student.id) {
+        setViewingStudent((prev: any) => prev ? { ...prev, intake: newIntake } : null);
+      }
+      toast.success(
+        language === 'ms' 
+          ? `Pelajar ${student.name} berjaya dilabelkan sebagai ${newIntake}!` 
+          : `Student ${student.name} successfully labeled as ${newIntake}!`,
+        { id: loadingToast }
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengemas kini ambilan', { id: loadingToast });
     }
   };
 

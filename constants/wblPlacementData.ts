@@ -14,6 +14,7 @@ export interface StudentPlacementPoint {
   industry: string;
   industryTrainerName: string;
   facultySupervisorName: string;
+  intake?: string;
   // Map positioning (0 to 1000 x, 0 to 500 y)
   mapCoordinates: { x: number; y: number };
   // Daily logbook tracking

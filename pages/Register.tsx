@@ -19,7 +19,7 @@ const PREDEFINED_PROGRAM = "Ijazah Sarjana Muda Teknousahawanan dengan Kepujian"
 export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, language, onLanguageChange }) => {
   const [formData, setFormData] = useState({
     username: '', password: '', name: '', email: '', phone: '', role: UserRole.STUDENT,
-    program: PREDEFINED_PROGRAM, matric_no: '', ic_no: '', address: '', staff_id: '',
+    program: PREDEFINED_PROGRAM, intake: 'Ambilan 1', matric_no: '', ic_no: '', address: '', staff_id: '',
     company_affiliation: '', company_position: '', has_dual_role: false,
     academic_level: '', experience_years: 0, teaching_subjects: '[]'
   });
@@ -221,6 +221,29 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
                       required
                     />
                   )}
+               </div>
+               <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>{t(language, 'intake')} <span className="text-red-500">*</span></span>
+                    <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      3 Pilihan Ambilan
+                    </span>
+                  </label>
+                  <select 
+                    className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={formData.intake || 'Ambilan 1'}
+                    onChange={(e) => setFormData({ ...formData, intake: e.target.value })}
+                    required
+                  >
+                    <option value="Ambilan 1">Ambilan 1</option>
+                    <option value="Ambilan 2">Ambilan 2</option>
+                    <option value="Ambilan 3">Ambilan 3</option>
+                  </select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {language === 'ms' 
+                      ? 'Sila pilih sesi kemasukan ambilan pengajian WBL anda (Ambilan 1, Ambilan 2, atau Ambilan 3).' 
+                      : 'Please select your WBL study intake session (Intake 1, Intake 2, or Intake 3).'}
+                  </p>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
