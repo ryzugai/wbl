@@ -21,6 +21,7 @@ import { Analysis } from './pages/Analysis';
 import { PosterFlipbook } from './pages/PosterFlipbook';
 import { UserActivities } from './pages/UserActivities';
 import { DailyLogbook } from './pages/DailyLogbook';
+import { PsmCaseStudyLogbook } from './pages/PsmCaseStudyLogbook';
 import { StudentEvaluationPage } from './pages/StudentEvaluationPage';
 import { WBLMessaging } from './pages/WBLMessaging';
 import { Toaster, toast } from 'react-hot-toast';
@@ -317,6 +318,17 @@ function App() {
                 applications={applications}
                 users={users}
                 language={language}
+                onNavigate={setCurrentView}
+            />
+        )}
+
+        {(currentView === 'psmCaseStudy' || currentView === 'psm2') && (
+            <PsmCaseStudyLogbook 
+                currentUser={currentUser}
+                applications={applications}
+                users={users}
+                language={language}
+                onNavigate={setCurrentView}
             />
         )}
 

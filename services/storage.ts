@@ -1,5 +1,5 @@
 
-import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus, CourseAnnouncement, CourseAnnouncementReadReceipt, WBLMessage, WBLConversation } from '../types';
+import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus, CourseAnnouncement, CourseAnnouncementReadReceipt, WBLMessage, WBLConversation, PsmCaseStudyWeeklyLog, PsmLogbookStatus } from '../types';
 import { COORDINATOR_ACCOUNT, DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc, getDocs } from 'firebase/firestore';
@@ -18,7 +18,8 @@ const STORAGE_KEYS = {
   EVALUATIONS: 'wbl_student_evaluations',
   COURSE_ANNOUNCEMENTS: 'wbl_course_announcements',
   WBL_CONVERSATIONS: 'wbl_conversations',
-  WBL_MESSAGES: 'wbl_messages'
+  WBL_MESSAGES: 'wbl_messages',
+  PSM_CASE_STUDY_LOGS: 'wbl_psm_case_study_logs'
 };
 
 const firebaseConfig = {
@@ -41,6 +42,7 @@ let inMemoryEvaluations: StudentEvaluation[] = [];
 let inMemoryAnnouncements: CourseAnnouncement[] = [];
 let inMemoryConversations: WBLConversation[] = [];
 let inMemoryMessages: WBLMessage[] = [];
+let inMemoryPsmLogs: PsmCaseStudyWeeklyLog[] = [];
 
 const stripHeavyFields = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -528,6 +530,7 @@ const setupRealtimeListeners = () => {
   syncCollection('student_evaluations', STORAGE_KEYS.EVALUATIONS);
   syncCollection('wbl_conversations', STORAGE_KEYS.WBL_CONVERSATIONS);
   syncCollection('wbl_messages', STORAGE_KEYS.WBL_MESSAGES);
+  syncCollection('psm_case_study_logs', STORAGE_KEYS.PSM_CASE_STUDY_LOGS);
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
@@ -2386,6 +2389,492 @@ export const StorageService = {
     safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, all);
     notifyListeners();
     if (db) await deleteDoc(doc(db, 'weekly_logbooks', id));
+  },
+
+  // ==================== PSM 2 CASE STUDY WEEKLY LOGBOOK MODULE ====================
+  getPsmCaseStudyLogs: (): PsmCaseStudyWeeklyLog[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.PSM_CASE_STUDY_LOGS);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PsmCaseStudyWeeklyLog[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryPsmLogs = parsed;
+          return inMemoryPsmLogs;
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading PSM case study logs from storage:', e);
+    }
+
+    if (inMemoryPsmLogs && inMemoryPsmLogs.length > 0) {
+      return inMemoryPsmLogs;
+    }
+
+    // Seed Initial Active PSM 2 Case Study Logs (20-Week PSM II BTMU 4084 / BMMT 4994)
+    const seedPsmLogs: PsmCaseStudyWeeklyLog[] = [
+      {
+        id: 'psm_aaron_w1',
+        studentId: '51515bde-267d-43a0-9c43-a31919d77933',
+        studentName: 'aaron',
+        studentMatric: '123456',
+        studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: 'Ambilan 1',
+        companyName: 'CYCLE PROCESS SDN BHD',
+        weekNumber: 1,
+        startDate: '2026-09-28',
+        endDate: '2026-10-02',
+        caseTitle: 'Pengenalan Skop Kajian Kes & Pemetaan Aliran Kerja Sistem Pemprosesan Kitaran Industri',
+        milestonePhase: 'Milestone 1: Pengenalan & Definisi Masalah Industri (M1 - M4)',
+        problemStatement: 'Ketidakcekapan pemantauan masa nyata terhadap status barisan pengeluaran kitaran bahan mentah mengakibatkan kelewatan tindak balas 15% setiap shif.',
+        methodologyActions: 'Sesi pemerhatian lapangan di barisan operasi Cycle Process Sdn Bhd dan temubual berstruktur bersama ketua seksyen pemprosesan.',
+        keyFindings: 'Terdapat jurang komunikasi antara sistem log manual shif dan pelayan pangkalan data pusat.',
+        technopreneurSolution: 'Mencadangkan pembinaan papan pemuka telemetri IoT berasaskan awan (AWS Serverless) untuk penjejakan status stesen kitaran masa nyata.',
+        consultationHours: 2,
+        evidenceUrl: 'https://drive.google.com/drive/folders/utem_wbl_psm2_aaron',
+        studentReflection: 'Memahami cabaran integrasi sistem fizikal ke sistem digital serta standard keselamatan industri perkilangan.',
+        status: 'completed',
+        submittedAt: '2026-10-02T16:30:00.000Z',
+        reviewedByTrainerId: 'hisham_trainer',
+        trainerName: 'En. Hisham bin Ahmad',
+        trainerPosition: 'Pengurus Operasi & Kejuruteraan',
+        trainerCompany: 'CYCLE PROCESS SDN BHD',
+        trainerStatus: 'verified',
+        trainerRating: 'cemerlang',
+        trainerComments: 'Isu yang dikenal pasti sangat tepat dengan cabaran semasa kilang kami. Cadangan penyelesaian berasaskan awan berpotensi dijimatkan kos operasi.',
+        trainerReviewedAt: '2026-10-03T10:15:00.000Z',
+        reviewedBySupervisorId: 'lecturer_fahrin',
+        supervisorName: 'Fahrin',
+        supervisorStaffId: 'STF-UTEM-008',
+        supervisorStatus: 'verified',
+        supervisorRating: 'cemerlang',
+        supervisorComments: 'Metodologi kajian lapangan tersusun dengan baik. Pastikan penulisan Bab 1 mematuhi format Buku Panduan PSM UTeM dan rujukan APA terkini.',
+        supervisorReviewedAt: '2026-10-04T14:20:00.000Z',
+        createdAt: '2026-09-28T08:00:00.000Z',
+        updatedAt: '2026-10-04T14:20:00.000Z'
+      },
+      {
+        id: 'psm_aaron_w2',
+        studentId: '51515bde-267d-43a0-9c43-a31919d77933',
+        studentName: 'aaron',
+        studentMatric: '123456',
+        studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: 'Ambilan 1',
+        companyName: 'CYCLE PROCESS SDN BHD',
+        weekNumber: 2,
+        startDate: '2026-10-05',
+        endDate: '2026-10-09',
+        caseTitle: 'Pengumpulan Data Metrik Masa Henti (Downtime) dan Analisis Punca Utama (Fishbone Diagram)',
+        milestonePhase: 'Milestone 1: Pengenalan & Definisi Masalah Industri (M1 - M4)',
+        problemStatement: 'Ketiadaan rekod analitik yang mengkategorikan jenis kegagalan sensor menyebabkan masa pembaikan (MTTR) berpanjangan melebihi 45 minit.',
+        methodologyActions: 'Mengumpul 120 set rekod log ralat mesin dari fail arkib penyelenggaraan dan membina Gambar Rajah Ishikawa (Fishbone Diagram).',
+        keyFindings: '62% punca masa henti berpunca daripada kelewatan penghantaran isyarat penderia analog ke pengawal PLC lama.',
+        technopreneurSolution: 'Merangka modul mikropengawal ESP32 berpagar optocoupler untuk menyalurkan isyarat telemetri terus ke kluster pengkomputeran pinggir.',
+        consultationHours: 3,
+        evidenceUrl: 'https://drive.google.com/drive/folders/utem_wbl_psm2_aaron_w2',
+        studentReflection: 'Belajar menganalisis punca kegagalan mekanikal dan menterjemahkannya kepada keperluan reka bentuk sistem teknikal.',
+        status: 'reviewed_by_trainer',
+        submittedAt: '2026-10-09T17:00:00.000Z',
+        reviewedByTrainerId: 'hisham_trainer',
+        trainerName: 'En. Hisham bin Ahmad',
+        trainerPosition: 'Pengurus Operasi & Kejuruteraan',
+        trainerCompany: 'CYCLE PROCESS SDN BHD',
+        trainerStatus: 'verified',
+        trainerRating: 'cemerlang',
+        trainerComments: 'Data yang dikumpul sangat sahih. Pihak jurutera penyelenggaraan mengesahkan penemuan punca kegagalan isyarat PLC.',
+        trainerReviewedAt: '2026-10-10T11:00:00.000Z',
+        supervisorStatus: 'pending',
+        createdAt: '2026-10-05T08:00:00.000Z',
+        updatedAt: '2026-10-10T11:00:00.000Z'
+      },
+      {
+        id: 'psm_izzati_w1',
+        studentId: '0b27c9ec-d003-4043-9fac-f2162ce675ef',
+        studentName: 'NURUL IZZATI BINTI YUSRI',
+        studentMatric: 'B062310215',
+        studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: 'Ambilan 1',
+        companyName: 'PETRONAS Chemicals Marketing (Labuan) Ltd',
+        weekNumber: 1,
+        startDate: '2026-09-28',
+        endDate: '2026-10-02',
+        caseTitle: 'Kajian Kes Strategi Penyelarasan Rantaian Bekalan & Perancangan Jualan Produk Petrokimia Serantau',
+        milestonePhase: 'Milestone 1: Pengenalan & Definisi Masalah Industri (M1 - M4)',
+        problemStatement: 'Ketidakseimbangan ramalan permintaan pasaran serantau bulanan menyebabkan kelewatan penjadualan kargo penghantaran bagi pelanggan Asia Pasifik.',
+        methodologyActions: 'Meneliti proses kerja perancangan pelan jualan November 2026 dan menyertai sesi perbincangan HRPIB mingguan bersama pasukan analitik PETRONAS.',
+        keyFindings: 'Proses unjuran jualan semasa mengambil masa 5 hari kerja kerana bergantung kepada perbandingan lembaran Excel merentas 3 jabatan.',
+        technopreneurSolution: 'Mencadangkan pembinaan model simulasi ramalan perniagaan pintar yang mengautomasi pemadanan kuota kargo kapal dengan komitmen jualan pelanggan.',
+        consultationHours: 2.5,
+        evidenceUrl: 'https://drive.google.com/drive/folders/psm2_petronas_izzati',
+        studentReflection: 'Memahami kerumitan pematuhan standard rantaian bekalan antarabangsa dalam industri tenaga dan bahan kimia.',
+        status: 'completed',
+        submittedAt: '2026-10-02T16:00:00.000Z',
+        reviewedByTrainerId: 'trainer_shanida',
+        trainerName: 'Pn. Noorul Shanida binti Ahmad Fadzil',
+        trainerPosition: 'Pengurus Perancangan & Pelaporan Jualan',
+        trainerCompany: 'PETRONAS Chemicals Marketing (Labuan) Ltd',
+        trainerStatus: 'verified',
+        trainerRating: 'cemerlang',
+        trainerComments: 'Analisis yang sangat komprehensif. Izzati menunjukkan pemahaman mendalam tentang logistik pasaran petrokimia antarabangsa.',
+        trainerReviewedAt: '2026-10-03T09:30:00.000Z',
+        reviewedBySupervisorId: 'coordinator_guzairy',
+        supervisorName: 'Dr. Mohd Guzairy bin Abd Ghani',
+        supervisorStaffId: 'STF-UTEM-001',
+        supervisorStatus: 'verified',
+        supervisorRating: 'cemerlang',
+        supervisorComments: 'Sangat membanggakan. Penyelidikan menepati keperluan Sarjana Muda Teknousahawanan bertaraf industri tinggi. Teruskan ke fasa pemodelan.',
+        supervisorReviewedAt: '2026-10-04T16:00:00.000Z',
+        createdAt: '2026-09-28T08:00:00.000Z',
+        updatedAt: '2026-10-04T16:00:00.000Z'
+      },
+      {
+        id: 'psm_auni_w1',
+        studentId: '8ad1aac5-d624-41c1-9607-e379b3c19e43',
+        studentName: 'AUNI HAZIQAH BINTI HASWADI',
+        studentMatric: 'B062310703',
+        studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: 'Ambilan 1',
+        companyName: 'FERRY RICH SDN BHD',
+        weekNumber: 1,
+        startDate: '2026-09-28',
+        endDate: '2026-10-02',
+        caseTitle: 'Analisis Pengalaman Pelanggan & Aliran Pembayaran Tiket Feri Melaka - Bengkalis',
+        milestonePhase: 'Milestone 1: Pengenalan & Definisi Masalah Industri (M1 - M4)',
+        problemStatement: 'Kesesakan kaunter fizikal semasa musim cuti umum kerana kadar penggunaan tempahan dalam talian masih di bawah 25%.',
+        methodologyActions: 'Kajian selidik kepada 50 penumpang feri antarabangsa di Kompleks Imigresen Melaka dan audit masa giliran kaunter.',
+        keyFindings: 'Kekurangan sokongan gerbang pembayaran tempatan (DuitNow QR & kad debit luar negara) menjadi penghalang utama penggunaan dalam talian.',
+        technopreneurSolution: 'Merekabentuk cadangan integrasi gerbang pembayaran QR DuitNow merentas sempadan dan kios tempahan kendiri pintar di jeti.',
+        consultationHours: 2,
+        evidenceUrl: 'https://drive.google.com/drive/folders/psm2_ferryrich_auni',
+        studentReflection: 'Mendapat pendedahan tentang cabaran pengurusan pelancongan maritim dan tingkah laku pengguna pelancong rentas sempadan.',
+        status: 'submitted',
+        submittedAt: '2026-10-02T17:15:00.000Z',
+        trainerStatus: 'pending',
+        supervisorStatus: 'pending',
+        createdAt: '2026-09-28T08:00:00.000Z',
+        updatedAt: '2026-10-02T17:15:00.000Z'
+      },
+      {
+        id: 'psm_suhaila_w1',
+        studentId: '16589537-e73b-4c9b-8c6f-1802f9a92290',
+        studentName: 'NOOR SUHAILA BINTI MOHAMED',
+        studentMatric: 'B062310610',
+        studentProgram: 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: 'Ambilan 1',
+        companyName: 'Amtis Solution Sdn.Bhd',
+        weekNumber: 1,
+        startDate: '2026-09-28',
+        endDate: '2026-10-02',
+        caseTitle: 'Kajian Penambahbaikan Pengurusan Dokumen Audit Digital & Kepatuhan Prosedur ISO Amtis Solution',
+        milestonePhase: 'Milestone 1: Pengenalan & Definisi Masalah Industri (M1 - M4)',
+        problemStatement: 'Penyimpanan fail audit manual memperlahankan semakan audit tahunan sebanyak 30 jam setiap suku tahun.',
+        methodologyActions: 'Analisis aliran fail pentadbiran jabatan dan temu ramah pegawai pematuhan ISO syarikat.',
+        keyFindings: 'Dokumen arkib tidak mempunyai metadata terindeks yang seragam.',
+        technopreneurSolution: 'Membangunkan struktur pengindeksan digital automatik dengan tagging OCR untuk repositori dokumen selamat.',
+        consultationHours: 2,
+        evidenceUrl: 'https://drive.google.com/drive/folders/psm2_amtis_suhaila',
+        studentReflection: 'Meningkatkan kemahiran pematuhan piawaian korporat dan tadbir urus fail teknologi maklumat.',
+        status: 'completed',
+        submittedAt: '2026-10-02T17:45:00.000Z',
+        reviewedByTrainerId: 'trainer_amtis',
+        trainerName: 'Pengurus Amtis Solution',
+        trainerPosition: 'Pengurus Operasi',
+        trainerCompany: 'Amtis Solution Sdn.Bhd',
+        trainerStatus: 'verified',
+        trainerRating: 'baik',
+        trainerComments: 'Kajian yang relevan dan praktikal untuk mempercepatkan proses audit syarikat kami.',
+        trainerReviewedAt: '2026-10-03T14:00:00.000Z',
+        reviewedBySupervisorId: 'lecturer_fahrin',
+        supervisorName: 'Fahrin',
+        supervisorStaffId: 'STF-UTEM-008',
+        supervisorStatus: 'verified',
+        supervisorRating: 'cemerlang',
+        supervisorComments: 'Cadangan teknousahawanan yang sangat baik dan bersesuaian dengan tahap PSM 2 WBL.',
+        supervisorReviewedAt: '2026-10-04T11:30:00.000Z',
+        createdAt: '2026-09-28T08:00:00.000Z',
+        updatedAt: '2026-10-04T11:30:00.000Z'
+      }
+    ];
+
+    inMemoryPsmLogs = seedPsmLogs;
+    safeSaveLocalStorage(STORAGE_KEYS.PSM_CASE_STUDY_LOGS, seedPsmLogs);
+    return seedPsmLogs;
+  },
+
+  getPsmCaseStudyLogsByStudent: (studentIdOrMatric: string): PsmCaseStudyWeeklyLog[] => {
+    const all = StorageService.getPsmCaseStudyLogs();
+    const cleanId = (studentIdOrMatric || '').toLowerCase().trim();
+    return all.filter(l => 
+      (l.studentId && l.studentId.toLowerCase().trim() === cleanId) ||
+      (l.studentMatric && l.studentMatric.toLowerCase().trim() === cleanId)
+    ).sort((a, b) => a.weekNumber - b.weekNumber);
+  },
+
+  getPsmCaseStudyLogById: (id: string): PsmCaseStudyWeeklyLog | undefined => {
+    const all = StorageService.getPsmCaseStudyLogs();
+    return all.find(l => l.id === id);
+  },
+
+  savePsmCaseStudyLog: async (logData: Partial<PsmCaseStudyWeeklyLog> & { studentId: string; weekNumber: number }): Promise<PsmCaseStudyWeeklyLog> => {
+    const all = StorageService.getPsmCaseStudyLogs();
+    const existingIndex = all.findIndex(l => 
+      (logData.id && l.id === logData.id) || 
+      (l.studentId === logData.studentId && l.weekNumber === logData.weekNumber)
+    );
+
+    const now = new Date().toISOString();
+    let savedLog: PsmCaseStudyWeeklyLog;
+
+    if (existingIndex !== -1) {
+      savedLog = {
+        ...all[existingIndex],
+        ...logData,
+        updatedAt: now
+      };
+      all[existingIndex] = savedLog;
+    } else {
+      savedLog = {
+        id: logData.id || `psm_${logData.studentId}_w${logData.weekNumber}_${Date.now()}`,
+        studentId: logData.studentId,
+        studentName: logData.studentName || 'Pelajar WBL',
+        studentMatric: logData.studentMatric || '',
+        studentProgram: logData.studentProgram || 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: logData.intake || 'Ambilan 1',
+        companyName: logData.companyName || 'Belum Ditetapkan',
+        weekNumber: logData.weekNumber,
+        startDate: logData.startDate || '2026-09-28',
+        endDate: logData.endDate || '2026-10-02',
+        caseTitle: logData.caseTitle || '',
+        milestonePhase: logData.milestonePhase || 'Milestone 1: Pengenalan & Definisi Masalah Industri (M1 - M4)',
+        problemStatement: logData.problemStatement || '',
+        methodologyActions: logData.methodologyActions || '',
+        keyFindings: logData.keyFindings || '',
+        technopreneurSolution: logData.technopreneurSolution || '',
+        consultationHours: logData.consultationHours || 2,
+        evidenceUrl: logData.evidenceUrl || '',
+        studentReflection: logData.studentReflection || '',
+        status: logData.status || 'draft',
+        createdAt: now,
+        updatedAt: now
+      };
+      all.push(savedLog);
+    }
+
+    inMemoryPsmLogs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.PSM_CASE_STUDY_LOGS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'psm_case_study_logs', savedLog.id), sanitizeForFirebase(savedLog), { merge: true });
+      } catch (err) {
+        console.warn('Firebase sync warning for psm_case_study_logs:', err);
+      }
+    }
+
+    return savedLog;
+  },
+
+  submitPsmCaseStudyLog: async (id: string): Promise<PsmCaseStudyWeeklyLog> => {
+    const all = StorageService.getPsmCaseStudyLogs();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log Case Study PSM 2 tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const updated: PsmCaseStudyWeeklyLog = {
+      ...target,
+      status: 'submitted',
+      submittedAt: now,
+      trainerStatus: 'pending',
+      supervisorStatus: 'pending',
+      updatedAt: now
+    };
+
+    const idx = all.findIndex(l => l.id === id);
+    all[idx] = updated;
+    inMemoryPsmLogs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.PSM_CASE_STUDY_LOGS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'psm_case_study_logs', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase submit error:', e);
+      }
+    }
+
+    // Send notifications to Supervisor and Trainer
+    try {
+      await StorageService.createNotification({
+        recipient_id: target.reviewedBySupervisorId || 'supervisor',
+        recipient_role: UserRole.LECTURER,
+        sender_name: target.studentName,
+        title_ms: 'Entri Case Study PSM 2 Dihantar',
+        title_en: 'PSM 2 Case Study Submitted',
+        message_ms: `Pelajar ${target.studentName} telah mengemukakan Buku Log Case Study PSM 2 Minggu ${target.weekNumber} (${target.caseTitle.slice(0, 50)}...) untuk semakan.`,
+        message_en: `Student ${target.studentName} has submitted Week ${target.weekNumber} PSM 2 Case Study for review.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    return updated;
+  },
+
+  reviewPsmCaseStudyByTrainer: async (
+    id: string, 
+    review: { 
+      trainerId: string; 
+      trainerName: string; 
+      trainerCompany?: string; 
+      trainerPosition?: string; 
+      trainerComments: string; 
+      trainerStatus: 'verified' | 'revision'; 
+      trainerRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+    }
+  ): Promise<PsmCaseStudyWeeklyLog> => {
+    const all = StorageService.getPsmCaseStudyLogs();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log Case Study PSM 2 tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const isRevision = review.trainerStatus === 'revision';
+    
+    // Status resolution: if supervisor already verified and trainer verifies, it is 'completed'
+    let finalStatus: PsmLogbookStatus = 'reviewed_by_trainer';
+    if (isRevision) {
+      finalStatus = 'revision';
+    } else if (target.supervisorStatus === 'verified') {
+      finalStatus = 'completed';
+    }
+
+    const updated: PsmCaseStudyWeeklyLog = {
+      ...target,
+      reviewedByTrainerId: review.trainerId,
+      trainerName: review.trainerName,
+      trainerCompany: review.trainerCompany || target.companyName,
+      trainerPosition: review.trainerPosition,
+      trainerComments: review.trainerComments,
+      trainerStatus: review.trainerStatus,
+      trainerRating: review.trainerRating || 'cemerlang',
+      trainerReviewedAt: now,
+      revisionNotes: isRevision ? review.trainerComments : target.revisionNotes,
+      status: finalStatus,
+      updatedAt: now
+    };
+
+    const idx = all.findIndex(l => l.id === id);
+    all[idx] = updated;
+    inMemoryPsmLogs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.PSM_CASE_STUDY_LOGS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'psm_case_study_logs', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase trainer review sync error:', e);
+      }
+    }
+
+    try {
+      await StorageService.createNotification({
+        recipient_id: target.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: review.trainerName,
+        title_ms: isRevision ? 'Pembetulan Case Study PSM 2 Diperlukan' : 'Semakan Jurulatih Industri Disahkan',
+        title_en: isRevision ? 'PSM 2 Revision Requested' : 'Industry Trainer Review Verified',
+        message_ms: isRevision 
+          ? `Jurulatih Industri (${review.trainerName}) meminta pembetulan bagi Case Study Minggu ${target.weekNumber} (${target.studentName}).`
+          : `Jurulatih Industri (${review.trainerName}) telah mengesahkan Case Study Minggu ${target.weekNumber} bagi ${target.studentName}.`,
+        message_en: `Trainer ${review.trainerName} reviewed Week ${target.weekNumber} PSM 2 case study for ${target.studentName}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    return updated;
+  },
+
+  reviewPsmCaseStudyBySupervisor: async (
+    id: string, 
+    review: { 
+      supervisorId: string; 
+      supervisorName: string; 
+      supervisorStaffId?: string; 
+      supervisorComments: string; 
+      supervisorStatus: 'verified' | 'revision'; 
+      supervisorRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+    }
+  ): Promise<PsmCaseStudyWeeklyLog> => {
+    const all = StorageService.getPsmCaseStudyLogs();
+    const target = all.find(l => l.id === id);
+    if (!target) throw new Error('Buku log Case Study PSM 2 tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const isRevision = review.supervisorStatus === 'revision';
+    
+    // Status resolution: if trainer already verified and supervisor verifies, it is 'completed'
+    let finalStatus: PsmLogbookStatus = 'reviewed_by_supervisor';
+    if (isRevision) {
+      finalStatus = 'revision';
+    } else if (target.trainerStatus === 'verified') {
+      finalStatus = 'completed';
+    }
+
+    const updated: PsmCaseStudyWeeklyLog = {
+      ...target,
+      reviewedBySupervisorId: review.supervisorId,
+      supervisorName: review.supervisorName,
+      supervisorStaffId: review.supervisorStaffId,
+      supervisorComments: review.supervisorComments,
+      supervisorStatus: review.supervisorStatus,
+      supervisorRating: review.supervisorRating || 'cemerlang',
+      supervisorReviewedAt: now,
+      revisionNotes: isRevision ? review.supervisorComments : target.revisionNotes,
+      status: finalStatus,
+      updatedAt: now
+    };
+
+    const idx = all.findIndex(l => l.id === id);
+    all[idx] = updated;
+    inMemoryPsmLogs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.PSM_CASE_STUDY_LOGS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'psm_case_study_logs', id), sanitizeForFirebase(updated), { merge: true });
+      } catch (e) {
+        console.warn('Firebase supervisor review sync error:', e);
+      }
+    }
+
+    try {
+      await StorageService.createNotification({
+        recipient_id: target.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: review.supervisorName,
+        title_ms: isRevision ? 'Bimbingan PSM 2: Pembetulan Diperlukan' : 'Bimbingan Akademik PSM 2 Disahkan',
+        title_en: isRevision ? 'PSM 2 Revision Requested by Supervisor' : 'Supervisor Academic Review Verified',
+        message_ms: isRevision 
+          ? `Penyelia Fakulti (${review.supervisorName}) memberikan ulasan pembetulan bagi Case Study Minggu ${target.weekNumber} (${target.studentName}).`
+          : `Penyelia Fakulti (${review.supervisorName}) telah mengesahkan semakan akademik Case Study Minggu ${target.weekNumber} bagi ${target.studentName}.`,
+        message_en: `Supervisor ${review.supervisorName} reviewed Week ${target.weekNumber} PSM 2 case study for ${target.studentName}.`,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    return updated;
+  },
+
+  deletePsmCaseStudyLog: async (id: string): Promise<void> => {
+    const all = StorageService.getPsmCaseStudyLogs().filter(l => l.id !== id);
+    inMemoryPsmLogs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.PSM_CASE_STUDY_LOGS, all);
+    notifyListeners();
+    if (db) await deleteDoc(doc(db, 'psm_case_study_logs', id));
   },
 
   // ==================== COURSE LECTURER ASSIGNMENTS ====================

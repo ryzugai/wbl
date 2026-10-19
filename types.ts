@@ -213,6 +213,59 @@ export interface WeeklyLogbook {
   updatedAt: string;
 }
 
+export type PsmLogbookStatus = 'draft' | 'submitted' | 'reviewed_by_trainer' | 'reviewed_by_supervisor' | 'completed' | 'revision';
+
+export interface PsmCaseStudyWeeklyLog {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentMatric: string;
+  studentProgram?: string;
+  intake?: string; // 'Ambilan 1' | 'Ambilan 2' | 'Ambilan 3'
+  companyName: string;
+  weekNumber: number; // 1 to 20 (PSM 2 runs for 20 weeks)
+  startDate: string;
+  endDate: string;
+  
+  // Case Study Content filled by Student
+  caseTitle: string; // Tajuk / Tema Kajian Kes Minggu Ini
+  milestonePhase?: string; // Fasa PSM 2
+  problemStatement: string; // Isu / Masalah Lapangan Industri yang Dikaji
+  methodologyActions: string; // Kaedah / Tindakan Lapangan / Temubual / Pemerhatian
+  keyFindings: string; // Dapatan Utama / Data / Bukti Kajian Kes Minggu Ini
+  technopreneurSolution: string; // Cadangan Solusi Teknousahawanan & Impak Industri
+  consultationHours: number; // Jam Bimbingan / Perbincangan (cth: 2 jam)
+  evidenceUrl?: string; // Pautan Dokumen / Google Drive / Bukti Lampiran
+  studentReflection?: string; // Refleksi & Perancangan Minggu Seterusnya
+  status: PsmLogbookStatus;
+  submittedAt?: string;
+
+  // Semakan & Ulasan Jurulatih Industri (Industry Trainer)
+  reviewedByTrainerId?: string;
+  trainerName?: string;
+  trainerPosition?: string;
+  trainerCompany?: string;
+  trainerComments?: string;
+  trainerStatus?: 'verified' | 'revision' | 'pending';
+  trainerRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+  trainerReviewedAt?: string;
+
+  // Semakan & Bimbingan Akademik Penyelia Fakulti (Faculty Supervisor)
+  reviewedBySupervisorId?: string;
+  supervisorName?: string;
+  supervisorStaffId?: string;
+  supervisorComments?: string;
+  supervisorStatus?: 'verified' | 'revision' | 'pending';
+  supervisorRating?: 'cemerlang' | 'baik' | 'memuaskan' | 'perlu_bimbingan';
+  supervisorReviewedAt?: string;
+
+  // Nota Pembetulan (jika status revision)
+  revisionNotes?: string;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type EvaluationStatus = 'draft' | 'submitted_by_trainer' | 'verified_by_lecturer' | 'revision_requested';
 
 export interface CourseLecturerAssignment {

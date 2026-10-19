@@ -864,7 +864,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     className="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <BookOpen size={13} />
-                    <span>Buka Buku Log Pelajar</span>
+                    <span>Buka Log Harian</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('psmCaseStudy')}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  >
+                    <Sparkles size={13} className="text-slate-950" />
+                    <span>Buku Log Case Study PSM 2</span>
                   </button>
                   <button
                     type="button"
@@ -1019,6 +1027,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
               />
               <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
+
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('psmCaseStudy')}
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <Sparkles size={13} className="text-indigo-600" />
+                <span>Buku Log Case Study PSM 2 &raquo;</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -340,19 +340,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
              <NavItem view="dailyLogbook" label={t(language, 'logbook')} icon={BookOpen} />
           )}
 
+          {/* PSM 2 Case Study Weekly Logbook for Students */}
+          {isStudent && (
+             <NavItem view="psmCaseStudy" label={language === 'ms' ? 'Buku Log Case Study PSM 2' : 'PSM 2 Case Study Logbook'} icon={FileText} />
+          )}
+
           {/* Logbook Verification for Industry Trainers */}
           {isTrainer && (
-             <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pengesahan Log Harian' : 'Logbook Verification'} icon={CheckCircle2} />
+             <>
+               <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pengesahan Log Harian' : 'Logbook Verification'} icon={CheckCircle2} />
+               <NavItem view="psmCaseStudy" label={language === 'ms' ? 'Semakan Case Study PSM 2' : 'PSM 2 Case Study Review'} icon={FileText} />
+             </>
           )}
 
           {/* Logbook Review & Monitoring for Faculty Supervisors (Penyelia Fakulti) */}
           {isSupervisor && !hasSystemAccess && (
-             <NavItem view="dailyLogbook" label={language === 'ms' ? 'Buku Log Pelajar Seliaan' : 'Supervised Logbooks'} icon={BookOpen} />
+             <>
+               <NavItem view="dailyLogbook" label={language === 'ms' ? 'Buku Log Pelajar Seliaan' : 'Supervised Logbooks'} icon={BookOpen} />
+               <NavItem view="psmCaseStudy" label={language === 'ms' ? 'Semakan Case Study PSM 2' : 'PSM 2 Case Study Review'} icon={FileText} />
+             </>
           )}
 
           {/* Logbook Cohort Oversight for WBL Coordinator & JKWBL */}
           {hasSystemAccess && (
-             <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pemantauan Buku Log' : 'Logbook Monitoring'} icon={BookOpen} />
+             <>
+               <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pemantauan Buku Log' : 'Logbook Monitoring'} icon={BookOpen} />
+               <NavItem view="psmCaseStudy" label={language === 'ms' ? 'Pemantauan Case Study PSM 2' : 'PSM 2 Case Study Oversight'} icon={FileText} />
+             </>
           )}
 
           {/* ========================================================= */}

@@ -16,6 +16,7 @@ interface DailyLogbookProps {
   applications: Application[];
   users: User[];
   language: Language;
+  onNavigate?: (view: string) => void;
 }
 
 const DEFAULT_DAYS = ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat'];
@@ -24,7 +25,8 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
   currentUser,
   applications,
   users,
-  language
+  language,
+  onNavigate
 }) => {
   // Roles
   const isStudent = currentUser.role === UserRole.STUDENT;
@@ -559,6 +561,37 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Dual Module Switcher: Daily Logbook vs PSM 2 Case Study Weekly Log */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 p-3 rounded-2xl border border-slate-800 text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-500 text-white tracking-wider">
+            Modul Log WBL
+          </span>
+          <span className="text-xs font-bold text-blue-200">
+            {language === 'ms' ? 'Pilih jenis buku log latihan:' : 'Select logbook type:'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            className="flex-1 sm:flex-initial px-4 py-1.5 rounded-xl text-xs font-black bg-blue-600 text-white shadow-xs"
+          >
+            {language === 'ms' ? '1. Log Latihan Harian (Operasi)' : '1. Daily Training Log'}
+          </button>
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('psmCaseStudy')}
+              className="flex-1 sm:flex-initial px-4 py-1.5 rounded-xl text-xs font-black bg-white/10 hover:bg-white/20 text-blue-200 hover:text-white transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span>{language === 'ms' ? '2. Buku Log Case Study PSM 2 (20 Mggu)' : '2. PSM 2 Case Study (20 Wks)'}</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black">Baru</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
