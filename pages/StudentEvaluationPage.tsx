@@ -29,7 +29,12 @@ import {
 import { CourseAnnouncementsSection } from '../components/CourseAnnouncementsSection';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
-import { getStudentPlacementStatus } from '../utils/wblRemindersAndEnrollment';
+import {
+  getStudentPlacementStatus,
+  normalizeMatric,
+  resolveEnrolledStudentIdentity,
+  ResolvedCourseStudent
+} from '../utils/wblRemindersAndEnrollment';
 
 interface StudentEvaluationPageProps {
   currentUser: User;
@@ -916,23 +921,30 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     const evalStudentIds = evaluations.filter(e => e.courseCode === course.courseCode).map(e => e.studentId);
     const combinedIds = Array.from(new Set([...enrolledIds, ...evalStudentIds]));
 
-    const records: CourseStudentGradeRecord[] = combinedIds.map(sId => {
-      const studentUser = users.find(u => u.id === sId || u.matric_no === sId);
-      const studentApp = applications.find(a => 
-        (a.student_id === sId || (studentUser && (a.student_id === studentUser.matric_no || a.created_by === studentUser.username))) && 
-        (a.application_status === 'Diluluskan' || a.student_preferred)
-      );
-      const ev = evaluations.find(e => 
-        (e.studentId === sId || (studentUser && (e.studentId === studentUser.id || e.studentMatric === studentUser.matric_no))) && 
-        e.courseCode === course.courseCode
+    const resolvedMap = new Map<string, ResolvedCourseStudent>();
+    for (const sId of combinedIds) {
+      const resolved = resolveEnrolledStudentIdentity(sId, users, applications);
+      if (!resolved) continue;
+      if (!resolvedMap.has(resolved.dedupeKey)) {
+        resolvedMap.set(resolved.dedupeKey, resolved);
+      }
+    }
+
+    const records: CourseStudentGradeRecord[] = Array.from(resolvedMap.values()).map((res) => {
+      const resMatricNorm = normalizeMatric(res.studentMatric);
+      const ev = evaluations.find(e =>
+        e.courseCode === course.courseCode &&
+        (e.studentId === res.canonicalId ||
+          (res.studentUser && e.studentId === res.studentUser.id) ||
+          (Boolean(resMatricNorm) && normalizeMatric(e.studentMatric) === resMatricNorm))
       );
 
       return {
-        studentMatric: studentUser?.matric_no || studentApp?.student_id || sId,
-        studentName: studentUser?.name || studentApp?.student_name || 'Pelajar WBL',
-        studentProgram: studentUser?.academic_level || studentApp?.student_program || 'BTEC',
-        companyName: ev?.companyName || studentApp?.company_name || studentUser?.company_affiliation || 'Organisasi Latihan Industri',
-        trainerName: ev?.trainerName || studentUser?.industry_trainer_name || 'Jurulatih Industri',
+        studentMatric: res.studentMatric,
+        studentName: res.studentName,
+        studentProgram: res.studentProgram,
+        companyName: ev?.companyName || res.companyName || 'Organisasi Latihan Industri',
+        trainerName: ev?.trainerName || res.trainerName || 'Jurulatih Industri',
         technicalSubtotal: ev?.technicalSubtotal || 0,
         softSkillsSubtotal: ev?.softSkillsSubtotal || 0,
         logbookSubtotal: ev?.logbookSubtotal || 0,
@@ -2984,37 +2996,44 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             }
 
             return targetCourses.map((currentCourse) => {
-              // Get enrolled student IDs for this course
+              // Get enrolled student IDs for this course (resolved & deduplicated; excludes orphaned UUIDs)
               const enrolledIds = currentCourse.assignedStudentIds || [];
               const evalStudentIds = evaluations.filter(e => e.courseCode === currentCourse.courseCode).map(e => e.studentId);
               const allTargetStudentIds = Array.from(new Set([...enrolledIds, ...evalStudentIds]));
 
-              // Build student items
-              const studentRows = allTargetStudentIds.map(sId => {
-                const studentUser = users.find(u => u.id === sId || u.matric_no === sId);
-                const studentApp = applications.find(a => 
-                  (a.student_id === sId || (studentUser && (a.student_id === studentUser.matric_no || a.created_by === studentUser.username))) && 
-                  (a.application_status === 'Diluluskan' || a.student_preferred)
-                );
-                const evalData = evaluations.find(e => 
-                  (e.studentId === sId || (studentUser && (e.studentId === studentUser.id || e.studentMatric === studentUser.matric_no))) && 
-                  e.courseCode === currentCourse.courseCode
+              const resolvedMap = new Map<string, ResolvedCourseStudent>();
+              for (const sId of allTargetStudentIds) {
+                const resolved = resolveEnrolledStudentIdentity(sId, users, applications);
+                if (!resolved) continue;
+                if (!resolvedMap.has(resolved.dedupeKey)) {
+                  resolvedMap.set(resolved.dedupeKey, resolved);
+                }
+              }
+
+              // Build clean student items
+              const studentRows = Array.from(resolvedMap.values()).map((res) => {
+                const resMatricNorm = normalizeMatric(res.studentMatric);
+                const evalData = evaluations.find(e =>
+                  e.courseCode === currentCourse.courseCode &&
+                  (e.studentId === res.canonicalId ||
+                    (res.studentUser && e.studentId === res.studentUser.id) ||
+                    (Boolean(resMatricNorm) && normalizeMatric(e.studentMatric) === resMatricNorm))
                 );
 
                 return {
-                  studentId: sId,
-                  studentUser,
-                  studentApp,
-                  studentName: studentUser?.name || studentApp?.student_name || 'Pelajar WBL',
-                  studentMatric: studentUser?.matric_no || studentApp?.student_id || sId,
-                  studentProgram: studentUser?.academic_level || studentApp?.student_program || 'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
-                  companyName: evalData?.companyName || studentApp?.company_name || studentUser?.company_affiliation || 'Organisasi Latihan Industri',
-                  companyLocation: studentApp?.company_district ? `${studentApp.company_district}, ${studentApp.company_state}` : (studentUser?.address || '-'),
-                  trainerId: evalData?.trainerId || studentUser?.industry_trainer_id || 'trainer',
-                  trainerName: evalData?.trainerName || studentUser?.industry_trainer_name || 'Jurulatih Industri',
-                  trainerPosition: evalData?.trainerPosition || studentUser?.industry_trainer_position || 'Jurulatih Industri',
-                  trainerPhone: evalData?.trainerPhone || studentUser?.industry_trainer_phone || '-',
-                  trainerEmail: evalData?.trainerEmail || studentUser?.industry_trainer_email || '-',
+                  studentId: res.canonicalId,
+                  studentUser: res.studentUser,
+                  studentApp: res.studentApp,
+                  studentName: res.studentName,
+                  studentMatric: res.studentMatric,
+                  studentProgram: res.studentProgram,
+                  companyName: evalData?.companyName || res.companyName || 'Organisasi Latihan Industri',
+                  companyLocation: res.companyLocation,
+                  trainerId: evalData?.trainerId || res.trainerId,
+                  trainerName: evalData?.trainerName || res.trainerName,
+                  trainerPosition: evalData?.trainerPosition || res.trainerPosition,
+                  trainerPhone: evalData?.trainerPhone || res.trainerPhone,
+                  trainerEmail: evalData?.trainerEmail || res.trainerEmail,
                   evaluation: evalData,
                   status: evalData ? evalData.status : 'unassessed',
                   totalScore: evalData ? evalData.totalScore : null,
@@ -3518,7 +3537,12 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {courseAssignments.map((course) => {
-                  const enrolledCount = (course.assignedStudentIds || []).length;
+                  const cleanEnrolledKeys = new Set<string>();
+                  for (const sId of course.assignedStudentIds || []) {
+                    const res = resolveEnrolledStudentIdentity(sId, users, applications);
+                    if (res) cleanEnrolledKeys.add(res.dedupeKey);
+                  }
+                  const enrolledCount = cleanEnrolledKeys.size;
                   const isSelected = selectedEnrollmentCourseCode === course.courseCode;
                   const isCurrentMod = course.courseCode.includes('3273') || course.courseCode === currentActiveModularCourse;
                   const isPastMod = course.courseCode.includes('2103');
@@ -3577,15 +3601,28 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             if (!currentCourse) return null;
 
             const enrolledStudentIds = currentCourse.assignedStudentIds || [];
-            
+
+            // Resolve & deduplicate enrolled students (automatically drops orphaned ghost UUIDs)
+            const enrolledResolvedMap = new Map<string, ResolvedCourseStudent>();
+            for (const sId of enrolledStudentIds) {
+              const resolved = resolveEnrolledStudentIdentity(sId, users, applications);
+              if (!resolved) continue;
+              if (!enrolledResolvedMap.has(resolved.dedupeKey)) {
+                enrolledResolvedMap.set(resolved.dedupeKey, resolved);
+              }
+            }
+            const enrolledDedupeKeys = new Set(enrolledResolvedMap.keys());
+
             // Available students not yet enrolled in this course (includes new cohort & unplaced students)
             const availableStudents = studentUsersList
-              .filter(
-                (s) =>
-                  s.is_active !== false &&
-                  !enrolledStudentIds.includes(s.id) &&
-                  !enrolledStudentIds.includes(s.matric_no || '')
-              )
+              .filter((s) => {
+                if (s.is_active === false) return false;
+                if (enrolledStudentIds.includes(s.id)) return false;
+                if (s.matric_no && enrolledStudentIds.includes(s.matric_no)) return false;
+                const sResolved = resolveEnrolledStudentIdentity(s.id, users, applications);
+                if (sResolved && enrolledDedupeKeys.has(sResolved.dedupeKey)) return false;
+                return true;
+              })
               .map((s) => ({
                 ...s,
                 placementInfo: getStudentPlacementStatus(s, applications)
@@ -3617,23 +3654,16 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             });
 
             // Enrolled students list
-            const enrolledStudents = enrolledStudentIds.map(sId => {
-              const u = users.find(user => user.id === sId || user.matric_no === sId);
-              const placementInfo = u ? getStudentPlacementStatus(u, applications) : null;
-              const app =
-                placementInfo?.approvedApp ||
-                applications.find(a => (a.student_id === sId || (u && (a.student_id === u.matric_no || a.created_by === u.username))) && (a.application_status === 'Diluluskan' || a.student_preferred));
-              return {
-                id: sId,
-                name: u?.name || app?.student_name || 'Pelajar WBL',
-                matric: u?.matric_no || app?.student_id || sId,
-                program: u?.program || u?.academic_level || app?.student_program || 'BTEC',
-                company: placementInfo?.companyName || app?.company_name || u?.company_affiliation || 'Belum Ditetapkan',
-                isPlaced: Boolean(placementInfo?.isPlaced || app?.company_name),
-                intake: u?.intake || 'Ambilan 1',
-                phone: u?.phone || '-'
-              };
-            });
+            const enrolledStudents = Array.from(enrolledResolvedMap.values()).map((res) => ({
+              id: res.canonicalId,
+              name: res.studentName,
+              matric: res.studentMatric,
+              program: res.studentProgram,
+              company: res.companyName,
+              isPlaced: res.isPlaced,
+              intake: res.intake,
+              phone: res.phone
+            }));
 
             return (
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">

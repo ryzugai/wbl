@@ -11,6 +11,7 @@ import {
   UTEM_WEEKLY_ASSESSMENTS,
   WeeklyAssessmentConfig
 } from '../constants/utemWblRubrics';
+import { DEFAULT_PLACED_STUDENTS, StudentPlacementPoint } from '../constants/wblPlacementData';
 
 export const WBL_SEMESTER_START_DATE = '2026-09-28';
 
@@ -19,6 +20,15 @@ export const normalizeText = (val?: string | null): string =>
 
 export const normalizeMatric = (val?: string | null): string =>
   (val || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+export const cleanPersonName = (val?: string | null): string =>
+  (val || '')
+    .toLowerCase()
+    .replace(/\b(binti|bin|bt|b\.|a\/l|a\/p)\b/g, ' ')
+    .replace(/[^a-z0-9]/g, '');
+
+export const isUuidLike = (val?: string | null): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((val || '').trim());
 
 export const normalizeCourseCode = (code?: string | null): string =>
   (code || '').replace(/\(i\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
@@ -111,32 +121,55 @@ export const getStudentPlacementStatus = (
   const sMatric = normalizeMatric(student.matric_no);
   const sUsername = normalizeText(student.username);
   const sName = normalizeText(student.name);
+  const sCleanName = cleanPersonName(student.name);
 
   const approvedApp = applications.find((a) => {
-    if (a.application_status !== 'Diluluskan') return false;
+    const statusOk = a.application_status === 'Diluluskan' || Boolean(a.student_preferred);
+    if (!statusOk) return false;
     if (!isValidCompanyName(a.company_name)) return false;
 
     const aMatric = normalizeMatric(a.student_id);
     const aCreator = normalizeText(a.created_by);
     const aName = normalizeText(a.student_name);
+    const aCleanName = cleanPersonName(a.student_name);
 
     return (
       a.student_id === student.id ||
       (Boolean(sMatric) && aMatric === sMatric) ||
       (Boolean(sUsername) && aCreator === sUsername) ||
-      (Boolean(sName) && aName === sName)
+      (Boolean(sName) && aName === sName) ||
+      (sCleanName.length >= 6 && aCleanName === sCleanName)
     );
   });
+
+  const intakeLabel = (student.intake || 'Ambilan 1').trim();
+  const isNewCohort = intakeLabel !== '' && intakeLabel !== 'Ambilan 1';
 
   const companyFromProfile = isValidCompanyName(student.company_affiliation)
     ? (student.company_affiliation || '').trim()
     : '';
 
-  const companyName = approvedApp?.company_name?.trim() || companyFromProfile || '';
-  const isPlaced = Boolean(approvedApp || companyFromProfile);
+  // Fallback match against official Ambilan 1 cohort placement list
+  const defaultPlacementMatch = !isNewCohort
+    ? DEFAULT_PLACED_STUDENTS.find((d) => {
+        const dMatric = normalizeMatric(d.matricNo);
+        const dCleanName = cleanPersonName(d.name);
+        return (
+          d.studentId === student.id ||
+          (Boolean(sMatric) && Boolean(dMatric) && dMatric === sMatric) ||
+          (sCleanName.length >= 6 && dCleanName === sCleanName)
+        );
+      })
+    : undefined;
 
-  const intakeLabel = (student.intake || 'Ambilan 1').trim();
-  const isNewCohort = intakeLabel !== '' && intakeLabel !== 'Ambilan 1';
+  const companyName =
+    approvedApp?.company_name?.trim() ||
+    companyFromProfile ||
+    (defaultPlacementMatch && isValidCompanyName(defaultPlacementMatch.companyName)
+      ? defaultPlacementMatch.companyName.trim()
+      : '') ||
+    '';
+  const isPlaced = Boolean(approvedApp || companyFromProfile || (defaultPlacementMatch && isValidCompanyName(defaultPlacementMatch.companyName)));
 
   return {
     isPlaced,
@@ -144,6 +177,185 @@ export const getStudentPlacementStatus = (
     approvedApp,
     isNewCohort,
     intakeLabel
+  };
+};
+
+export interface ResolvedCourseStudent {
+  canonicalId: string;
+  dedupeKey: string;
+  studentUser?: User;
+  studentApp?: Application;
+  defaultPoint?: StudentPlacementPoint;
+  studentName: string;
+  studentMatric: string;
+  studentProgram: string;
+  companyName: string;
+  companyLocation: string;
+  trainerId: string;
+  trainerName: string;
+  trainerPosition: string;
+  trainerPhone: string;
+  trainerEmail: string;
+  intake: string;
+  phone: string;
+  isPlaced: boolean;
+}
+
+/**
+ * Resolves a course enrolled ID (UUID or matric) to a genuine student record across
+ * Users, Applications, and official WBL Placement data.
+ * Returns null for orphaned/deleted UUIDs that have no real student identity (prevents "Pelajar WBL" ghost rows).
+ */
+export const resolveEnrolledStudentIdentity = (
+  sId: string,
+  users: User[],
+  applications: Application[]
+): ResolvedCourseStudent | null => {
+  const rawId = (sId || '').trim();
+  if (!rawId) return null;
+
+  const normIdMatric = normalizeMatric(rawId);
+  const studentUsers = users.filter((u) => u.role === UserRole.STUDENT);
+
+  // 1. Direct match in student users by id or matric_no
+  let studentUser = studentUsers.find(
+    (u) => u.id === rawId || (Boolean(normIdMatric) && !isUuidLike(rawId) && normalizeMatric(u.matric_no) === normIdMatric)
+  );
+
+  // 2. Match in official DEFAULT_PLACED_STUDENTS (e.g. legacy UUID like Noor Suhaila 16589537-...)
+  let defaultPoint = DEFAULT_PLACED_STUDENTS.find(
+    (d) =>
+      d.studentId === rawId ||
+      (Boolean(normIdMatric) && !isUuidLike(rawId) && normalizeMatric(d.matricNo) === normIdMatric)
+  );
+
+  // If we found a legacy DEFAULT_PLACED_STUDENTS record, try mapping it to an existing User in Firestore
+  if (!studentUser && defaultPoint) {
+    const dMatric = normalizeMatric(defaultPoint.matricNo);
+    const dCleanName = cleanPersonName(defaultPoint.name);
+    studentUser = studentUsers.find(
+      (u) =>
+        (Boolean(dMatric) && normalizeMatric(u.matric_no) === dMatric) ||
+        (dCleanName.length >= 6 && cleanPersonName(u.name) === dCleanName)
+    );
+  }
+
+  // If we have a User, also enrich with DEFAULT_PLACED_STUDENTS if not matched yet
+  if (studentUser && !defaultPoint) {
+    const uMatric = normalizeMatric(studentUser.matric_no);
+    const uCleanName = cleanPersonName(studentUser.name);
+    defaultPoint = DEFAULT_PLACED_STUDENTS.find(
+      (d) =>
+        d.studentId === studentUser!.id ||
+        (Boolean(uMatric) && normalizeMatric(d.matricNo) === uMatric) ||
+        (uCleanName.length >= 6 && cleanPersonName(d.name) === uCleanName)
+    );
+  }
+
+  // 3. Match placement application (prefer Diluluskan / student_preferred, then any application)
+  const findMatchingApp = (onlyApprovedOrPreferred: boolean): Application | undefined => {
+    const uMatric = normalizeMatric(studentUser?.matric_no || defaultPoint?.matricNo);
+    const uUsername = normalizeText(studentUser?.username);
+    const uCleanName = cleanPersonName(studentUser?.name || defaultPoint?.name);
+
+    return applications.find((a) => {
+      if (onlyApprovedOrPreferred && a.application_status !== 'Diluluskan' && !a.student_preferred) {
+        return false;
+      }
+      const aMatric = normalizeMatric(a.student_id);
+      const aCreator = normalizeText(a.created_by);
+      const aCleanName = cleanPersonName(a.student_name);
+
+      return (
+        a.student_id === rawId ||
+        (Boolean(normIdMatric) && !isUuidLike(rawId) && aMatric === normIdMatric) ||
+        (Boolean(studentUser?.id) && a.student_id === studentUser!.id) ||
+        (Boolean(uMatric) && aMatric === uMatric) ||
+        (Boolean(uUsername) && aCreator === uUsername) ||
+        (uCleanName.length >= 6 && aCleanName === uCleanName)
+      );
+    });
+  };
+
+  const studentApp = findMatchingApp(true) || findMatchingApp(false);
+
+  // If we found an application directly by rawId, try linking to a real User as well
+  if (!studentUser && studentApp) {
+    const aMatric = normalizeMatric(studentApp.student_id);
+    const aCreator = normalizeText(studentApp.created_by);
+    const aCleanName = cleanPersonName(studentApp.student_name);
+    studentUser = studentUsers.find(
+      (u) =>
+        (Boolean(aMatric) && normalizeMatric(u.matric_no) === aMatric) ||
+        (Boolean(aCreator) && normalizeText(u.username) === aCreator) ||
+        (aCleanName.length >= 6 && cleanPersonName(u.name) === aCleanName)
+    );
+  }
+
+  // If NONE of user, application, or default placement resolved -> this is an orphaned/ghost ID!
+  const resolvedName = (studentUser?.name || studentApp?.student_name || defaultPoint?.name || '').trim();
+  if (!resolvedName || normalizeText(resolvedName) === 'pelajar wbl') {
+    return null;
+  }
+
+  const resolvedMatric = (
+    studentUser?.matric_no ||
+    studentApp?.student_id ||
+    defaultPoint?.matricNo ||
+    (!isUuidLike(rawId) ? rawId : '')
+  ).trim();
+
+  const placementInfo = studentUser ? getStudentPlacementStatus(studentUser, applications) : null;
+  const companyName =
+    placementInfo?.companyName ||
+    (studentApp && isValidCompanyName(studentApp.company_name) ? studentApp.company_name.trim() : '') ||
+    (studentUser && isValidCompanyName(studentUser.company_affiliation) ? studentUser.company_affiliation!.trim() : '') ||
+    (defaultPoint && isValidCompanyName(defaultPoint.companyName) ? defaultPoint.companyName.trim() : '') ||
+    'Belum Ditetapkan';
+
+  const isPlaced = Boolean(
+    placementInfo?.isPlaced ||
+      (studentApp && (studentApp.application_status === 'Diluluskan' || studentApp.student_preferred) && isValidCompanyName(studentApp.company_name)) ||
+      (defaultPoint && isValidCompanyName(defaultPoint.companyName))
+  );
+
+  // Canonical ID prefers real user.id, otherwise matric number (never an orphaned raw UUID)
+  const canonicalId = studentUser?.id || resolvedMatric || rawId;
+  const dedupeKey =
+    normalizeMatric(resolvedMatric) ||
+    cleanPersonName(resolvedName) ||
+    canonicalId.toLowerCase();
+
+  return {
+    canonicalId,
+    dedupeKey,
+    studentUser,
+    studentApp,
+    defaultPoint,
+    studentName: resolvedName,
+    studentMatric: resolvedMatric || '-',
+    studentProgram:
+      studentUser?.program ||
+      studentUser?.academic_level ||
+      studentApp?.student_program ||
+      defaultPoint?.program ||
+      'SARJANA MUDA TEKNOUSAHAWANAN (BTEC)',
+    companyName,
+    companyLocation:
+      studentApp?.company_district
+        ? `${studentApp.company_district}, ${studentApp.company_state}`
+        : defaultPoint?.companyAddress || studentUser?.address || '-',
+    trainerId: studentUser?.industry_trainer_id || 'trainer',
+    trainerName:
+      studentUser?.industry_trainer_name ||
+      defaultPoint?.industryTrainerName ||
+      'Jurulatih Industri',
+    trainerPosition: studentUser?.industry_trainer_position || 'Jurulatih Industri',
+    trainerPhone: studentUser?.industry_trainer_phone || '-',
+    trainerEmail: studentUser?.industry_trainer_email || '-',
+    intake: studentUser?.intake || defaultPoint?.intake || 'Ambilan 1',
+    phone: studentUser?.phone || defaultPoint?.phone || '-',
+    isPlaced
   };
 };
 

@@ -8,11 +8,16 @@ import {
   getStudentPlacementStatus,
   isValidCompanyName,
   normalizeText,
-  normalizeMatric
+  normalizeMatric,
+  cleanPersonName,
+  resolveEnrolledStudentIdentity
 } from '../utils/wblRemindersAndEnrollment';
+import { DEFAULT_PLACED_STUDENTS } from '../constants/wblPlacementData';
 
 const MANUAL_ENROLL_OVERRIDE_KEY = 'wbl_manual_enrolled_map';
 const MANUAL_UNENROLL_OVERRIDE_KEY = 'wbl_manual_unenrolled_map';
+let isAutoEnrollRunning = false;
+let autoEnrollSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
 const readOverrideMap = (key: string): Record<string, string[]> => {
   try {
@@ -540,7 +545,17 @@ const setupRealtimeListeners = () => {
         } else {
           safeSaveLocalStorage(storageKey, data);
         }
-        notifyListeners(); 
+        notifyListeners();
+
+        // Trigger safe background auto-enroll & orphan UUID cleanup once core collections sync from Firestore
+        if (colName === 'users' || colName === 'applications' || colName === 'course_assignments') {
+          if (autoEnrollSyncTimer) clearTimeout(autoEnrollSyncTimer);
+          autoEnrollSyncTimer = setTimeout(() => {
+            if (inMemoryUsers.some((u) => u.role === UserRole.STUDENT)) {
+              StorageService.autoEnrollPlacedStudentsAllCourses({ notifyNew: false }).catch(() => {});
+            }
+          }, 250);
+        }
       }
     }, (error) => {
         console.error(`Sync Error for ${colName}:`, error);
@@ -3305,131 +3320,228 @@ export const StorageService = {
 
   /**
    * Automatically enrolls all students who have received company placement into ALL WBL courses,
-   * while keeping unplaced / new-cohort students (unless manually enrolled) inside the "+ Enrol Pelajar Baharu" pool.
+   * cleans up orphaned/deleted UUIDs ("Pelajar WBL" ghost entries), migrates legacy UUIDs (e.g. Noor Suhaila),
+   * and keeps unplaced / new-cohort students (unless manually enrolled) inside the "+ Enrol Pelajar Baharu" pool.
    */
   autoEnrollPlacedStudentsAllCourses: async (options?: {
     targetStudentIds?: string[];
     notifyNew?: boolean;
   }): Promise<{ changedCourses: number; newlyEnrolledPlacedCount: number }> => {
-    const allCourses = StorageService.getCourseAssignments();
-    if (allCourses.length === 0) {
+    if (isAutoEnrollRunning) {
       return { changedCourses: 0, newlyEnrolledPlacedCount: 0 };
     }
+    isAutoEnrollRunning = true;
 
-    const users = StorageService.getUsers();
-    const applications = StorageService.getApplications();
-    const manualEnrolled = readOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY);
-    const manualUnenrolled = readOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY);
-
-    const activeStudents = users.filter(
-      (u) => u.role === UserRole.STUDENT && u.is_active !== false
-    );
-
-    const placedStudents = activeStudents.filter((s) => {
-      if (options?.targetStudentIds && !options.targetStudentIds.includes(s.id)) {
-        return false;
-      }
-      return getStudentPlacementStatus(s, applications).isPlaced;
-    });
-
-    const unplacedStudentIds = new Set(
-      activeStudents
-        .filter((s) => !getStudentPlacementStatus(s, applications).isPlaced)
-        .flatMap((s) => [s.id, s.matric_no || ''].filter(Boolean))
-    );
-
-    const now = new Date().toISOString();
-    let changedCourses = 0;
-    const newlyEnrolledStudentSet = new Set<string>();
-    const updatedCourses: CourseLecturerAssignment[] = [];
-    const modifiedCourses: CourseLecturerAssignment[] = [];
-
-    for (const course of allCourses) {
-      const code = course.courseCode;
-      const manualKeepSet = new Set(manualEnrolled[code] || []);
-      const manualSkipSet = new Set(manualUnenrolled[code] || []);
-
-      const originalIds = course.assignedStudentIds || [];
-      const nextIdsSet = new Set<string>();
-
-      // Keep existing IDs EXCEPT legacy unplaced students who were not manually enrolled
-      for (const sid of originalIds) {
-        if (!options?.targetStudentIds && unplacedStudentIds.has(sid) && !manualKeepSet.has(sid)) {
-          continue;
-        }
-        nextIdsSet.add(sid);
+    try {
+      const allCourses = StorageService.getCourseAssignments();
+      if (allCourses.length === 0) {
+        return { changedCourses: 0, newlyEnrolledPlacedCount: 0 };
       }
 
-      // Automatically ensure every placed student is enrolled in this course (unless manually unenrolled)
-      for (const ps of placedStudents) {
-        if (manualSkipSet.has(ps.id)) continue;
-        const alreadyPresent =
-          nextIdsSet.has(ps.id) || (ps.matric_no ? nextIdsSet.has(ps.matric_no) : false);
-        if (!alreadyPresent) {
-          nextIdsSet.add(ps.id);
-          newlyEnrolledStudentSet.add(ps.id);
+      const users = StorageService.getUsers();
+      const applications = StorageService.getApplications();
+      const studentUsers = users.filter((u) => u.role === UserRole.STUDENT);
+      const hasLoadedStudentUsers = studentUsers.length > 0;
+
+      const manualEnrolled = readOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY);
+      const manualUnenrolled = readOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY);
+
+      // Build deduplicated list of all placed students to auto-enroll
+      const placedCandidateMap = new Map<
+        string,
+        { canonicalId: string; dedupeKey: string; matric?: string; altIds: string[] }
+      >();
+
+      const officialCohortCleanNames = new Set(
+        DEFAULT_PLACED_STUDENTS.map((d) => cleanPersonName(d.name)).filter(Boolean)
+      );
+      const officialCohortMatrics = new Set(
+        DEFAULT_PLACED_STUDENTS.map((d) => normalizeMatric(d.matricNo)).filter(Boolean)
+      );
+
+      // 1. Placed students from Users collection
+      for (const s of studentUsers) {
+        const isInOfficialCohort =
+          officialCohortCleanNames.has(cleanPersonName(s.name)) ||
+          officialCohortMatrics.has(normalizeMatric(s.matric_no));
+        if (s.is_active === false && !isInOfficialCohort) continue;
+        if (options?.targetStudentIds && !options.targetStudentIds.includes(s.id)) continue;
+
+        const placement = getStudentPlacementStatus(s, applications);
+        if (!placement.isPlaced) continue;
+
+        const resolved = resolveEnrolledStudentIdentity(s.id, users, applications);
+        if (!resolved) continue;
+
+        if (!placedCandidateMap.has(resolved.dedupeKey)) {
+          placedCandidateMap.set(resolved.dedupeKey, {
+            canonicalId: resolved.canonicalId,
+            dedupeKey: resolved.dedupeKey,
+            matric: resolved.studentMatric,
+            altIds: [s.id, s.matric_no || '', resolved.canonicalId].filter(Boolean)
+          });
         }
       }
 
-      const nextIds = Array.from(nextIdsSet);
-      const changed =
-        nextIds.length !== originalIds.length ||
-        nextIds.some((id, idx) => originalIds[idx] !== id);
+      // 2. Placed students from approved/preferred Applications (handles cases where User doc was deleted/re-created)
+      if (!options?.targetStudentIds) {
+        for (const app of applications) {
+          const statusOk = app.application_status === 'Diluluskan' || Boolean(app.student_preferred);
+          if (!statusOk || !isValidCompanyName(app.company_name)) continue;
 
-      if (changed) {
-        const updatedCourse: CourseLecturerAssignment = {
-          ...course,
-          assignedStudentIds: nextIds,
-          updatedAt: now
-        };
-        updatedCourses.push(updatedCourse);
-        modifiedCourses.push(updatedCourse);
-        changedCourses += 1;
-      } else {
-        updatedCourses.push(course);
-      }
-    }
+          const lookupKey = app.student_id || app.id;
+          if (!lookupKey) continue;
+          const resolved = resolveEnrolledStudentIdentity(lookupKey, users, applications);
+          if (!resolved || !resolved.isPlaced) continue;
 
-    if (changedCourses > 0) {
-      inMemoryCourseAssignments = [...updatedCourses];
-      safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, updatedCourses);
-      notifyListeners();
-
-      if (db) {
-        for (const mc of modifiedCourses) {
-          try {
-            await setDoc(doc(db, 'course_assignments', mc.id), sanitizeForFirebase(mc), {
-              merge: true
+          if (!placedCandidateMap.has(resolved.dedupeKey)) {
+            placedCandidateMap.set(resolved.dedupeKey, {
+              canonicalId: resolved.canonicalId,
+              dedupeKey: resolved.dedupeKey,
+              matric: resolved.studentMatric,
+              altIds: [lookupKey, resolved.canonicalId, resolved.studentMatric].filter(Boolean)
             });
-          } catch (e) {
-            console.warn('Firebase auto-enroll sync notice:', e);
+          }
+        }
+
+        // 3. Guarantee Noor Suhaila Binti Mohamed (B062310610) is always restored if placed
+        const suhailaResolved =
+          resolveEnrolledStudentIdentity('B062310610', users, applications) ||
+          resolveEnrolledStudentIdentity('16589537-e73b-4c9b-8c6f-1802f9a92290', users, applications);
+        if (suhailaResolved && !placedCandidateMap.has(suhailaResolved.dedupeKey)) {
+          placedCandidateMap.set(suhailaResolved.dedupeKey, {
+            canonicalId: suhailaResolved.canonicalId,
+            dedupeKey: suhailaResolved.dedupeKey,
+            matric: suhailaResolved.studentMatric,
+            altIds: [
+              suhailaResolved.canonicalId,
+              suhailaResolved.studentMatric,
+              '16589537-e73b-4c9b-8c6f-1802f9a92290'
+            ].filter(Boolean)
+          });
+        }
+      }
+
+      const placedCandidates = Array.from(placedCandidateMap.values());
+      const now = new Date().toISOString();
+      let changedCourses = 0;
+      const newlyEnrolledStudentSet = new Set<string>();
+      const updatedCourses: CourseLecturerAssignment[] = [];
+      const modifiedCourses: CourseLecturerAssignment[] = [];
+
+      for (const course of allCourses) {
+        const code = course.courseCode;
+        const manualKeepSet = new Set(manualEnrolled[code] || []);
+        const manualSkipSet = new Set(manualUnenrolled[code] || []);
+
+        const originalIds = course.assignedStudentIds || [];
+        const seenKeys = new Set<string>();
+        const nextIds: string[] = [];
+
+        // Keep existing valid IDs, clean orphaned ghost UUIDs ("Pelajar WBL"), and drop unplaced legacy entries
+        for (const sid of originalIds) {
+          if (!hasLoadedStudentUsers) {
+            if (!seenKeys.has(sid)) {
+              seenKeys.add(sid);
+              nextIds.push(sid);
+            }
+            continue;
+          }
+
+          const resolved = resolveEnrolledStudentIdentity(sid, users, applications);
+          if (!resolved) {
+            // Orphaned / deleted UUID with no matching student -> purge permanently!
+            continue;
+          }
+
+          const isManuallyKept =
+            manualKeepSet.has(sid) ||
+            manualKeepSet.has(resolved.canonicalId) ||
+            (Boolean(resolved.studentMatric) && manualKeepSet.has(resolved.studentMatric));
+
+          if (!options?.targetStudentIds && !resolved.isPlaced && !isManuallyKept) {
+            continue;
+          }
+
+          if (!seenKeys.has(resolved.dedupeKey)) {
+            seenKeys.add(resolved.dedupeKey);
+            nextIds.push(resolved.canonicalId);
+          }
+        }
+
+        // Automatically ensure every placed student is enrolled in this course (unless manually unenrolled)
+        for (const candidate of placedCandidates) {
+          const isManuallySkipped = candidate.altIds.some((aid) => manualSkipSet.has(aid));
+          if (isManuallySkipped) continue;
+
+          if (!seenKeys.has(candidate.dedupeKey)) {
+            seenKeys.add(candidate.dedupeKey);
+            nextIds.push(candidate.canonicalId);
+            newlyEnrolledStudentSet.add(candidate.canonicalId);
+          }
+        }
+
+        const changed =
+          nextIds.length !== originalIds.length ||
+          nextIds.some((id, idx) => originalIds[idx] !== id);
+
+        if (changed) {
+          const updatedCourse: CourseLecturerAssignment = {
+            ...course,
+            assignedStudentIds: nextIds,
+            updatedAt: now
+          };
+          updatedCourses.push(updatedCourse);
+          modifiedCourses.push(updatedCourse);
+          changedCourses += 1;
+        } else {
+          updatedCourses.push(course);
+        }
+      }
+
+      if (changedCourses > 0) {
+        inMemoryCourseAssignments = [...updatedCourses];
+        safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, updatedCourses);
+        notifyListeners();
+
+        if (db) {
+          for (const mc of modifiedCourses) {
+            try {
+              await setDoc(doc(db, 'course_assignments', mc.id), sanitizeForFirebase(mc), {
+                merge: true
+              });
+            } catch (e) {
+              console.warn('Firebase auto-enroll sync notice:', e);
+            }
+          }
+        }
+
+        if (options?.notifyNew && newlyEnrolledStudentSet.size > 0) {
+          for (const sid of newlyEnrolledStudentSet) {
+            try {
+              await StorageService.createNotification({
+                recipient_id: sid,
+                recipient_role: UserRole.STUDENT,
+                sender_name: 'Sistem WBL FPTT UTeM',
+                title_ms: 'Auto-Enrolmen Kesemua Kursus WBL Berjaya',
+                title_en: 'Automatic Enrollment in All WBL Courses',
+                message_ms: `Tahniah! Memandangkan penempatan syarikat anda telah disahkan, anda telah didaftarkan secara automatik ke dalam kesemua ${allCourses.length} kursus WBL.`,
+                message_en: `Since your company placement is confirmed, you have been automatically enrolled into all ${allCourses.length} WBL courses.`,
+                is_read: false,
+                created_at: now
+              });
+            } catch {}
           }
         }
       }
 
-      if (options?.notifyNew && newlyEnrolledStudentSet.size > 0) {
-        for (const sid of newlyEnrolledStudentSet) {
-          try {
-            await StorageService.createNotification({
-              recipient_id: sid,
-              recipient_role: UserRole.STUDENT,
-              sender_name: 'Sistem WBL FPTT UTeM',
-              title_ms: 'Auto-Enrolmen Kesemua Kursus WBL Berjaya',
-              title_en: 'Automatic Enrollment in All WBL Courses',
-              message_ms: `Tahniah! Memandangkan penempatan syarikat anda telah disahkan, anda telah didaftarkan secara automatik ke dalam kesemua ${allCourses.length} kursus WBL.`,
-              message_en: `Since your company placement is confirmed, you have been automatically enrolled into all ${allCourses.length} WBL courses.`,
-              is_read: false,
-              created_at: now
-            });
-          } catch {}
-        }
-      }
+      return {
+        changedCourses,
+        newlyEnrolledPlacedCount: newlyEnrolledStudentSet.size
+      };
+    } finally {
+      isAutoEnrollRunning = false;
     }
-
-    return {
-      changedCourses,
-      newlyEnrolledPlacedCount: newlyEnrolledStudentSet.size
-    };
   },
 
   unenrollStudentFromCourse: async (courseCode: string, studentId: string): Promise<CourseLecturerAssignment> => {
