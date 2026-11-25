@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StorageService } from '../services/storage';
-import { UserRole, Company } from '../types';
+import { UserRole, Company, Application, User } from '../types';
 import { getRoleLabels } from '../constants';
 import { toast } from 'react-hot-toast';
 import { MapPin, Sparkles, Building2, BookCheck } from 'lucide-react';
 import { Language, t } from '../translations';
+import { buildCompaniesWithStudents } from '../utils/trainerCvEligibility';
 
 interface RegisterProps {
   onRegisterSuccess: () => void;
@@ -27,11 +28,20 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
   const [programOption, setProgramOption] = useState<'default' | 'custom'>('default');
   const [customProgram, setCustomProgram] = useState('');
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [suggestedCompanies, setSuggestedCompanies] = useState<Company[]>([]);
 
   useEffect(() => {
     setCompanies(StorageService.getCompanies());
+    setApplications(StorageService.getApplications());
+    setAllUsers(StorageService.getUsers());
   }, []);
+
+  const companiesWithStudents = useMemo(
+    () => buildCompaniesWithStudents(companies, applications, allUsers),
+    [companies, applications, allUsers]
+  );
 
   useEffect(() => {
     if (formData.role === UserRole.STUDENT && formData.address && formData.address.length > 3) {
@@ -299,10 +309,26 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onBack, l
                   </h4>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'selectCompany')}</label>
-                    <select required className="w-full p-2 border rounded bg-white" value={formData.company_affiliation} onChange={e => setFormData({...formData, company_affiliation: e.target.value})}>
+                    <select required className="w-full p-2 border rounded bg-white text-sm" value={formData.company_affiliation} onChange={e => setFormData({...formData, company_affiliation: e.target.value})}>
                         <option value="">{t(language, 'selectOption')}</option>
-                        {companies.map(c => <option key={c.id} value={c.company_name}>{c.company_name}</option>)}
+                        <optgroup label="🟢 Syarikat Yang Ada Pelajar Ditempatkan">
+                          {companiesWithStudents.filter(c => c.placedStudents.length > 0).map(c => (
+                            <option key={`placed_${c.companyName}`} value={c.companyName}>
+                              ✓ {c.companyName} [{c.placedStudents.length} Pelajar: {c.placedStudents.slice(0, 2).map(s => s.name).join(', ')}{c.placedStudents.length > 2 ? '...' : ''}]
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Syarikat Lain (Tiada Pelajar Ditempatkan Semasa)">
+                          {companiesWithStudents.filter(c => c.placedStudents.length === 0).map(c => (
+                            <option key={`other_${c.companyName}`} value={c.companyName}>
+                              {c.companyName} (0 Pelajar)
+                            </option>
+                          ))}
+                        </optgroup>
                     </select>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      *Sila pilih syarikat bertanda ✓ (Ada Pelajar) jika terdapat nama syarikat yang serupa. Anda juga boleh menukar syarikat kemudian di tetapan profil.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">{t(language, 'position')}</label>

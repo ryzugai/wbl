@@ -1,5 +1,5 @@
 
-import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus, CourseAnnouncement, CourseAnnouncementReadReceipt, WBLMessage, WBLConversation, PsmCaseStudyWeeklyLog, PsmLogbookStatus } from '../types';
+import { User, Company, Application, UserRole, AdConfig, UserActivity, Notification, WeeklyLogbook, DailyLogEntry, CourseLecturerAssignment, StudentEvaluation, EvaluationStatus, CourseAnnouncement, CourseAnnouncementReadReceipt, WBLMessage, WBLConversation, PsmCaseStudyWeeklyLog, PsmLogbookStatus, TrainerCV, TrainerCVStatus } from '../types';
 import { COORDINATOR_ACCOUNT, DEFAULT_WBL_COURSES, calculateUTeMGrade } from '../constants';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc, getDocs } from 'firebase/firestore';
@@ -19,7 +19,8 @@ const STORAGE_KEYS = {
   COURSE_ANNOUNCEMENTS: 'wbl_course_announcements',
   WBL_CONVERSATIONS: 'wbl_conversations',
   WBL_MESSAGES: 'wbl_messages',
-  PSM_CASE_STUDY_LOGS: 'wbl_psm_case_study_logs'
+  PSM_CASE_STUDY_LOGS: 'wbl_psm_case_study_logs',
+  TRAINER_CVS: 'wbl_trainer_cvs'
 };
 
 const firebaseConfig = {
@@ -43,6 +44,7 @@ let inMemoryAnnouncements: CourseAnnouncement[] = [];
 let inMemoryConversations: WBLConversation[] = [];
 let inMemoryMessages: WBLMessage[] = [];
 let inMemoryPsmLogs: PsmCaseStudyWeeklyLog[] = [];
+let inMemoryTrainerCVs: TrainerCV[] = [];
 
 const stripHeavyFields = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
@@ -508,6 +510,9 @@ const setupRealtimeListeners = () => {
         } else if (colName === 'wbl_messages') {
           inMemoryMessages = data as WBLMessage[];
           safeSaveLocalStorage(storageKey, data);
+        } else if (colName === 'trainer_cvs') {
+          inMemoryTrainerCVs = data as TrainerCV[];
+          safeSaveLocalStorage(storageKey, data);
         } else {
           safeSaveLocalStorage(storageKey, data);
         }
@@ -531,6 +536,7 @@ const setupRealtimeListeners = () => {
   syncCollection('wbl_conversations', STORAGE_KEYS.WBL_CONVERSATIONS);
   syncCollection('wbl_messages', STORAGE_KEYS.WBL_MESSAGES);
   syncCollection('psm_case_study_logs', STORAGE_KEYS.PSM_CASE_STUDY_LOGS);
+  syncCollection('trainer_cvs', STORAGE_KEYS.TRAINER_CVS);
   
   const unsubAd = onSnapshot(doc(db, 'settings', 'ad_config'), (snapshot) => {
     if (snapshot.exists()) {
@@ -641,6 +647,12 @@ const init = () => {
     inMemoryEvaluations = JSON.parse(localStorage.getItem(STORAGE_KEYS.EVALUATIONS) || '[]');
   } catch {
     inMemoryEvaluations = [];
+  }
+
+  try {
+    inMemoryTrainerCVs = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRAINER_CVS) || '[]');
+  } catch {
+    inMemoryTrainerCVs = [];
   }
 
   cleanAndMigrateLocalStorage();
@@ -4739,11 +4751,166 @@ export const StorageService = {
     }
   },
 
+  // =========================================================================
+  // INDUSTRY TRAINER CV GENERATOR & COORDINATOR APPOINTMENT REVIEW
+  // =========================================================================
+  getTrainerCVs: (): TrainerCV[] => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.TRAINER_CVS);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          inMemoryTrainerCVs = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+    return inMemoryTrainerCVs || [];
+  },
+
+  getTrainerCVByUserId: (userId: string): TrainerCV | undefined => {
+    const all = StorageService.getTrainerCVs();
+    return all.find(cv => cv.userId === userId);
+  },
+
+  saveTrainerCV: async (cvData: TrainerCV, notifyCoordinatorOnSubmit = false): Promise<TrainerCV> => {
+    const all = StorageService.getTrainerCVs();
+    const now = new Date().toISOString();
+    const existingIdx = all.findIndex(c => c.id === cvData.id || c.userId === cvData.userId);
+
+    const saved: TrainerCV = {
+      ...cvData,
+      id: cvData.id || `cv_${cvData.userId}`,
+      createdAt: existingIdx !== -1 ? all[existingIdx].createdAt : (cvData.createdAt || now),
+      updatedAt: now
+    };
+
+    if (existingIdx !== -1) {
+      all[existingIdx] = saved;
+    } else {
+      all.unshift(saved);
+    }
+
+    inMemoryTrainerCVs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.TRAINER_CVS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        const cleanDoc = sanitizeForFirebase({
+          ...saved,
+          profileImage: saved.profileImage && saved.profileImage.length > 5000 ? '' : saved.profileImage
+        });
+        await setDoc(doc(db, 'trainer_cvs', saved.id), cleanDoc, { merge: true });
+      } catch (e) {
+        console.warn('Firebase sync notice for trainer_cvs:', e);
+      }
+    }
+
+    if (notifyCoordinatorOnSubmit && saved.status === 'submitted') {
+      try {
+        await StorageService.createNotification({
+          recipient_id: 'coordinator',
+          recipient_role: UserRole.COORDINATOR,
+          title_ms: saved.isEligible
+            ? `CV Lantikan JI (LAYAK / HIJAU) Dihantar: ${saved.fullName}`
+            : `CV Lantikan JI Dihantar untuk Semakan: ${saved.fullName}`,
+          title_en: saved.isEligible
+            ? `Eligible Industry Trainer CV Submitted: ${saved.fullName}`
+            : `Industry Trainer CV Submitted for Review: ${saved.fullName}`,
+          message_ms: `${saved.fullName} (${saved.companyName}) telah menjana dan menghantar CV bagi semakan lantikan Jurulatih Industri. ${saved.isEligible ? 'Syarat kelayakan akademik & pengalaman DIPENUHI (HIJAU).' : 'Memerlukan semakan lanjut syarat kelayakan.'}`,
+          message_en: `${saved.fullName} (${saved.companyName}) submitted their CV for Industry Trainer appointment review.`,
+          sender_name: saved.fullName,
+          is_read: false,
+          created_at: now
+        });
+      } catch {}
+    }
+
+    return saved;
+  },
+
+  reviewTrainerCV: async (
+    cvId: string,
+    decision: Exclude<TrainerCVStatus, 'draft' | 'submitted'>,
+    reviewNote: string,
+    reviewer: User,
+    appointmentLetterRef?: string
+  ): Promise<TrainerCV> => {
+    const all = StorageService.getTrainerCVs();
+    const idx = all.findIndex(c => c.id === cvId);
+    if (idx === -1) throw new Error('Rekod CV tidak ditemui.');
+
+    const now = new Date().toISOString();
+    const updated: TrainerCV = {
+      ...all[idx],
+      status: decision,
+      coordinatorReviewNote: reviewNote,
+      reviewedBy: reviewer.name,
+      reviewedAt: now,
+      appointmentLetterRef: decision === 'appointed' ? (appointmentLetterRef || all[idx].appointmentLetterRef || `UTeM/FPTT/WBL/JI/${new Date().getFullYear()}/${String(idx + 1).padStart(3, '0')}`) : all[idx].appointmentLetterRef,
+      updatedAt: now
+    };
+
+    all[idx] = updated;
+    inMemoryTrainerCVs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.TRAINER_CVS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        const cleanDoc = sanitizeForFirebase({
+          ...updated,
+          profileImage: updated.profileImage && updated.profileImage.length > 5000 ? '' : updated.profileImage
+        });
+        await setDoc(doc(db, 'trainer_cvs', updated.id), cleanDoc, { merge: true });
+      } catch (e) {
+        console.warn('Firebase sync notice for reviewTrainerCV:', e);
+      }
+    }
+
+    try {
+      await StorageService.createNotification({
+        recipient_id: updated.userId,
+        recipient_role: updated.userRole,
+        title_ms: decision === 'appointed'
+          ? 'Tahniah! CV Lantikan Jurulatih Industri Anda Telah Disahkan & Dilantik'
+          : 'Semakan Penyelaras: CV Jurulatih Industri Perlu Dikemaskini',
+        title_en: decision === 'appointed'
+          ? 'Approved: You have been appointed as WBL Industry Trainer'
+          : 'Coordinator Review: Industry Trainer CV Requires Update',
+        message_ms: decision === 'appointed'
+          ? `Penyelaras WBL (${reviewer.name}) telah menyemak CV anda dan meluluskan lantikan sebagai Jurulatih Industri (No. Rujukan: ${updated.appointmentLetterRef}).${reviewNote ? ` Ulasan: ${reviewNote}` : ''}`
+          : `Penyelaras WBL (${reviewer.name}) memohon anda mengemaskini CV lantikan Jurulatih Industri.${reviewNote ? ` Catatan: ${reviewNote}` : ''}`,
+        message_en: reviewNote || (decision === 'appointed' ? 'Your Industry Trainer appointment has been approved.' : 'Please update your CV details.'),
+        sender_name: reviewer.name,
+        is_read: false,
+        created_at: now
+      });
+    } catch {}
+
+    return updated;
+  },
+
+  deleteTrainerCV: async (cvId: string): Promise<void> => {
+    const all = StorageService.getTrainerCVs().filter(c => c.id !== cvId);
+    inMemoryTrainerCVs = [...all];
+    safeSaveLocalStorage(STORAGE_KEYS.TRAINER_CVS, all);
+    notifyListeners();
+
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'trainer_cvs', cvId));
+      } catch {}
+    }
+  },
+
   getFullSystemBackup: () => ({
     users: StorageService.getUsers(),
     companies: StorageService.getCompanies(),
     applications: StorageService.getApplications(),
     logbooks: StorageService.getWeeklyLogbooks(),
+    trainerCVs: StorageService.getTrainerCVs(),
     adConfig: StorageService.getAdConfig(),
     timestamp: new Date().toISOString()
   }),
@@ -4754,6 +4921,7 @@ export const StorageService = {
     safeSaveLocalStorage(STORAGE_KEYS.COMPANIES, data.companies || []);
     safeSaveLocalStorage(STORAGE_KEYS.APPLICATIONS, data.applications || []);
     if (data.logbooks) safeSaveLocalStorage(STORAGE_KEYS.LOGBOOKS, data.logbooks || []);
+    if (data.trainerCVs) safeSaveLocalStorage(STORAGE_KEYS.TRAINER_CVS, data.trainerCVs || []);
     if (data.adConfig) safeSaveLocalStorage(STORAGE_KEYS.AD_CONFIG, data.adConfig);
     notifyListeners();
   }

@@ -58,8 +58,21 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     initialTab || (isTrainer ? 'weeklyAssessment' : 'evaluations')
   );
 
+  // Dynamically determine current active modular course (BTMT 3273(i) Digital Entrepreneurship for Nov 2026)
+  const currentActiveModularCourse = useMemo(() => {
+    const nowStr = new Date().toISOString().split('T')[0];
+    const found = WBL_COURSE_SEQUENCE.find(c => nowStr >= c.startDate && nowStr <= c.endDate);
+    return found ? found.courseCode : 'BTMT 3273(i)';
+  }, []);
+
   // Weekly Assessment States (Industry Coach Weekly Evaluation for 4x 5-week modules & 20-week PSM2 starting 28 Sept 2026)
-  const [selectedWeeklyCourseCode, setSelectedWeeklyCourseCode] = useState<string>('BTMU 2103(i)');
+  const [selectedWeeklyCourseCode, setSelectedWeeklyCourseCode] = useState<string>(() => {
+    const stored = sessionStorage.getItem('selectedWeeklyCourseCode');
+    if (stored) return stored;
+    const nowStr = new Date().toISOString().split('T')[0];
+    const found = WBL_COURSE_SEQUENCE.find(c => nowStr >= c.startDate && nowStr <= c.endDate);
+    return found ? found.courseCode : 'BTMT 3273(i)';
+  });
   const [selectedWeeklyStudentMatric, setSelectedWeeklyStudentMatric] = useState<string>('');
   const [isWeeklyModalOpen, setIsWeeklyModalOpen] = useState(false);
   const [evaluatingWeekConfig, setEvaluatingWeekConfig] = useState<WeeklyAssessmentConfig | null>(null);
@@ -86,7 +99,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   const [isSendingReminder, setIsSendingReminder] = useState<string | null>(null);
 
   // Course Enrollment States (for Coordinator)
-  const [selectedEnrollmentCourseCode, setSelectedEnrollmentCourseCode] = useState<string>('BTMT 3283(i)');
+  const [selectedEnrollmentCourseCode, setSelectedEnrollmentCourseCode] = useState<string>('BTMT 3273(i)');
   const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState('');
   const [enrollmentProgramFilter, setEnrollmentProgramFilter] = useState('all');
   const [selectedStudentsToEnroll, setSelectedStudentsToEnroll] = useState<string[]>([]);
@@ -130,13 +143,13 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         setSelectedCourseFilter(courseCode || 'all');
         setActiveTab('evaluations');
       } else if (view === 'weekly') {
-        setSelectedWeeklyCourseCode(courseCode || 'BTMU 2103(i)');
+        setSelectedWeeklyCourseCode(courseCode || currentActiveModularCourse);
         setActiveTab('weeklyAssessment');
       }
     };
     window.addEventListener('wblCourseSelected', handleCourseSelected);
     return () => window.removeEventListener('wblCourseSelected', handleCourseSelected);
-  }, []);
+  }, [currentActiveModularCourse]);
 
   // Data state
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>([]);
@@ -1251,6 +1264,31 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             </div>
           </div>
 
+          {/* Policy Banner: Past courses remain fully open for evaluation until week 20 */}
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-emerald-50 border border-amber-300 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-xl bg-amber-400 text-slate-950 font-black shrink-0 shadow-xs text-base">
+                📢
+              </span>
+              <div>
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex flex-wrap items-center gap-2">
+                  <span>Makluman Rasmi WBL: Penilaian Subjek Lepas Kekal Dibuka Sehingga Minggu 20</span>
+                  <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                    Terbuka Sehingga 12 Feb 2027
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                  Walaupun modul telah melepasi blok 5 minggu asal (contoh: <strong>Modul 1: BTMU 2103 Pengurusan Operasi</strong>), Jurulatih Industri &amp; Pensyarah Kursus <strong>masih dibenarkan sepenuhnya</strong> untuk mengisi, menyunting markah, dan mengesahkan penilaian sehingga <strong>Minggu 20 (12 Februari 2027)</strong>.
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              <span className="text-[11px] font-black px-3 py-1.5 bg-white text-emerald-800 rounded-xl border border-emerald-300 shadow-2xs">
+                ✓ BTMU 2103 &amp; BTMT 3273 Boleh Dinilai
+              </span>
+            </div>
+          </div>
+
           {/* 5 Course Modular Sequence Tabs (Requested Order) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
@@ -1258,7 +1296,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                 <Layers size={14} className="text-blue-600" />
                 <span>Pilih Kursus / Modul WBL Mengikut Turutan Rasmi:</span>
               </span>
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-slate-500 font-bold">
                 4 Modul @ 5 Minggu + PSM2 @ 20 Minggu
               </span>
             </div>
@@ -1267,6 +1305,9 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               {WBL_COURSE_SEQUENCE.map((c) => {
                 const isSelected = selectedWeeklyCourseCode === c.courseCode;
                 const totalWeeks = c.durationWeeks;
+                const nowStr = new Date().toISOString().split('T')[0];
+                const isCourseActive = c.courseCode === currentActiveModularCourse || (nowStr >= c.startDate && nowStr <= c.endDate);
+                const isCoursePast = nowStr > c.endDate;
                 
                 // Count how many weeks have been evaluated for current student in this course
                 let evaluatedCount = 0;
@@ -1288,6 +1329,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     className={`p-4 rounded-2xl text-left transition-all border relative flex flex-col justify-between ${
                       isSelected
                         ? 'bg-gradient-to-b from-blue-900 to-indigo-950 text-white border-blue-500 shadow-md ring-2 ring-blue-400/40'
+                        : isCourseActive
+                        ? 'bg-blue-50/70 hover:bg-blue-100/80 text-slate-900 border-blue-300 shadow-xs'
                         : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200/80 shadow-xs'
                     }`}
                   >
@@ -1316,6 +1359,30 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       }`}>
                         <div>📅 {c.startDate} - {c.endDate}</div>
                         <div>⚖️ Nisbah: {c.evaluatorRatio}</div>
+                      </div>
+
+                      {/* Course status pill */}
+                      <div className="mt-2">
+                        {isCourseActive ? (
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full ${
+                            isSelected ? 'bg-emerald-400 text-slate-950' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                            <span>Modul Semasa (Aktif)</span>
+                          </span>
+                        ) : isCoursePast ? (
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            isSelected ? 'bg-amber-400/90 text-slate-950' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`} title="Penilaian kekal dibuka sehingga Minggu 20">
+                            <span>🔓 Penilaian Dibuka Hingga M20</span>
+                          </span>
+                        ) : (
+                          <span className={`text-[9px] font-medium px-2 py-0.5 rounded-full ${
+                            isSelected ? 'text-slate-300' : 'text-slate-400 bg-slate-100'
+                          }`}>
+                            Akan Datang
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1540,6 +1607,66 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Universal Industry Sector Adaptation Banner for Digital Entrepreneurship (BTMT 3273) */}
+          {(activeCourseSequenceItem.courseCode.includes('3273') || selectedWeeklyCourseCode.includes('3273')) && (
+            <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-blue-950 text-white p-5 rounded-3xl border border-indigo-700 shadow-md space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2.5 bg-amber-400 text-slate-950 rounded-2xl font-black text-base shadow-sm">
+                    🚀
+                  </span>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black text-white flex flex-wrap items-center gap-2">
+                      <span>Modul 2 Semasa: Keusahawanan Digital (Digital Entrepreneurship)</span>
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                        Minggu 6 - 10 (02 Nov - 04 Dis 2026)
+                      </span>
+                    </h4>
+                    <p className="text-xs text-blue-200 mt-0.5 leading-relaxed">
+                      Fokus kepada cadangan model perniagaan digital (Digital BMC), ekosistem e-dagang, pemasaran media sosial, dan penambahbaikan operasi digital di syarikat penempatan WBL.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-amber-300 font-mono font-semibold shrink-0 bg-white/10 px-3 py-1 rounded-xl">
+                  CLO 3: Propose a unique digital business model
+                </div>
+              </div>
+
+              {/* 5-Week Milestone Roadmap Pill Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                {[
+                  { m: 'M1 (Mggu 6)', t: 'Ekosistem & Audit Digital', d: 'Ekosistem digital firma, startup & kerangka undang-undang e-dagang' },
+                  { m: 'M2 (Mggu 7)', t: 'Digital BMC & UVP', d: 'Pembangunan Digital Business Model Canvas & proposisi nilai unik' },
+                  { m: 'M3 (Mggu 8)', t: 'Pemasaran Media Sosial', d: 'Strategi pemasaran digital, penciptaan kandungan & kempen interaktif' },
+                  { m: 'M4 (Mggu 9)', t: 'Operasi E-Pasaran & Bayaran', d: 'Pengurusan platform e-dagang, gerbang pembayaran & logistik digital' },
+                  { m: 'M5 (Mggu 10)', t: 'Laporan Jualan & Pitching', d: 'Analitik prestasi digital, laporan projek & pembentangan pitching' },
+                ].map((step, idx) => (
+                  <div key={idx} className="bg-white/10 rounded-xl p-2.5 border border-white/10 space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-amber-300 block">{step.m}</span>
+                    <span className="font-bold text-white text-[11px] block">{step.t}</span>
+                    <span className="text-[10px] text-blue-200 block leading-tight">{step.d}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Note on past course accessibility */}
+              <div className="p-3 bg-amber-500/10 border border-amber-400/40 rounded-xl flex items-center justify-between text-xs text-amber-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🔓</span>
+                  <span><strong>Nota Fleksibiliti Penilaian:</strong> Modul 1 (BTMU 2103 Pengurusan Operasi) masih dibuka sepenuhnya untuk penilaian dan semakan sehingga Minggu 20 (12 Feb 2027).</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedWeeklyCourseCode('BTMU 2103(i)')}
+                  className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-bold text-[10px] transition-colors shrink-0"
+                >
+                  Semak Modul 1 &raquo;
+                </button>
               </div>
             </div>
           )}
@@ -2395,10 +2522,26 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                           className="p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/30 transition-all flex flex-col justify-between gap-3 group"
                         >
                           <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono text-xs font-black px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
-                                {course.courseCode}
-                              </span>
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-xs font-black px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                                  {course.courseCode}
+                                </span>
+                                {(course.courseCode.includes('3273') || course.courseCode === currentActiveModularCourse) ? (
+                                  <span className="text-[10px] font-black px-1.5 py-0.2 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span>Modul 2 (Aktif)</span>
+                                  </span>
+                                ) : course.courseCode.includes('2103') ? (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded" title="Penilaian kekal dibuka sehingga Minggu 20 (12 Feb 2027)">
+                                    🔓 Buka Hingga M20
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-medium px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded">
+                                    Akan Datang
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-slate-400">
                                 {course.semester || 'Semester 7'}
                               </span>
@@ -3266,6 +3409,20 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </div>
             </div>
 
+            {/* Makluman Modular Semasa & Polisi Fleksibiliti Penilaian */}
+            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200 p-4 rounded-xl flex items-start gap-3">
+              <Info className="text-emerald-700 shrink-0 mt-0.5" size={18} />
+              <div className="text-xs text-slate-700 space-y-1">
+                <div className="font-black text-emerald-950 flex flex-wrap items-center gap-2">
+                  <span>Modul Semasa: BTMT 3273(i) Digital Entrepreneurship (Keusahawanan Digital)</span>
+                  <span className="px-2 py-0.5 text-[10px] bg-emerald-600 text-white rounded font-bold">Minggu 6 - 10</span>
+                </div>
+                <p>
+                  Penilaian dan pengurusan enrolmen bagi subjek terdahulu (<strong>Modul 1: BTMU 2103 Pengurusan Operasi</strong>) <strong>kekal dibuka sepenuhnya sehingga Minggu 20 (12 Februari 2027)</strong>. Pensyarah kursus dan jurulatih boleh terus mengemaskini markah serta mendaftarkan pelajar tanpa sebarang sekatan tarikh.
+                </p>
+              </div>
+            </div>
+
             {/* Step 1: Select Offered Course */}
             <div>
               <label className="text-xs font-bold text-slate-700 block mb-2">
@@ -3275,6 +3432,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                 {courseAssignments.map((course) => {
                   const enrolledCount = (course.assignedStudentIds || []).length;
                   const isSelected = selectedEnrollmentCourseCode === course.courseCode;
+                  const isCurrentMod = course.courseCode.includes('3273') || course.courseCode === currentActiveModularCourse;
+                  const isPastMod = course.courseCode.includes('2103');
 
                   return (
                     <div
@@ -3289,10 +3448,23 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                           : 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-xs font-black px-2 py-0.5 bg-emerald-100 text-emerald-900 rounded-md">
-                          {course.courseCode}
-                        </span>
+                      <div className="flex items-start justify-between gap-1 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-xs font-black px-2 py-0.5 bg-emerald-100 text-emerald-900 rounded-md">
+                            {course.courseCode}
+                          </span>
+                          {isCurrentMod && (
+                            <span className="text-[10px] font-black px-1.5 py-0.2 bg-emerald-600 text-white rounded-md flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" />
+                              Modul 2 (Aktif)
+                            </span>
+                          )}
+                          {isPastMod && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded-md" title="Penilaian kekal dibuka sehingga Minggu 20">
+                              🔓 Buka Hingga M20
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-500 font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200">
                           {course.semester || 'Semester 7'}
                         </span>

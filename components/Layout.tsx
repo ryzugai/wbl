@@ -27,6 +27,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
   const [isEvaluationSubmenuOpen, setIsEvaluationSubmenuOpen] = useState(isEvaluationView);
   const [pendingEvalCount, setPendingEvalCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [pendingTrainerCVCount, setPendingTrainerCVCount] = useState(0);
 
   const isCourseMonitoringView = currentView === 'lecturerCourseMonitoring';
   const [isLecturerCourseSubmenuOpen, setIsLecturerCourseSubmenuOpen] = useState(true);
@@ -56,6 +57,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
         setApplications(StorageService.getApplications());
         setEvaluations(StorageService.getEvaluations());
         setUnreadMessageCount(StorageService.getUnreadWBLMessagesCount(currentUser.id));
+        const cvs = StorageService.getTrainerCVs();
+        setPendingTrainerCVCount(cvs.filter(c => c.status === 'submitted').length);
       } catch {}
     };
     loadAppData();
@@ -345,12 +348,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
              <NavItem view="psmCaseStudy" label={language === 'ms' ? 'Buku Log Case Study PSM 2' : 'PSM 2 Case Study Logbook'} icon={FileText} />
           )}
 
-          {/* Logbook Verification for Industry Trainers */}
+          {/* Logbook Verification & CV Generator for Industry Trainers */}
           {isTrainer && (
              <>
                <NavItem view="dailyLogbook" label={language === 'ms' ? 'Pengesahan Log Harian' : 'Logbook Verification'} icon={CheckCircle2} />
                <NavItem view="psmCaseStudy" label={language === 'ms' ? 'Semakan Case Study PSM 2' : 'PSM 2 Case Study Review'} icon={FileText} />
+               <NavItem view="trainerCV" label={language === 'ms' ? 'CV Lantikan Jurulatih Industri' : 'Industry Trainer CV'} icon={Award} />
              </>
+          )}
+
+          {/* CV Generator option for Industry Supervisors (SV Industri) */}
+          {currentUser.role === UserRole.SUPERVISOR && (
+             <NavItem view="trainerCV" label={language === 'ms' ? 'CV Lantikan Jurulatih Industri' : 'Industry Trainer CV'} icon={Award} />
           )}
 
           {/* Logbook Review & Monitoring for Faculty Supervisors (Penyelia Fakulti) */}
@@ -1004,7 +1013,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentUser, currentVi
           )}
 
           {hasSystemAccess && (
-            <NavItem view="staff" label={t(language, 'staff')} icon={UserCog} />
+            <>
+              <button
+                type="button"
+                onClick={() => handleNavigate('trainerCV')}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 ${
+                  currentView === 'trainerCV'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Award size={20} className={currentView === 'trainerCV' ? 'text-white' : 'text-emerald-600'} />
+                  <span className="font-medium text-left leading-tight">
+                    {language === 'ms' ? 'Semakan CV & Lantikan JI' : 'Trainer CV & Appointment'}
+                  </span>
+                </div>
+                {pendingTrainerCVCount > 0 && (
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    currentView === 'trainerCV' ? 'bg-white text-emerald-700' : 'bg-emerald-600 text-white animate-pulse'
+                  }`}>
+                    {pendingTrainerCVCount}
+                  </span>
+                )}
+              </button>
+              <NavItem view="staff" label={t(language, 'staff')} icon={UserCog} />
+            </>
           )}
           
           <NavItem view="applications" label={t(language, 'applications')} icon={FileText} />

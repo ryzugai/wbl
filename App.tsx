@@ -24,6 +24,7 @@ import { DailyLogbook } from './pages/DailyLogbook';
 import { PsmCaseStudyLogbook } from './pages/PsmCaseStudyLogbook';
 import { StudentEvaluationPage } from './pages/StudentEvaluationPage';
 import { WBLMessaging } from './pages/WBLMessaging';
+import { TrainerCVPage } from './pages/TrainerCVPage';
 import { Toaster, toast } from 'react-hot-toast';
 import { Language } from './translations';
 
@@ -373,7 +374,29 @@ function App() {
             />
         )}
 
-        {currentView === 'profile' && <Profile language={language} user={currentUser} onUpdateUser={handleUpdateUser} users={users} />}
+        {currentView === 'trainerCV' && (
+            <TrainerCVPage
+                currentUser={currentUser}
+                users={users}
+                companies={companies}
+                applications={applications}
+                onUpdateUser={handleUpdateUser}
+                language={language}
+                onNavigate={setCurrentView}
+            />
+        )}
+
+        {currentView === 'profile' && (
+            <Profile
+                language={language}
+                user={currentUser}
+                onUpdateUser={handleUpdateUser}
+                users={users}
+                companies={companies}
+                applications={applications}
+                onNavigate={setCurrentView}
+            />
+        )}
         
         {currentView === 'staff' && (
             <StaffList 
@@ -381,9 +404,11 @@ function App() {
                 users={users} 
                 currentUser={currentUser}
                 applications={applications}
+                companies={companies}
                 onUpdateApplication={handleUpdateApplication}
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
+                onNavigate={setCurrentView}
             />
         )}
 

@@ -1,23 +1,26 @@
 import React, { useState, useMemo } from 'react';
-import { User, UserRole, Application } from '../types';
-import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, CheckCircle, Edit, Trash2, Users, ShieldCheck, Key, BookOpen, Search, ShieldAlert, CheckCircle2, Lock, Unlock, RefreshCw } from 'lucide-react';
+import { User, UserRole, Application, Company } from '../types';
+import { Mail, Phone, Building2, CreditCard, Briefcase, UserCog, CheckCircle, Edit, Trash2, Users, ShieldCheck, Key, BookOpen, Search, ShieldAlert, CheckCircle2, Lock, Unlock, RefreshCw, FileText } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
 import { Modal } from '../components/Modal';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../translations';
 import { StorageService } from '../services/storage';
+import { buildCompaniesWithStudents, evaluateTrainerEligibility, inferQualificationCategory } from '../utils/trainerCvEligibility';
 
 interface StaffListProps {
   users: User[];
   currentUser?: User;
   applications?: Application[];
+  companies?: Company[];
   onUpdateApplication?: (app: Application) => Promise<void>;
   onUpdateUser: (user: User) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
+  onNavigate?: (view: string) => void;
   language: Language;
 }
 
-export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applications = [], onUpdateUser, onDeleteUser, language }) => {
+export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applications = [], companies = [], onUpdateUser, onDeleteUser, onNavigate, language }) => {
   const [activeTab, setActiveTab] = useState<'allUsers' | 'lecturers' | 'industry'>('allUsers');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -38,6 +41,10 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
   // Filtered lists
   const lecturers = useMemo(() => users.filter(u => u.role === UserRole.LECTURER), [users]);
   const industryStaff = useMemo(() => users.filter(u => u.role === UserRole.TRAINER || u.role === UserRole.SUPERVISOR), [users]);
+  const companiesWithStudents = useMemo(
+    () => buildCompaniesWithStudents(companies.length > 0 ? companies : StorageService.getCompanies(), applications, users),
+    [companies, applications, users]
+  );
 
   // Notifications related to forgot password
   const forgotPasswordRequests = useMemo(() => {
@@ -411,9 +418,39 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                         </div>
                         {user.academic_level && (
                           <div className="text-[10px] text-slate-500 truncate max-w-[200px]">
-                            {user.academic_level}
+                            {user.academic_level} {user.experience_years ? `(${user.experience_years} thn)` : ''}
                           </div>
                         )}
+                        {(user.role === UserRole.TRAINER || user.role === UserRole.SUPERVISOR) && (() => {
+                          const compMatch = companiesWithStudents.find(c => c.companyName === (user.company_affiliation || '').trim());
+                          const stuCount = compMatch?.placedStudents.length || 0;
+                          const cvRec = StorageService.getTrainerCVByUserId(user.id);
+                          const elig = evaluateTrainerEligibility({
+                            qualificationCategory: cvRec ? cvRec.qualificationCategory : inferQualificationCategory(user.academic_level, user.special_recognition),
+                            experienceYears: cvRec ? cvRec.experienceYears : (Number(user.experience_years) || 0),
+                            hasSpecialRecognition: cvRec ? cvRec.hasSpecialRecognition : user.special_recognition,
+                            specialRecognitionDetails: cvRec ? cvRec.specialRecognitionDetails : user.special_recognition_details
+                          });
+                          return (
+                            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                stuCount > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}>
+                                {stuCount > 0 ? `✓ ${stuCount} Pelajar` : '⚠ 0 Pelajar'}
+                              </span>
+                              {elig.isEligible && (
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigate && onNavigate('trainerCV')}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-0.5"
+                                  title={elig.reasonMs}
+                                >
+                                  <FileText size={10} /> CV Hijau (Layak JI)
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td className="p-4 align-top">
@@ -683,6 +720,34 @@ export const StaffList: React.FC<StaffListProps> = ({ users, currentUser, applic
                 onChange={e => setEditingUser({...editingUser, phone: e.target.value})} 
               />
             </div>
+            {(editingUser.role === UserRole.TRAINER || editingUser.role === UserRole.SUPERVISOR) && (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  {language === 'ms' ? 'Syarikat Penempatan Industri (Pilih syarikat yang ada pelajar)' : 'Industry Company'}
+                </label>
+                <select
+                  className="w-full p-2 border border-slate-300 rounded-xl bg-white text-slate-900 text-xs font-bold"
+                  value={editingUser.company_affiliation || ''}
+                  onChange={e => setEditingUser({ ...editingUser, company_affiliation: e.target.value })}
+                >
+                  <option value="">-- Pilih Syarikat --</option>
+                  <optgroup label="🟢 Syarikat Ada Pelajar Ditempatkan">
+                    {companiesWithStudents.filter(c => c.placedStudents.length > 0).map(c => (
+                      <option key={`edit_p_${c.companyName}`} value={c.companyName}>
+                        ✓ {c.companyName} ({c.placedStudents.length} Pelajar: {c.placedStudents.slice(0, 2).map(s => s.name).join(', ')})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Syarikat Lain (0 Pelajar)">
+                    {companiesWithStudents.filter(c => c.placedStudents.length === 0).map(c => (
+                      <option key={`edit_o_${c.companyName}`} value={c.companyName}>
+                        {c.companyName} (0 Pelajar)
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+            )}
             <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-md transition-all active:scale-95 text-xs">
               {t(language, 'save')}
             </button>

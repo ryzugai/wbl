@@ -29,6 +29,8 @@ export interface User {
   company_position?: string;
   academic_level?: string;
   experience_years?: number;
+  special_recognition?: boolean;
+  special_recognition_details?: string;
   has_dual_role?: boolean;
   is_approved?: boolean;
   is_active?: boolean;
@@ -424,6 +426,80 @@ export interface WBLConversation {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TrainerQualificationCategory =
+  | 'phd'
+  | 'master'
+  | 'degree'
+  | 'diploma'
+  | 'certificate'
+  | 'special_skill';
+
+export type TrainerCVStatus = 'draft' | 'submitted' | 'appointed' | 'revision_requested';
+
+export interface TrainerCVEducationItem {
+  level: string;
+  field: string;
+  institution: string;
+  year: string;
+}
+
+export interface TrainerCVWorkItem {
+  company: string;
+  position: string;
+  startYear: string;
+  endYear: string;
+  responsibilities: string;
+}
+
+export interface TrainerCVCertificationItem {
+  title: string;
+  issuer: string;
+  year: string;
+}
+
+export interface TrainerCV {
+  id: string;
+  userId: string;
+  username: string;
+  userRole: UserRole;
+  fullName: string;
+  icNo?: string;
+  staffId?: string;
+  email: string;
+  phone: string;
+  profileImage?: string;
+  companyName: string;
+  companyPosition: string;
+  department?: string;
+  officeAddress?: string;
+  qualificationCategory: TrainerQualificationCategory;
+  highestQualificationTitle: string;
+  fieldOfStudy: string;
+  institutionName: string;
+  graduationYear: string;
+  experienceYears: number;
+  hasSpecialRecognition: boolean;
+  specialRecognitionDetails?: string;
+  professionalSummary: string;
+  educationList: TrainerCVEducationItem[];
+  workExperienceList: TrainerCVWorkItem[];
+  certificationsList: TrainerCVCertificationItem[];
+  areasOfExpertise: string[];
+  coachingCourses: string[];
+  isEligible: boolean;
+  matchedCriterionCode?: 'i' | 'ii' | 'iii' | 'iv' | 'v' | 'vi';
+  matchedCriterionText?: string;
+  status: TrainerCVStatus;
+  submittedAt?: string;
+  coordinatorReviewNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  appointmentLetterRef?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 
 

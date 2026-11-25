@@ -1,12 +1,14 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { User, UserRole } from '../types';
-import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck, UserCheck, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { User, UserRole, Company, Application } from '../types';
+import { User as UserIcon, Mail, Phone, Lock, Save, Building2, BookOpen, Fingerprint, CreditCard, Briefcase, MapPin, GraduationCap, Clock, FileText, Sparkles, Plus, Trash2, Award, Book, Camera, Link as LinkIcon, Star, Languages, BrainCircuit, Monitor, Loader2, Palette, Check, BookCheck, UserCheck, ShieldCheck, Search, Users, AlertTriangle, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { ROLE_LABELS } from '../constants';
 import { generateResume, ResumeTheme } from '../utils/resumeGenerator';
 import { Modal } from '../components/Modal';
 import { t } from '../translations';
+import { StorageService } from '../services/storage';
+import { buildCompaniesWithStudents, evaluateTrainerEligibility, inferQualificationCategory } from '../utils/trainerCvEligibility';
 
 const PREDEFINED_PROGRAM = "Ijazah Sarjana Muda Teknousahawanan dengan Kepujian";
 
@@ -70,9 +72,12 @@ interface ProfileProps {
   onUpdateUser: (updatedUser: User) => Promise<void>;
   language: 'ms' | 'en';
   users?: User[];
+  companies?: Company[];
+  applications?: Application[];
+  onNavigate?: (view: string) => void;
 }
 
-export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, users }) => {
+export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, users = [], companies, applications, onNavigate }) => {
   const [formData, setFormData] = useState<User>(() => ({ 
     ...user, 
     teaching_subjects: user.teaching_subjects || '[]' 
@@ -87,6 +92,95 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
   const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Industry Company Switcher State (for SV Industri & JI)
+  const [isCompanySwitcherOpen, setIsCompanySwitcherOpen] = useState(false);
+  const [companySearchQuery, setCompanySearchQuery] = useState('');
+  const [showOnlyWithStudents, setShowOnlyWithStudents] = useState(true);
+  const [selectedNewCompany, setSelectedNewCompany] = useState(user.company_affiliation || '');
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+
+  const effectiveCompanies = useMemo(
+    () => (companies && companies.length > 0 ? companies : StorageService.getCompanies()),
+    [companies]
+  );
+  const effectiveApplications = useMemo(
+    () => (applications && applications.length > 0 ? applications : StorageService.getApplications()),
+    [applications]
+  );
+
+  const companiesWithStudents = useMemo(
+    () => buildCompaniesWithStudents(effectiveCompanies, effectiveApplications, users),
+    [effectiveCompanies, effectiveApplications, users]
+  );
+
+  const companiesThatHaveStudents = useMemo(
+    () => companiesWithStudents.filter((c) => c.placedStudents.length > 0),
+    [companiesWithStudents]
+  );
+
+  const currentCompanyInfo = useMemo(() => {
+    const currentName = (formData.company_affiliation || '').trim();
+    if (!currentName) return null;
+    return companiesWithStudents.find((c) => c.companyName === currentName) || null;
+  }, [companiesWithStudents, formData.company_affiliation]);
+
+  const filteredSwitcherCompanies = useMemo(() => {
+    let list = showOnlyWithStudents ? companiesThatHaveStudents : companiesWithStudents;
+    if (companySearchQuery.trim()) {
+      const q = companySearchQuery.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.companyName.toLowerCase().includes(q) ||
+          (c.district || '').toLowerCase().includes(q) ||
+          (c.state || '').toLowerCase().includes(q) ||
+          c.placedStudents.some(
+            (s) => s.name.toLowerCase().includes(q) || s.matricNo.toLowerCase().includes(q)
+          )
+      );
+    }
+    return list;
+  }, [showOnlyWithStudents, companiesThatHaveStudents, companiesWithStudents, companySearchQuery]);
+
+  const industryEligibility = useMemo(() => {
+    if (formData.role !== UserRole.TRAINER && formData.role !== UserRole.SUPERVISOR) return null;
+    const cat = inferQualificationCategory(formData.academic_level, formData.special_recognition);
+    return evaluateTrainerEligibility({
+      qualificationCategory: cat,
+      experienceYears: Number(formData.experience_years) || 0,
+      hasSpecialRecognition: formData.special_recognition,
+      specialRecognitionDetails: formData.special_recognition_details
+    });
+  }, [formData.role, formData.academic_level, formData.experience_years, formData.special_recognition, formData.special_recognition_details]);
+
+  const handleQuickSaveCompany = async () => {
+    const cleanCompany = selectedNewCompany.trim();
+    if (!cleanCompany) {
+      toast.error('Sila pilih nama syarikat terlebih dahulu.');
+      return;
+    }
+    setIsSavingCompany(true);
+    try {
+      const updatedUser: User = {
+        ...user,
+        ...formData,
+        company_affiliation: cleanCompany
+      };
+      await onUpdateUser(updatedUser);
+      setFormData(updatedUser);
+      // Also sync Trainer CV companyName if CV already exists
+      const existingCV = StorageService.getTrainerCVByUserId(user.id);
+      if (existingCV) {
+        await StorageService.saveTrainerCV({ ...existingCV, companyName: cleanCompany }, false);
+      }
+      setIsCompanySwitcherOpen(false);
+      toast.success(`Syarikat penempatan berjaya ditukar kepada: ${cleanCompany}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Gagal menukar syarikat.');
+    } finally {
+      setIsSavingCompany(false);
+    }
+  };
+
   // Structured Resume State
   const [eduHistory, setEduHistory] = useState<any[]>([]);
   const [projHistory, setProjHistory] = useState<any[]>([]);
@@ -97,6 +191,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
 
   useEffect(() => {
     setFormData({ ...user, teaching_subjects: user.teaching_subjects || '[]' });
+    setSelectedNewCompany(user.company_affiliation || '');
     setPassword(user.password || '');
     setSelectedLang(language);
     
@@ -250,7 +345,7 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">{t(language, 'profileTitle')}</h2>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
             {user.role === UserRole.STUDENT && !isEditing && (
                 <button 
                     disabled={isGenerating}
@@ -259,6 +354,20 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
                 >
                     {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />} 
                     {t(language, 'profileGenResume')}
+                </button>
+            )}
+            {(user.role === UserRole.TRAINER || user.role === UserRole.SUPERVISOR) && onNavigate && (
+                <button
+                    type="button"
+                    onClick={() => onNavigate('trainerCV')}
+                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg font-bold transition-colors shadow-sm ${
+                      industryEligibility?.isEligible
+                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                        : 'bg-indigo-600 hover:bg-indigo-700'
+                    }`}
+                >
+                    <FileText size={18} />
+                    <span>{language === 'ms' ? 'Jana CV Lantikan JI' : 'Generate Trainer CV'}</span>
                 </button>
             )}
             {!isEditing ? (
@@ -678,13 +787,281 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser, language, 
             )}
 
             {(formData.role === UserRole.TRAINER || formData.role === UserRole.SUPERVISOR) && (
-                 <section className="space-y-4">
-                 <h4 className="text-lg font-semibold text-slate-800 border-b border-slate-100 pb-2">{t(language, 'industryInfo')}</h4>
+                 <section className="space-y-5">
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                   <h4 className="text-lg font-semibold text-slate-800">{t(language, 'industryInfo')}</h4>
+                   <button
+                     type="button"
+                     onClick={() => {
+                       setSelectedNewCompany(formData.company_affiliation || '');
+                       setIsCompanySwitcherOpen(!isCompanySwitcherOpen);
+                     }}
+                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors"
+                   >
+                     <RefreshCw size={14} />
+                     <span>{isCompanySwitcherOpen ? 'Tutup Senarai Syarikat' : 'Tukar Syarikat Penempatan'}</span>
+                   </button>
+                 </div>
+
+                 {/* Current Company & Linked Students Status Card */}
+                 <div className={`p-4 rounded-xl border-2 space-y-2.5 ${
+                   currentCompanyInfo && currentCompanyInfo.placedStudents.length > 0
+                     ? 'bg-emerald-50/80 border-emerald-300'
+                     : 'bg-amber-50/90 border-amber-300'
+                 }`}>
+                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                     <div className="flex items-start gap-2.5">
+                       <Building2 size={20} className={currentCompanyInfo && currentCompanyInfo.placedStudents.length > 0 ? 'text-emerald-700 mt-0.5' : 'text-amber-600 mt-0.5'} />
+                       <div>
+                         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                           Syarikat Semasa Anda
+                         </div>
+                         <div className="text-base font-black text-slate-900">
+                           {formData.company_affiliation || 'Belum Ditetapkan'}
+                         </div>
+                         {currentCompanyInfo && (currentCompanyInfo.district || currentCompanyInfo.state) && (
+                           <div className="text-xs text-slate-600">
+                             📍 {[currentCompanyInfo.district, currentCompanyInfo.state].filter(Boolean).join(', ')}
+                           </div>
+                         )}
+                       </div>
+                     </div>
+
+                     <span className={`px-3 py-1 rounded-full text-xs font-black inline-flex items-center gap-1.5 self-start sm:self-center ${
+                       currentCompanyInfo && currentCompanyInfo.placedStudents.length > 0
+                         ? 'bg-emerald-600 text-white'
+                         : 'bg-amber-200 text-amber-950'
+                     }`}>
+                       <Users size={13} />
+                       <span>
+                         {currentCompanyInfo ? currentCompanyInfo.placedStudents.length : 0} Pelajar Ditempatkan
+                       </span>
+                     </span>
+                   </div>
+
+                   {currentCompanyInfo && currentCompanyInfo.placedStudents.length > 0 ? (
+                     <div className="pt-2 border-t border-emerald-200/80 text-xs text-emerald-950">
+                       <span className="font-bold block mb-1">Pelajar WBL ditempatkan di syarikat ini:</span>
+                       <div className="flex flex-wrap gap-1.5">
+                         {currentCompanyInfo.placedStudents.map((stu) => (
+                           <span key={stu.id} className="px-2.5 py-0.5 bg-white border border-emerald-300 rounded-lg font-bold text-[11px] text-emerald-900">
+                             {stu.name} ({stu.matricNo})
+                           </span>
+                         ))}
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="pt-2 border-t border-amber-200/80 text-xs text-amber-950 flex items-start gap-2">
+                       <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                       <div>
+                         <strong>Tiada pelajar WBL dikesan di bawah nama syarikat ini.</strong> Jika terdapat 2 nama syarikat yang sama/hampir sama dalam sistem dan anda tersalah pilih syarikat yang tiada pelajar, sila klik <strong>"Tukar Syarikat Penempatan"</strong> di atas untuk memilih syarikat yang mempunyai pelajar ditempatkan.
+                       </div>
+                     </div>
+                   )}
+                 </div>
+
+                 {/* Interactive Company Switcher Panel (Always available for SV Industri & JI even after account approval) */}
+                 {(isCompanySwitcherOpen || isEditing) && (
+                   <div className="p-4 rounded-2xl bg-slate-50 border-2 border-blue-200 space-y-3.5">
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                       <div>
+                         <h5 className="text-sm font-black text-blue-950 flex items-center gap-1.5">
+                           <Building2 size={16} className="text-blue-600" />
+                           <span>Tukar Syarikat Penempatan (Paparan Syarikat Yang Ada Pelajar Ditempatkan)</span>
+                         </h5>
+                         <p className="text-[11px] text-slate-600 mt-0.5">
+                           Pilih syarikat yang memaparkan nama pelajar seliaan anda. Anda boleh menukar syarikat pada bila-bila masa walaupun akaun telah diluluskan.
+                         </p>
+                       </div>
+                     </div>
+
+                     <div className="flex flex-col sm:flex-row gap-2">
+                       <div className="relative flex-1">
+                         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                         <input
+                           type="text"
+                           value={companySearchQuery}
+                           onChange={(e) => setCompanySearchQuery(e.target.value)}
+                           placeholder="Cari nama syarikat, daerah, atau nama pelajar..."
+                           className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                         />
+                       </div>
+                       <div className="flex gap-1.5">
+                         <button
+                           type="button"
+                           onClick={() => setShowOnlyWithStudents(true)}
+                           className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                             showOnlyWithStudents
+                               ? 'bg-emerald-600 text-white shadow-xs'
+                               : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-100'
+                           }`}
+                         >
+                           🟢 Ada Pelajar ({companiesThatHaveStudents.length})
+                         </button>
+                         <button
+                           type="button"
+                           onClick={() => setShowOnlyWithStudents(false)}
+                           className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                             !showOnlyWithStudents
+                               ? 'bg-slate-800 text-white shadow-xs'
+                               : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-100'
+                           }`}
+                         >
+                           Semua Syarikat ({companiesWithStudents.length})
+                         </button>
+                       </div>
+                     </div>
+
+                     <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                       {filteredSwitcherCompanies.length === 0 ? (
+                         <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
+                           Tiada syarikat dijumpai untuk carian ini. Cuba tukar kepada paparan "Semua Syarikat".
+                         </div>
+                       ) : (
+                         filteredSwitcherCompanies.map((comp) => {
+                           const isPicked = selectedNewCompany === comp.companyName;
+                           const hasStu = comp.placedStudents.length > 0;
+                           return (
+                             <button
+                               key={comp.companyName}
+                               type="button"
+                               onClick={() => {
+                                 setSelectedNewCompany(comp.companyName);
+                                 setFormData((prev) => ({ ...prev, company_affiliation: comp.companyName }));
+                               }}
+                               className={`w-full text-left p-3 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                                 isPicked
+                                   ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-200'
+                                   : hasStu
+                                   ? 'border-emerald-200 bg-white hover:border-emerald-400'
+                                   : 'border-slate-200 bg-white/80 hover:border-slate-300 opacity-85'
+                               }`}
+                             >
+                               <div className="flex items-start justify-between gap-2">
+                                 <div className="min-w-0">
+                                   <div className="font-black text-xs text-slate-900 flex flex-wrap items-center gap-1.5">
+                                     <span>{comp.companyName}</span>
+                                     {comp.isDuplicateNameVariant && (
+                                       <span className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 rounded">
+                                         Nama Syarikat Serupa
+                                       </span>
+                                     )}
+                                   </div>
+                                   {(comp.district || comp.state) && (
+                                     <div className="text-[11px] text-slate-500">
+                                       📍 {[comp.district, comp.state].filter(Boolean).join(', ')}
+                                     </div>
+                                   )}
+                                 </div>
+                                 <span
+                                   className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                                     hasStu
+                                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                       : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                   }`}
+                                 >
+                                   {hasStu ? `🟢 ${comp.placedStudents.length} Pelajar` : '0 Pelajar'}
+                                 </span>
+                               </div>
+
+                               {hasStu && (
+                                 <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-100">
+                                   {comp.placedStudents.map((stu) => (
+                                     <span
+                                       key={stu.id}
+                                       className="text-[10px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-md"
+                                     >
+                                       👤 {stu.name} ({stu.matricNo})
+                                     </span>
+                                   ))}
+                                 </div>
+                               )}
+                             </button>
+                           );
+                         })
+                       )}
+                     </div>
+
+                     {!isEditing && (
+                       <div className="flex items-center justify-between pt-2 border-t border-blue-200/70 gap-3">
+                         <div className="text-xs text-slate-700 truncate">
+                           Dipilih: <strong className="text-blue-800">{selectedNewCompany || '-'}</strong>
+                         </div>
+                         <button
+                           type="button"
+                           disabled={isSavingCompany || !selectedNewCompany || selectedNewCompany === user.company_affiliation}
+                           onClick={handleQuickSaveCompany}
+                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-colors shrink-0"
+                         >
+                           <Save size={14} />
+                           <span>{isSavingCompany ? 'Menyimpan...' : 'Simpan Pertukaran Syarikat'}</span>
+                         </button>
+                       </div>
+                     )}
+                   </div>
+                 )}
+
+                 {/* Other Industry Profile Fields */}
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <InputField label={t(language, 'selectCompany')} icon={Building2} value={formData.company_affiliation} disabled={true} isEditing={isEditing} />
                      <InputField label={t(language, 'position')} icon={Briefcase} value={formData.company_position} onChange={(v: string) => setFormData({...formData, company_position: v})} isEditing={isEditing} />
-                     <InputField label={t(language, 'academicLevel')} icon={GraduationCap} value={formData.academic_level} onChange={(v: string) => setFormData({...formData, academic_level: v})} isEditing={isEditing} />
+                     <div className="space-y-1">
+                       <label className="text-sm font-medium text-slate-700">{t(language, 'academicLevel')}</label>
+                       {isEditing ? (
+                         <select
+                           value={formData.academic_level || ''}
+                           onChange={(e) => setFormData({ ...formData, academic_level: e.target.value })}
+                           className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 shadow-sm"
+                         >
+                           <option value="">-- Pilih Kelayakan Akademik --</option>
+                           <option value="PhD">Ijazah Kedoktoran (PhD)</option>
+                           <option value="Master">Sarjana (Master)</option>
+                           <option value="Degree">Ijazah Sarjana Muda (Degree)</option>
+                           <option value="Diploma">Diploma Lanjutan / Diploma</option>
+                           <option value="Sijil / SPM">Sijil / Kelayakan Diiktiraf Syarikat / SPM</option>
+                           <option value="Kemahiran Istimewa / Pengiktirafan Profesional">Kemahiran Istimewa / Pengiktirafan Profesional</option>
+                         </select>
+                       ) : (
+                         <div className="relative">
+                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                             <GraduationCap size={18} />
+                           </div>
+                           <input disabled className="w-full pl-10 pr-4 py-2 border border-transparent bg-slate-50 rounded-lg text-slate-600" value={formData.academic_level || '-'} />
+                         </div>
+                       )}
+                     </div>
                      <InputField label={t(language, 'experienceYears')} icon={Clock} value={String(formData.experience_years || 0)} onChange={(v: string) => setFormData({...formData, experience_years: parseInt(v) || 0})} isEditing={isEditing} type="number" />
+
+                     {/* Live JI CV Eligibility Summary Box */}
+                     {industryEligibility && (
+                       <div className={`p-3.5 rounded-xl border-2 flex flex-col justify-between gap-2 ${
+                         industryEligibility.isEligible
+                           ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
+                           : 'bg-amber-50 border-amber-300 text-amber-950'
+                       }`}>
+                         <div className="flex items-center justify-between gap-2">
+                           <span className="text-xs font-black flex items-center gap-1.5">
+                             {industryEligibility.isEligible ? (
+                               <CheckCircle2 size={15} className="text-emerald-600" />
+                             ) : (
+                               <AlertTriangle size={15} className="text-amber-600" />
+                             )}
+                             <span>{industryEligibility.isEligible ? 'LAYAK CV HIJAU (LANTIKAN JI)' : 'SEMAKAN SYARAT LANTIKAN JI'}</span>
+                           </span>
+                         </div>
+                         <p className="text-[11px] leading-snug">{industryEligibility.reasonMs}</p>
+                         {onNavigate && (
+                           <button
+                             type="button"
+                             onClick={() => onNavigate('trainerCV')}
+                             className={`self-start px-3 py-1.5 rounded-lg text-[11px] font-black text-white transition-colors ${
+                               industryEligibility.isEligible ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+                             }`}
+                           >
+                             Buka Penjana CV Lantikan JI &raquo;
+                           </button>
+                         )}
+                       </div>
+                     )}
                  </div>
                  </section>
             )}

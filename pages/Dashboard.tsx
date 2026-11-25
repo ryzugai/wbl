@@ -83,17 +83,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [adConfig.isEnabled, adConfig.items.length, showAd]);
 
   // Modular Course Milestones & Countdown (5-week modules & PSM2)
-  const [selectedModularCourseCode, setSelectedModularCourseCode] = useState<string>('BTMU 2103(i)');
-
-  // Determine active modular course dynamically based on current date
+  // Determine active modular course dynamically based on current date (e.g. BTMT 3273(i) Digital Entrepreneurship for Nov 2026)
   const activeModularItem = useMemo(() => {
     const nowStr = new Date().toISOString().split('T')[0];
     const found = WBL_COURSE_SEQUENCE.find(c => nowStr >= c.startDate && nowStr <= c.endDate);
-    return found || WBL_COURSE_SEQUENCE[0]; // Default to Modul 1
+    return found || WBL_COURSE_SEQUENCE.find(c => c.courseCode.includes('3273')) || WBL_COURSE_SEQUENCE[1];
   }, []);
 
+  const [selectedModularCourseCode, setSelectedModularCourseCode] = useState<string>(() => {
+    const nowStr = new Date().toISOString().split('T')[0];
+    const found = WBL_COURSE_SEQUENCE.find(c => nowStr >= c.startDate && nowStr <= c.endDate);
+    return found ? found.courseCode : 'BTMT 3273(i)';
+  });
+
   const selectedModularItem = useMemo(() => {
-    return WBL_COURSE_SEQUENCE.find(c => c.courseCode === selectedModularCourseCode) || activeModularItem;
+    const item = WBL_COURSE_SEQUENCE.find(c => c.courseCode === selectedModularCourseCode) || activeModularItem;
+    const nowStr = new Date().toISOString().split('T')[0];
+    return {
+      ...item,
+      isPast: nowStr > item.endDate,
+      isActive: nowStr >= item.startDate && nowStr <= item.endDate
+    };
   }, [selectedModularCourseCode, activeModularItem]);
 
   // Weekly assessments for the selected modular course (5 weeks)
@@ -619,9 +629,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
           <div className="text-right shrink-0">
-            <span className="text-[10px] font-black text-emerald-700 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1.5">
+            <span className="text-[10px] font-black text-emerald-700 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1.5 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Modul 1 Aktif (Operasi)</span>
+              <span>{activeModularItem.badge.split('(')[0].trim() || 'Modul Semasa'} Aktif ({activeModularItem.shortName})</span>
             </span>
             <p className="text-[10px] font-bold text-slate-400 mt-1">
               {new Date().toLocaleDateString(language === 'ms' ? 'ms-MY' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -711,21 +721,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 <div className="mt-3 pt-2 border-t border-slate-200/30 flex items-center justify-between text-[9px] font-bold">
-                  {m.isPast ? (
-                    <span className="text-emerald-500 flex items-center gap-1">
-                      <Check size={11} /> Selesai
-                    </span>
-                  ) : isCurrentActive ? (
+                  {isCurrentActive ? (
                     <span className={`flex items-center gap-1 font-black ${isSelected ? 'text-amber-300' : 'text-blue-700'}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
-                      Sedang Berjalan
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      Sedang Berjalan (Aktif)
+                    </span>
+                  ) : m.isPast ? (
+                    <span className={`flex items-center gap-1 font-black ${isSelected ? 'text-emerald-300' : 'text-emerald-700'}`} title="Modul telah lepas tetapi penilaian masih boleh diteruskan sehingga Minggu 20 (12 Feb 2027)">
+                      <Check size={11} className="text-emerald-500" />
+                      <span>Modul Lepas (Penilaian Dibuka)</span>
                     </span>
                   ) : (
                     <span className={isSelected ? 'text-slate-300' : 'text-slate-400'}>
                       Akan Datang
                     </span>
                   )}
-                  <span className={isSelected ? 'text-white underline' : 'text-blue-600'}>
+                  <span className={isSelected ? 'text-white underline font-black' : 'text-blue-600'}>
                     Pilih &raquo;
                   </span>
                 </div>
@@ -820,13 +831,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2 py-0.5 rounded-md">
                   {selectedModularItem.badge}
                 </span>
+                {selectedModularItem.isActive && (
+                  <span className="text-[10px] font-black text-emerald-300 bg-emerald-900/60 border border-emerald-400 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span>Modul Aktif Semasa</span>
+                  </span>
+                )}
+                {selectedModularItem.isPast && (
+                  <span className="text-[10px] font-black text-amber-300 bg-amber-950/80 border border-amber-500/60 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    🔓 Penilaian Masih Dibuka Sehingga Minggu 20 (12 Feb 2027)
+                  </span>
+                )}
               </div>
 
               <h4 className="text-xl font-black text-white tracking-tight">
                 {selectedModularItem.order}. {selectedModularItem.courseName}
               </h4>
               <p className="text-xs text-indigo-200/90 leading-relaxed max-w-2xl">
-                Tarikh Akhir Modul &amp; Penilaian Rubrik Mingguan: <strong className="text-white underline">{new Date(selectedModularItem.endDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> (Tempoh: {selectedModularItem.durationWeeks} Minggu).
+                {selectedModularItem.isPast ? (
+                  <>
+                    Tempoh rasmi 5 minggu kursus ini telah selesai ({new Date(selectedModularItem.startDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short' })} - {new Date(selectedModularItem.endDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })}). <strong className="text-amber-300 font-bold">Penilaian &amp; semakan markah tetap DIBENARKAN sepenuhnya sehingga Minggu 20 (12 Februari 2027).</strong>
+                  </>
+                ) : (
+                  <>
+                    Tarikh Akhir Modul &amp; Penilaian Rubrik Mingguan: <strong className="text-white underline">{new Date(selectedModularItem.endDate).toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> (Tempoh: {selectedModularItem.durationWeeks} Minggu).
+                  </>
+                )}
               </p>
             </div>
 
@@ -876,10 +906,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onNavigate('weeklyAssessment')}
+                    onClick={() => {
+                      sessionStorage.setItem('selectedWeeklyCourseCode', selectedModularItem.courseCode);
+                      onNavigate('weeklyAssessment');
+                    }}
                     className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
                   >
-                    <span>Penilaian Rubrik Mingguan</span>
+                    <span>Penilaian Rubrik ({selectedModularItem.shortName})</span>
                     <ArrowRight size={13} />
                   </button>
                 </>
