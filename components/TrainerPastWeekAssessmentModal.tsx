@@ -159,8 +159,8 @@ export const TrainerPastWeekAssessmentModal: React.FC<TrainerPastWeekAssessmentM
               </div>
               <p className="text-rose-100 leading-snug">
                 {language === 'ms'
-                  ? 'Sila lengkapkan dan HANTAR kesemua borang markah bagi minggu kursus yang telah berlalu. Peringatan ini hanya akan terpadam secara automatik selepas semua markah dihantar.'
-                  : 'Please complete and submit all assessment mark forms for past course weeks. This reminder will automatically clear once all marks are submitted.'}
+                  ? 'Sila lengkapkan dan HANTAR kesemua borang markah bagi minggu kursus WBL (selain PSM 2 BTMU 4084(i)) yang telah berlalu. Peringatan ini hanya akan terpadam secara automatik selepas semua markah dihantar.'
+                  : 'Please complete and submit all assessment mark forms for past WBL course weeks (excluding PSM 2 BTMU 4084(i)). This reminder will automatically clear once all marks are submitted.'}
               </p>
             </div>
           </div>
@@ -215,8 +215,8 @@ export const TrainerPastWeekAssessmentModal: React.FC<TrainerPastWeekAssessmentM
                 </h2>
                 <p className="text-xs text-rose-100 mt-1 leading-relaxed">
                   {language === 'ms'
-                    ? 'Terdapat minggu kursus WBL yang telah berlalu tetapi borang markah pelajar di syarikat anda masih belum dilengkapkan & dihantar. Selagi markah belum diisi, popup peringatan ini tidak akan terpadam.'
-                    : 'There are past WBL course weeks with unfilled student assessment marks for your company. This popup cannot be dismissed until all pending marks are submitted.'}
+                    ? 'Terdapat minggu kursus WBL (selain PSM 2 BTMU 4084(i)) yang telah berlalu tetapi borang markah pelajar di syarikat anda masih belum dilengkapkan & dihantar. Selagi markah belum diisi, popup peringatan ini tidak akan terpadam.'
+                    : 'There are past WBL course weeks (excluding PSM 2 BTMU 4084(i)) with unfilled student assessment marks for your company. This popup cannot be dismissed until all pending marks are submitted.'}
                 </p>
               </div>
             </div>

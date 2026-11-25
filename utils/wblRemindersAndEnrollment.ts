@@ -294,9 +294,11 @@ export interface PendingPastWeekMarkItem {
   currentStatus: 'missing' | 'draft' | 'revision_requested';
 }
 
+const EXCLUDED_TRAINER_POPUP_COURSE_CODES = new Set(['BTMU 4084']);
+
 /**
  * Computes ALL unfilled weekly assessment mark forms for course weeks that have already passed (endDate < today)
- * for a given Industry Trainer across all their placed students.
+ * for a given Industry Trainer across all their placed students — excluding PSM 2 (BTMU 4084(i)).
  */
 export const computeTrainerPendingPastWeekMarks = (
   trainer: User,
@@ -313,8 +315,11 @@ export const computeTrainerPendingPastWeekMarks = (
   const pending: PendingPastWeekMarkItem[] = [];
 
   for (const courseSeq of WBL_COURSE_SEQUENCE) {
-    const weeklyConfigs: WeeklyAssessmentConfig[] = UTEM_WEEKLY_ASSESSMENTS[courseSeq.courseCode] || [];
     const normSeqCode = normalizeCourseCode(courseSeq.courseCode);
+    // Kecualikan kursus PSM 2 BTMU 4084(i) daripada popup peringatan markah mingguan Jurulatih Industri
+    if (EXCLUDED_TRAINER_POPUP_COURSE_CODES.has(normSeqCode)) continue;
+
+    const weeklyConfigs: WeeklyAssessmentConfig[] = UTEM_WEEKLY_ASSESSMENTS[courseSeq.courseCode] || [];
 
     for (const weekCfg of weeklyConfigs) {
       // Only include weeks that have already passed (strictly past endDate)
