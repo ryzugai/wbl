@@ -29,6 +29,7 @@ import {
 import { CourseAnnouncementsSection } from '../components/CourseAnnouncementsSection';
 import { Language, t } from '../translations';
 import { toast } from 'react-hot-toast';
+import { getStudentPlacementStatus } from '../utils/wblRemindersAndEnrollment';
 
 interface StudentEvaluationPageProps {
   currentUser: User;
@@ -102,8 +103,10 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
   const [selectedEnrollmentCourseCode, setSelectedEnrollmentCourseCode] = useState<string>('BTMT 3273(i)');
   const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState('');
   const [enrollmentProgramFilter, setEnrollmentProgramFilter] = useState('all');
+  const [enrollmentCohortFilter, setEnrollmentCohortFilter] = useState<'all' | 'unplaced' | 'new_cohort'>('all');
   const [selectedStudentsToEnroll, setSelectedStudentsToEnroll] = useState<string[]>([]);
   const [enrollmentActiveSubtab, setEnrollmentActiveSubtab] = useState<'enrolled' | 'available'>('enrolled');
+  const [pendingAutoOpenWeek, setPendingAutoOpenWeek] = useState<number | null>(null);
 
   useEffect(() => {
     if (initialTab) {
@@ -131,11 +134,24 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
       setActiveTab('weeklyAssessment');
       sessionStorage.removeItem('selectedWeeklyCourseCode');
     }
+    const weeklyStudent = sessionStorage.getItem('selectedWeeklyStudentMatric');
+    if (weeklyStudent) {
+      setSelectedWeeklyStudentMatric(weeklyStudent);
+      sessionStorage.removeItem('selectedWeeklyStudentMatric');
+    }
+    const autoWeek = sessionStorage.getItem('autoOpenWeeklyWeek');
+    if (autoWeek) {
+      const parsedWeek = parseInt(autoWeek, 10);
+      if (!isNaN(parsedWeek) && parsedWeek > 0) {
+        setPendingAutoOpenWeek(parsedWeek);
+      }
+      sessionStorage.removeItem('autoOpenWeeklyWeek');
+    }
   }, [initialTab]);
 
   useEffect(() => {
     const handleCourseSelected = (e: any) => {
-      const { courseCode, view } = e.detail || {};
+      const { courseCode, studentMatric, weekNumber, view } = e.detail || {};
       if (view === 'monitoring') {
         setSelectedMonitoringCourseCode(courseCode || 'all');
         setActiveTab('courseMonitoring');
@@ -144,6 +160,12 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
         setActiveTab('evaluations');
       } else if (view === 'weekly') {
         setSelectedWeeklyCourseCode(courseCode || currentActiveModularCourse);
+        if (studentMatric) {
+          setSelectedWeeklyStudentMatric(studentMatric);
+        }
+        if (weekNumber && Number(weekNumber) > 0) {
+          setPendingAutoOpenWeek(Number(weekNumber));
+        }
         setActiveTab('weeklyAssessment');
       }
     };
@@ -187,6 +209,18 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
     const unsub = StorageService.subscribe(loadData);
     return () => unsub();
   }, []);
+
+  // Automatically sync enrollment for all placed students across ALL courses
+  useEffect(() => {
+    if (users.length === 0) return;
+    StorageService.autoEnrollPlacedStudentsAllCourses({ notifyNew: false })
+      .then((res) => {
+        if (res.changedCourses > 0) {
+          loadData();
+        }
+      })
+      .catch(() => {});
+  }, [users.length, applications.length]);
 
   // Registered lecturers list for coordinator dropdown
   const facultyLecturers = useMemo(() => {
@@ -437,6 +471,16 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
 
     setIsWeeklyModalOpen(true);
   };
+
+  // Auto-open the targeted past-week grading modal when jumped from persistent Trainer reminder popup
+  useEffect(() => {
+    if (!pendingAutoOpenWeek || activeTab !== 'weeklyAssessment' || !currentSelectedStudent) return;
+    const cfg = currentWeeklyConfigs.find((w) => w.week === pendingAutoOpenWeek);
+    if (cfg) {
+      setPendingAutoOpenWeek(null);
+      handleOpenWeeklyModal(cfg);
+    }
+  }, [pendingAutoOpenWeek, activeTab, currentSelectedStudent, currentWeeklyConfigs]);
 
   // Save Weekly Assessment
   const handleSaveWeeklyEvaluation = async (submitNow: boolean = false) => {
@@ -3409,19 +3453,63 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
               </div>
             </div>
 
-            {/* Makluman Modular Semasa & Polisi Fleksibiliti Penilaian */}
-            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200 p-4 rounded-xl flex items-start gap-3">
-              <Info className="text-emerald-700 shrink-0 mt-0.5" size={18} />
-              <div className="text-xs text-slate-700 space-y-1">
-                <div className="font-black text-emerald-950 flex flex-wrap items-center gap-2">
-                  <span>Modul Semasa: BTMT 3273(i) Digital Entrepreneurship (Keusahawanan Digital)</span>
-                  <span className="px-2 py-0.5 text-[10px] bg-emerald-600 text-white rounded font-bold">Minggu 6 - 10</span>
+            {/* Makluman Auto-Enrolmen Pelajar Ditempatkan & Senarai Kohort Baharu */}
+            {(() => {
+              const placedCount = studentUsersList.filter(
+                (s) => s.is_active !== false && getStudentPlacementStatus(s, applications).isPlaced
+              ).length;
+              const unplacedOrNewCount = studentUsersList.filter((s) => {
+                if (s.is_active === false) return false;
+                const st = getStudentPlacementStatus(s, applications);
+                return !st.isPlaced || st.isNewCohort;
+              }).length;
+
+              return (
+                <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200 p-4 rounded-xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <Info className="text-emerald-700 shrink-0 mt-0.5" size={18} />
+                    <div className="text-xs text-slate-700 space-y-1">
+                      <div className="font-black text-emerald-950 flex flex-wrap items-center gap-2">
+                        <span>Auto-Enrolmen Kursus Aktif: Pelajar Ditempatkan ({placedCount} Orang)</span>
+                        <span className="px-2 py-0.5 text-[10px] bg-emerald-600 text-white rounded font-bold">
+                          Semua {courseAssignments.length} Kursus Automatik
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] bg-amber-100 text-amber-900 border border-amber-300 rounded font-bold">
+                          Kohort Baharu / Belum Penempatan: {unplacedOrNewCount} Orang
+                        </span>
+                      </div>
+                      <p>
+                        Pelajar yang telah <strong>ditempatkan kepada syarikat</strong> akan <strong>dienrol secara automatik ke kesemua kursus WBL</strong>. Pelajar <strong>kohort baharu (Ambilan 2 / Ambilan 3) atau belum mendapat penempatan</strong> akan dimasukkan ke dalam tab <strong>"+ Enrol Pelajar Baharu"</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={async () => {
+                      setIsSaving(true);
+                      try {
+                        const res = await StorageService.autoEnrollPlacedStudentsAllCourses({ notifyNew: false });
+                        loadData();
+                        toast.success(
+                          res.changedCourses > 0
+                            ? `Auto-enrolmen berjaya disegerakkan pada ${res.changedCourses} kursus!`
+                            : 'Semua pelajar yang telah ditempatkan sudah pun dienrol ke kesemua kursus.'
+                        );
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Gagal menyegerak enrolmen.');
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs shrink-0 self-start lg:self-center cursor-pointer"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Segerak Auto-Enrol</span>
+                  </button>
                 </div>
-                <p>
-                  Penilaian dan pengurusan enrolmen bagi subjek terdahulu (<strong>Modul 1: BTMU 2103 Pengurusan Operasi</strong>) <strong>kekal dibuka sepenuhnya sehingga Minggu 20 (12 Februari 2027)</strong>. Pensyarah kursus dan jurulatih boleh terus mengemaskini markah serta mendaftarkan pelajar tanpa sebarang sekatan tarikh.
-                </p>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Step 1: Select Offered Course */}
             <div>
@@ -3490,17 +3578,39 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
 
             const enrolledStudentIds = currentCourse.assignedStudentIds || [];
             
-            // Available students not yet enrolled in this course
-            const availableStudents = studentUsersList.filter(s => !enrolledStudentIds.includes(s.id) && !enrolledStudentIds.includes(s.matric_no || ''));
+            // Available students not yet enrolled in this course (includes new cohort & unplaced students)
+            const availableStudents = studentUsersList
+              .filter(
+                (s) =>
+                  s.is_active !== false &&
+                  !enrolledStudentIds.includes(s.id) &&
+                  !enrolledStudentIds.includes(s.matric_no || '')
+              )
+              .map((s) => ({
+                ...s,
+                placementInfo: getStudentPlacementStatus(s, applications)
+              }));
+
+            const unplacedCountInAvailable = availableStudents.filter((s) => !s.placementInfo.isPlaced).length;
+            const newCohortCountInAvailable = availableStudents.filter((s) => s.placementInfo.isNewCohort).length;
 
             // Filter available students
             const filteredAvailable = availableStudents.filter(s => {
               if (enrollmentProgramFilter !== 'all' && s.academic_level !== enrollmentProgramFilter) {
                 return false;
               }
+              if (enrollmentCohortFilter === 'unplaced' && s.placementInfo.isPlaced) {
+                return false;
+              }
+              if (enrollmentCohortFilter === 'new_cohort' && !s.placementInfo.isNewCohort) {
+                return false;
+              }
               if (enrollmentSearchQuery.trim()) {
                 const q = enrollmentSearchQuery.toLowerCase();
-                const match = s.name.toLowerCase().includes(q) || (s.matric_no && s.matric_no.toLowerCase().includes(q));
+                const match =
+                  s.name.toLowerCase().includes(q) ||
+                  (s.matric_no && s.matric_no.toLowerCase().includes(q)) ||
+                  (s.placementInfo.intakeLabel && s.placementInfo.intakeLabel.toLowerCase().includes(q));
                 if (!match) return false;
               }
               return true;
@@ -3509,13 +3619,18 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
             // Enrolled students list
             const enrolledStudents = enrolledStudentIds.map(sId => {
               const u = users.find(user => user.id === sId || user.matric_no === sId);
-              const app = applications.find(a => (a.student_id === sId || (u && (a.student_id === u.matric_no || a.created_by === u.username))) && (a.application_status === 'Diluluskan' || a.student_preferred));
+              const placementInfo = u ? getStudentPlacementStatus(u, applications) : null;
+              const app =
+                placementInfo?.approvedApp ||
+                applications.find(a => (a.student_id === sId || (u && (a.student_id === u.matric_no || a.created_by === u.username))) && (a.application_status === 'Diluluskan' || a.student_preferred));
               return {
                 id: sId,
                 name: u?.name || app?.student_name || 'Pelajar WBL',
                 matric: u?.matric_no || app?.student_id || sId,
-                program: u?.academic_level || app?.student_program || 'BTEC',
-                company: app?.company_name || u?.company_affiliation || 'Belum Ditetapkan',
+                program: u?.program || u?.academic_level || app?.student_program || 'BTEC',
+                company: placementInfo?.companyName || app?.company_name || u?.company_affiliation || 'Belum Ditetapkan',
+                isPlaced: Boolean(placementInfo?.isPlaced || app?.company_name),
+                intake: u?.intake || 'Ambilan 1',
                 phone: u?.phone || '-'
               };
             });
@@ -3608,7 +3723,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                               <th className="p-3 text-center w-12">#</th>
                               <th className="p-3">No. Matrik</th>
                               <th className="p-3">Nama Pelajar</th>
-                              <th className="p-3">Program</th>
+                              <th className="p-3">Ambilan</th>
                               <th className="p-3">Organisasi Latihan</th>
                               <th className="p-3 text-right">Tindakan</th>
                             </tr>
@@ -3619,8 +3734,21 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                 <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
                                 <td className="p-3 font-mono font-bold text-blue-700">{s.matric}</td>
                                 <td className="p-3 font-bold text-slate-800">{s.name}</td>
-                                <td className="p-3 text-slate-500">{s.program}</td>
-                                <td className="p-3 text-slate-600">{s.company}</td>
+                                <td className="p-3">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                    {s.intake}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-slate-600">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>{s.company}</span>
+                                    {s.isPlaced && (
+                                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                                        Auto-Enrol
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
                                 <td className="p-3 text-right">
                                   <button
                                     type="button"
@@ -3648,7 +3776,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                       <div>
                         <div className="text-xs font-bold text-slate-700">
-                          {language === 'ms' ? 'Tindakan Pendaftaran Berkelompok:' : 'Batch Enrollment Actions:'}
+                          {language === 'ms' ? 'Senarai Enrol Pelajar Baharu (Kohort Baharu & Belum Penempatan):' : 'New Student Enrollment List (New Cohort & Unplaced):'}
                         </div>
                         <div className="text-[11px] text-slate-500">
                           {selectedStudentsToEnroll.length} pelajar dipilih daripada {filteredAvailable.length} pelajar tersedia
@@ -3657,15 +3785,38 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
 
                       <div className="flex flex-wrap items-center gap-2">
                         {selectedStudentsToEnroll.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleEnrollSelectedStudents(currentCourse.courseCode)}
-                            disabled={isSaving}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
-                          >
-                            <UserPlus size={14} />
-                            <span>{language === 'ms' ? `Enrol Pelajar Ditanda (${selectedStudentsToEnroll.length})` : `Enroll Selected (${selectedStudentsToEnroll.length})`}</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleEnrollSelectedStudents(currentCourse.courseCode)}
+                              disabled={isSaving}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                            >
+                              <UserPlus size={14} />
+                              <span>{language === 'ms' ? `Enrol Kursus Ini (${selectedStudentsToEnroll.length})` : `Enroll Selected (${selectedStudentsToEnroll.length})`}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setIsSaving(true);
+                                try {
+                                  await StorageService.enrollStudentsInAllCourses(selectedStudentsToEnroll);
+                                  loadData();
+                                  toast.success(`Berjaya mendaftarkan ${selectedStudentsToEnroll.length} pelajar ke kesemua kursus WBL!`);
+                                  setSelectedStudentsToEnroll([]);
+                                } catch (err: any) {
+                                  toast.error(err?.message || 'Gagal mendaftar pelajar.');
+                                } finally {
+                                  setIsSaving(false);
+                                }
+                              }}
+                              disabled={isSaving}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                            >
+                              <Layers size={14} />
+                              <span>Enrol Semua Kursus ({selectedStudentsToEnroll.length})</span>
+                            </button>
+                          </>
                         )}
 
                         {filteredAvailable.length > 0 && (
@@ -3685,6 +3836,43 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                       </div>
                     </div>
 
+                    {/* Category Filter Pills for New Cohort / Unplaced */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setEnrollmentCohortFilter('all')}
+                        className={`px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                          enrollmentCohortFilter === 'all'
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        Semua Tersedia ({availableStudents.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEnrollmentCohortFilter('unplaced')}
+                        className={`px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                          enrollmentCohortFilter === 'unplaced'
+                            ? 'bg-amber-600 text-white border-amber-600'
+                            : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                        }`}
+                      >
+                        Belum Dapat Penempatan ({unplacedCountInAvailable})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEnrollmentCohortFilter('new_cohort')}
+                        className={`px-3 py-1.5 rounded-xl font-bold border transition-all ${
+                          enrollmentCohortFilter === 'new_cohort'
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+                        }`}
+                      >
+                        Kohort Baharu • Ambilan 2/3 ({newCohortCountInAvailable})
+                      </button>
+                    </div>
+
                     {/* Filter and Search */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                       <div className="relative flex-1">
@@ -3693,7 +3881,7 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                           type="text"
                           value={enrollmentSearchQuery}
                           onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
-                          placeholder={language === 'ms' ? 'Cari nama pelajar atau no matrik...' : 'Search student name or matric...'}
+                          placeholder={language === 'ms' ? 'Cari nama pelajar, no matrik atau ambilan...' : 'Search student name, matric or intake...'}
                           className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                         />
                       </div>
@@ -3720,8 +3908,8 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                     {filteredAvailable.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 border border-slate-200 rounded-xl">
                         {language === 'ms' 
-                          ? 'Semua pelajar aktif telah dienrol ke dalam kursus ini.' 
-                          : 'All active students are already enrolled in this course.'}
+                          ? 'Tiada pelajar baharu / belum penempatan dalam kategori ini. Semua pelajar yang telah ditempatkan telah dienrol secara automatik.' 
+                          : 'No new cohort or unplaced students in this category. All placed students are auto-enrolled.'}
                       </div>
                     ) : (
                       <div className="overflow-x-auto border border-slate-200 rounded-xl">
@@ -3744,15 +3932,15 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                               </th>
                               <th className="p-3">No. Matrik</th>
                               <th className="p-3">Nama Pelajar</th>
-                              <th className="p-3">Program</th>
-                              <th className="p-3">Penempatan Industri</th>
+                              <th className="p-3">Kohort / Ambilan</th>
+                              <th className="p-3">Status Penempatan</th>
                               <th className="p-3 text-right">Tindakan</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {filteredAvailable.map((s) => {
                               const isChecked = selectedStudentsToEnroll.includes(s.id);
-                              const app = applications.find(a => (a.student_id === s.id || a.student_id === s.matric_no || a.created_by === s.username) && (a.application_status === 'Diluluskan' || a.student_preferred));
+                              const pInfo = s.placementInfo;
 
                               return (
                                 <tr key={s.id} className={`hover:bg-emerald-50/40 transition-colors ${isChecked ? 'bg-emerald-50/30' : ''}`}>
@@ -3772,10 +3960,24 @@ export const StudentEvaluationPage: React.FC<StudentEvaluationPageProps> = ({
                                   </td>
                                   <td className="p-3 font-mono font-bold text-slate-800">{s.matric_no || '-'}</td>
                                   <td className="p-3 font-bold text-slate-800">{s.name}</td>
-                                  <td className="p-3 text-slate-500">{s.academic_level || 'BTEC'}</td>
+                                  <td className="p-3">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                        pInfo.isNewCohort
+                                          ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                                      }`}
+                                    >
+                                      {pInfo.isNewCohort ? `Kohort Baharu (${pInfo.intakeLabel})` : pInfo.intakeLabel}
+                                    </span>
+                                  </td>
                                   <td className="p-3 text-slate-600">
-                                    {app?.company_name || s.company_affiliation || (
-                                      <span className="text-slate-400 italic">Belum ditempatkan</span>
+                                    {pInfo.isPlaced ? (
+                                      <span className="text-emerald-700 font-semibold">{pInfo.companyName}</span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                                        Belum Mendapat Penempatan
+                                      </span>
                                     )}
                                   </td>
                                   <td className="p-3 text-right">

@@ -153,13 +153,18 @@ export const PsmCaseStudyLogbook: React.FC<PsmCaseStudyLogbookProps> = ({
   // For Supervisor: find supervised students
   const supervisedStudents = useMemo(() => {
     if (!isSupervisor) return [];
+    const curNameNorm = (currentUser.name || '').trim().toLowerCase();
     return allStudents.filter(s => {
+      const matchesUser =
+        s.faculty_supervisor_id === currentUser.id ||
+        (Boolean(curNameNorm) && (s.faculty_supervisor_name || '').trim().toLowerCase() === curNameNorm);
       // Check if student's assigned supervisor matches currentUser
       const matchesApp = applications.some(a => 
         (a.student_id === s.matric_no || a.created_by === s.username) &&
-        (a.faculty_supervisor_name === currentUser.name || a.faculty_supervisor_id === currentUser.id)
+        (a.faculty_supervisor_id === currentUser.id ||
+          (Boolean(curNameNorm) && (a.faculty_supervisor_name || '').trim().toLowerCase() === curNameNorm))
       );
-      return matchesApp || s.company_affiliation === currentUser.name;
+      return matchesUser || matchesApp;
     });
   }, [allStudents, applications, currentUser, isSupervisor]);
 

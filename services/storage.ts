@@ -4,6 +4,30 @@ import { COORDINATOR_ACCOUNT, DEFAULT_WBL_COURSES, calculateUTeMGrade } from '..
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, writeBatch, getDoc, getDocs } from 'firebase/firestore';
 import { IDBDocStorage } from './idbStorage';
+import {
+  getStudentPlacementStatus,
+  isValidCompanyName,
+  normalizeText,
+  normalizeMatric
+} from '../utils/wblRemindersAndEnrollment';
+
+const MANUAL_ENROLL_OVERRIDE_KEY = 'wbl_manual_enrolled_map';
+const MANUAL_UNENROLL_OVERRIDE_KEY = 'wbl_manual_unenrolled_map';
+
+const readOverrideMap = (key: string): Record<string, string[]> => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeOverrideMap = (key: string, map: Record<string, string[]>) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(map));
+  } catch {}
+};
 
 const STORAGE_KEYS = {
   USERS: 'wbl_users',
@@ -1407,6 +1431,31 @@ export const StorageService = {
       );
     }
 
+    // Auto-enroll placed student into ALL WBL courses once placement is approved
+    if (
+      updatedApp.application_status === 'Diluluskan' &&
+      isValidCompanyName(updatedApp.company_name)
+    ) {
+      try {
+        const allUsers = StorageService.getUsers();
+        const matchedStudent = allUsers.find(
+          (u) =>
+            u.role === UserRole.STUDENT &&
+            (u.id === updatedApp.student_id ||
+              (updatedApp.student_id && normalizeMatric(u.matric_no) === normalizeMatric(updatedApp.student_id)) ||
+              (updatedApp.created_by && normalizeText(u.username) === normalizeText(updatedApp.created_by)))
+        );
+        if (matchedStudent) {
+          await StorageService.autoEnrollPlacedStudentsAllCourses({
+            targetStudentIds: [matchedStudent.id],
+            notifyNew: true
+          });
+        }
+      } catch (err) {
+        console.warn('Auto-enrollment notice on application approval:', err);
+      }
+    }
+
     return updatedApp;
   },
 
@@ -1527,6 +1576,16 @@ export const StorageService = {
       }
     }
 
+    // 3b. Auto-enroll newly placed student into ALL WBL courses
+    try {
+      await StorageService.autoEnrollPlacedStudentsAllCourses({
+        targetStudentIds: [student.id],
+        notifyNew: true
+      });
+    } catch (e) {
+      console.warn('Auto-enroll notice during setStudentPlacement:', e);
+    }
+
     // 4. Send notification to student
     try {
       await StorageService.createNotification({
@@ -1534,8 +1593,8 @@ export const StorageService = {
         recipient_role: UserRole.STUDENT,
         title_ms: `Penetapan Rasmi Syarikat Penempatan WBL`,
         title_en: `Official WBL Placement Assignment`,
-        message_ms: `Tahniah! Anda telah ditetapkan secara rasmi di syarikat ${company.company_name} oleh Penyelaras WBL.${deletedCount > 0 ? ` Sebanyak ${deletedCount} permohonan pilihan lain telah dipadamkan.` : ''}`,
-        message_en: `Congratulations! You have been officially assigned to ${company.company_name} by WBL Coordinator.${deletedCount > 0 ? ` ${deletedCount} other application choices have been deleted.` : ''}`,
+        message_ms: `Tahniah! Anda telah ditetapkan secara rasmi di syarikat ${company.company_name} oleh Penyelaras WBL dan telah didaftarkan secara automatik ke kesemua kursus WBL.${deletedCount > 0 ? ` Sebanyak ${deletedCount} permohonan pilihan lain telah dipadamkan.` : ''}`,
+        message_en: `Congratulations! You have been officially assigned to ${company.company_name} by WBL Coordinator and automatically enrolled into all WBL courses.${deletedCount > 0 ? ` ${deletedCount} other application choices have been deleted.` : ''}`,
         is_read: false,
         created_at: new Date().toISOString(),
         sender_name: performedBy?.name || 'Penyelaras WBL',
@@ -2138,20 +2197,77 @@ export const StorageService = {
       }
     }
 
-    // Send notification to Coordinator & Industry Trainer
+    // Send notification to BOTH Industry Trainer (JI) AND Faculty Supervisor (Penyelia Fakulti)
     try {
-      await StorageService.createNotification({
-        recipient_id: trainerDetails?.trainerId || 'coordinator',
-        recipient_role: UserRole.TRAINER,
-        sender_name: updated.studentName,
-        sender_matric: updated.studentMatric,
-        title_ms: `Logbook Mingguan Dihantar - Minggu ${updated.weekNumber}`,
-        title_en: `Weekly Logbook Submitted - Week ${updated.weekNumber}`,
-        message_ms: `Pelajar ${updated.studentName} (${updated.studentMatric}) telah menghantar logbook Minggu ${updated.weekNumber} bagi penempatan di ${updated.companyName} untuk pengesahan jurulatih industri.`,
-        message_en: `Student ${updated.studentName} (${updated.studentMatric}) submitted Week ${updated.weekNumber} logbook at ${updated.companyName} for trainer verification.`,
-        is_read: false,
-        created_at: now
-      });
+      const allUsers = StorageService.getUsers();
+      const allApps = StorageService.getApplications();
+      const studentUser = allUsers.find(
+        (u) =>
+          u.id === updated.studentId ||
+          (updated.studentMatric && normalizeMatric(u.matric_no) === normalizeMatric(updated.studentMatric))
+      );
+      const studentApp = allApps.find(
+        (a) =>
+          (updated.studentMatric && normalizeMatric(a.student_id) === normalizeMatric(updated.studentMatric)) ||
+          (studentUser?.username && normalizeText(a.created_by) === normalizeText(studentUser.username))
+      );
+
+      // 1. Notify Industry Trainer(s)
+      const trainerComp = normalizeText(updated.companyName);
+      const matchedTrainers = allUsers.filter(
+        (u) =>
+          (u.role === UserRole.TRAINER || (u.role === UserRole.SUPERVISOR && Boolean(u.has_dual_role))) &&
+          (u.id === (trainerDetails?.trainerId || updated.verifiedByTrainerId || studentUser?.industry_trainer_id) ||
+            (Boolean(trainerComp) &&
+              Boolean(u.company_affiliation) &&
+              normalizeText(u.company_affiliation).includes(trainerComp)))
+      );
+
+      const trainerRecipients =
+        matchedTrainers.length > 0
+          ? matchedTrainers.map((t) => t.id)
+          : [trainerDetails?.trainerId || 'trainer'];
+
+      for (const recipientId of Array.from(new Set(trainerRecipients))) {
+        await StorageService.createNotification({
+          recipient_id: recipientId,
+          recipient_role: UserRole.TRAINER,
+          sender_name: updated.studentName,
+          sender_matric: updated.studentMatric,
+          title_ms: `Peringatan Pengesahan Buku Log - Minggu ${updated.weekNumber}`,
+          title_en: `Logbook Verification Reminder - Week ${updated.weekNumber}`,
+          message_ms: `Pelajar ${updated.studentName} (${updated.studentMatric}) telah menghantar Buku Log Mingguan Minggu ${updated.weekNumber} di ${updated.companyName}. Mohon pengesahan Jurulatih Industri.`,
+          message_en: `Student ${updated.studentName} (${updated.studentMatric}) submitted Week ${updated.weekNumber} logbook at ${updated.companyName} for Industry Trainer verification.`,
+          is_read: false,
+          created_at: now
+        });
+      }
+
+      // 2. Notify Faculty Supervisor (Penyelia Fakulti)
+      const facultySupId =
+        studentUser?.faculty_supervisor_id ||
+        studentApp?.faculty_supervisor_id ||
+        allUsers.find(
+          (u) =>
+            u.role === UserRole.LECTURER &&
+            normalizeText(u.name) ===
+              normalizeText(studentUser?.faculty_supervisor_name || studentApp?.faculty_supervisor_name)
+        )?.id;
+
+      if (facultySupId) {
+        await StorageService.createNotification({
+          recipient_id: facultySupId,
+          recipient_role: UserRole.LECTURER,
+          sender_name: updated.studentName,
+          sender_matric: updated.studentMatric,
+          title_ms: `Peringatan Semakan & Pengesahan Buku Log - Minggu ${updated.weekNumber}`,
+          title_en: `Faculty Supervisor Logbook Verification - Week ${updated.weekNumber}`,
+          message_ms: `Pelajar seliaan ${updated.studentName} (${updated.studentMatric}) telah menghantar Buku Log Minggu ${updated.weekNumber} di ${updated.companyName}. Mohon semakan & pengesahan Penyelia Fakulti.`,
+          message_en: `Supervised student ${updated.studentName} (${updated.studentMatric}) submitted Week ${updated.weekNumber} logbook at ${updated.companyName} for Faculty Supervisor review.`,
+          is_read: false,
+          created_at: now
+        });
+      }
     } catch {}
 
     const currentUser = getCurrentUser();
@@ -2715,16 +2831,41 @@ export const StorageService = {
       }
     }
 
-    // Send notifications to Supervisor and Trainer
+    // Send notification STRICTLY to Faculty Supervisor (Penyelia Fakulti) ONLY — NOT to Industry Trainer
     try {
+      const allUsers = StorageService.getUsers();
+      const allApps = StorageService.getApplications();
+      const studentUser = allUsers.find(
+        (u) =>
+          u.id === target.studentId ||
+          (target.studentMatric && normalizeMatric(u.matric_no) === normalizeMatric(target.studentMatric))
+      );
+      const studentApp = allApps.find(
+        (a) =>
+          (target.studentMatric && normalizeMatric(a.student_id) === normalizeMatric(target.studentMatric)) ||
+          (studentUser?.username && normalizeText(a.created_by) === normalizeText(studentUser.username))
+      );
+
+      const facultySupId =
+        target.reviewedBySupervisorId ||
+        studentUser?.faculty_supervisor_id ||
+        studentApp?.faculty_supervisor_id ||
+        allUsers.find(
+          (u) =>
+            u.role === UserRole.LECTURER &&
+            normalizeText(u.name) ===
+              normalizeText(studentUser?.faculty_supervisor_name || studentApp?.faculty_supervisor_name)
+        )?.id;
+
       await StorageService.createNotification({
-        recipient_id: target.reviewedBySupervisorId || 'supervisor',
+        recipient_id: facultySupId || 'supervisor',
         recipient_role: UserRole.LECTURER,
         sender_name: target.studentName,
-        title_ms: 'Entri Case Study PSM 2 Dihantar',
-        title_en: 'PSM 2 Case Study Submitted',
-        message_ms: `Pelajar ${target.studentName} telah mengemukakan Buku Log Case Study PSM 2 Minggu ${target.weekNumber} (${target.caseTitle.slice(0, 50)}...) untuk semakan.`,
-        message_en: `Student ${target.studentName} has submitted Week ${target.weekNumber} PSM 2 Case Study for review.`,
+        sender_matric: target.studentMatric,
+        title_ms: `Peringatan Pengesahan Log Case Study PSM 2 - Minggu ${target.weekNumber}`,
+        title_en: `PSM 2 Case Study Verification Reminder - Week ${target.weekNumber}`,
+        message_ms: `Pelajar seliaan ${target.studentName} (${target.studentMatric}) telah menghantar Buku Log Case Study PSM 2 Minggu ${target.weekNumber} (${(target.caseTitle || '').slice(0, 60)}) untuk pengesahan Penyelia Fakulti.`,
+        message_en: `Supervised student ${target.studentName} has submitted Week ${target.weekNumber} PSM 2 Case Study log for Faculty Supervisor verification.`,
         is_read: false,
         created_at: now
       });
@@ -2903,9 +3044,14 @@ export const StorageService = {
     } catch {}
 
     const users = StorageService.getUsers();
-    const studentUsers = users.filter(u => u.role === UserRole.STUDENT);
-    const defaultStudentIds = studentUsers.map(s => s.id);
-    if (defaultStudentIds.length === 0) defaultStudentIds.push('student_demo_1');
+    const applications = StorageService.getApplications();
+    const placedStudentUsers = users.filter(
+      (u) =>
+        u.role === UserRole.STUDENT &&
+        u.is_active !== false &&
+        getStudentPlacementStatus(u, applications).isPlaced
+    );
+    const defaultStudentIds = placedStudentUsers.map((s) => s.id);
 
     if (rawList.length === 0 && inMemoryCourseAssignments.length === 0) {
       const lecturers = users.filter(u => u.role === UserRole.LECTURER || u.role === UserRole.COORDINATOR || u.is_jkwbl);
@@ -3065,6 +3211,18 @@ export const StorageService = {
     const existingIds = new Set(current.assignedStudentIds || []);
     studentIds.forEach(id => existingIds.add(id));
 
+    // Track manual enrollment overrides and clear any manual unenroll flags
+    const manualEnrolled = readOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY);
+    const manualUnenrolled = readOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY);
+    const enrolledSet = new Set(manualEnrolled[courseCode] || []);
+    studentIds.forEach((id) => enrolledSet.add(id));
+    manualEnrolled[courseCode] = Array.from(enrolledSet);
+    if (manualUnenrolled[courseCode]) {
+      manualUnenrolled[courseCode] = manualUnenrolled[courseCode].filter((id) => !studentIds.includes(id));
+    }
+    writeOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY, manualEnrolled);
+    writeOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY, manualUnenrolled);
+
     const updated: CourseLecturerAssignment = {
       ...current,
       assignedStudentIds: Array.from(existingIds),
@@ -3137,6 +3295,143 @@ export const StorageService = {
     return updated;
   },
 
+  enrollStudentsInAllCourses: async (studentIds: string[]): Promise<void> => {
+    if (!studentIds || studentIds.length === 0) return;
+    const allCourses = StorageService.getCourseAssignments();
+    for (const course of allCourses) {
+      await StorageService.enrollStudentsInCourse(course.courseCode, studentIds);
+    }
+  },
+
+  /**
+   * Automatically enrolls all students who have received company placement into ALL WBL courses,
+   * while keeping unplaced / new-cohort students (unless manually enrolled) inside the "+ Enrol Pelajar Baharu" pool.
+   */
+  autoEnrollPlacedStudentsAllCourses: async (options?: {
+    targetStudentIds?: string[];
+    notifyNew?: boolean;
+  }): Promise<{ changedCourses: number; newlyEnrolledPlacedCount: number }> => {
+    const allCourses = StorageService.getCourseAssignments();
+    if (allCourses.length === 0) {
+      return { changedCourses: 0, newlyEnrolledPlacedCount: 0 };
+    }
+
+    const users = StorageService.getUsers();
+    const applications = StorageService.getApplications();
+    const manualEnrolled = readOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY);
+    const manualUnenrolled = readOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY);
+
+    const activeStudents = users.filter(
+      (u) => u.role === UserRole.STUDENT && u.is_active !== false
+    );
+
+    const placedStudents = activeStudents.filter((s) => {
+      if (options?.targetStudentIds && !options.targetStudentIds.includes(s.id)) {
+        return false;
+      }
+      return getStudentPlacementStatus(s, applications).isPlaced;
+    });
+
+    const unplacedStudentIds = new Set(
+      activeStudents
+        .filter((s) => !getStudentPlacementStatus(s, applications).isPlaced)
+        .flatMap((s) => [s.id, s.matric_no || ''].filter(Boolean))
+    );
+
+    const now = new Date().toISOString();
+    let changedCourses = 0;
+    const newlyEnrolledStudentSet = new Set<string>();
+    const updatedCourses: CourseLecturerAssignment[] = [];
+    const modifiedCourses: CourseLecturerAssignment[] = [];
+
+    for (const course of allCourses) {
+      const code = course.courseCode;
+      const manualKeepSet = new Set(manualEnrolled[code] || []);
+      const manualSkipSet = new Set(manualUnenrolled[code] || []);
+
+      const originalIds = course.assignedStudentIds || [];
+      const nextIdsSet = new Set<string>();
+
+      // Keep existing IDs EXCEPT legacy unplaced students who were not manually enrolled
+      for (const sid of originalIds) {
+        if (!options?.targetStudentIds && unplacedStudentIds.has(sid) && !manualKeepSet.has(sid)) {
+          continue;
+        }
+        nextIdsSet.add(sid);
+      }
+
+      // Automatically ensure every placed student is enrolled in this course (unless manually unenrolled)
+      for (const ps of placedStudents) {
+        if (manualSkipSet.has(ps.id)) continue;
+        const alreadyPresent =
+          nextIdsSet.has(ps.id) || (ps.matric_no ? nextIdsSet.has(ps.matric_no) : false);
+        if (!alreadyPresent) {
+          nextIdsSet.add(ps.id);
+          newlyEnrolledStudentSet.add(ps.id);
+        }
+      }
+
+      const nextIds = Array.from(nextIdsSet);
+      const changed =
+        nextIds.length !== originalIds.length ||
+        nextIds.some((id, idx) => originalIds[idx] !== id);
+
+      if (changed) {
+        const updatedCourse: CourseLecturerAssignment = {
+          ...course,
+          assignedStudentIds: nextIds,
+          updatedAt: now
+        };
+        updatedCourses.push(updatedCourse);
+        modifiedCourses.push(updatedCourse);
+        changedCourses += 1;
+      } else {
+        updatedCourses.push(course);
+      }
+    }
+
+    if (changedCourses > 0) {
+      inMemoryCourseAssignments = [...updatedCourses];
+      safeSaveLocalStorage(STORAGE_KEYS.COURSE_ASSIGNMENTS, updatedCourses);
+      notifyListeners();
+
+      if (db) {
+        for (const mc of modifiedCourses) {
+          try {
+            await setDoc(doc(db, 'course_assignments', mc.id), sanitizeForFirebase(mc), {
+              merge: true
+            });
+          } catch (e) {
+            console.warn('Firebase auto-enroll sync notice:', e);
+          }
+        }
+      }
+
+      if (options?.notifyNew && newlyEnrolledStudentSet.size > 0) {
+        for (const sid of newlyEnrolledStudentSet) {
+          try {
+            await StorageService.createNotification({
+              recipient_id: sid,
+              recipient_role: UserRole.STUDENT,
+              sender_name: 'Sistem WBL FPTT UTeM',
+              title_ms: 'Auto-Enrolmen Kesemua Kursus WBL Berjaya',
+              title_en: 'Automatic Enrollment in All WBL Courses',
+              message_ms: `Tahniah! Memandangkan penempatan syarikat anda telah disahkan, anda telah didaftarkan secara automatik ke dalam kesemua ${allCourses.length} kursus WBL.`,
+              message_en: `Since your company placement is confirmed, you have been automatically enrolled into all ${allCourses.length} WBL courses.`,
+              is_read: false,
+              created_at: now
+            });
+          } catch {}
+        }
+      }
+    }
+
+    return {
+      changedCourses,
+      newlyEnrolledPlacedCount: newlyEnrolledStudentSet.size
+    };
+  },
+
   unenrollStudentFromCourse: async (courseCode: string, studentId: string): Promise<CourseLecturerAssignment> => {
     const all = StorageService.getCourseAssignments();
     const idx = all.findIndex(a => a.courseCode === courseCode);
@@ -3144,6 +3439,18 @@ export const StorageService = {
 
     const current = all[idx];
     const updatedStudentIds = (current.assignedStudentIds || []).filter(id => id !== studentId);
+
+    // Record manual unenroll override so auto-sync respects coordinator's explicit removal
+    const manualEnrolled = readOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY);
+    const manualUnenrolled = readOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY);
+    const skipSet = new Set(manualUnenrolled[courseCode] || []);
+    skipSet.add(studentId);
+    manualUnenrolled[courseCode] = Array.from(skipSet);
+    if (manualEnrolled[courseCode]) {
+      manualEnrolled[courseCode] = manualEnrolled[courseCode].filter((id) => id !== studentId);
+    }
+    writeOverrideMap(MANUAL_ENROLL_OVERRIDE_KEY, manualEnrolled);
+    writeOverrideMap(MANUAL_UNENROLL_OVERRIDE_KEY, manualUnenrolled);
 
     const updated: CourseLecturerAssignment = {
       ...current,

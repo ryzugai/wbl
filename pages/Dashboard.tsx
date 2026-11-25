@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Application, Company, User, UserRole, AdConfig, WeeklyLogbook, DailyLogEntry } from '../types';
+import { Application, Company, User, UserRole, AdConfig, WeeklyLogbook, DailyLogEntry, PsmCaseStudyWeeklyLog } from '../types';
 import { 
   Building2, 
   Clock, 
@@ -21,7 +21,10 @@ import {
   AlertCircle, 
   ChevronRight, 
   FileSpreadsheet,
-  Search
+  Search,
+  Bell,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { StorageService } from '../services/storage';
 import { Language, t } from '../translations';
@@ -29,6 +32,13 @@ import { generatePlacementConfirmationLetter } from '../utils/letterGenerator';
 import { MalaysiaStudentMap } from '../components/MalaysiaStudentMap';
 import { WBL_COURSE_SEQUENCE, UTEM_WEEKLY_ASSESSMENTS } from '../constants/utemWblRubrics';
 import { StudentPlacementPoint, getStudentCoordinatesByState, DEFAULT_PLACED_STUDENTS } from '../constants/wblPlacementData';
+import {
+  getCurrentWblSemesterWeek,
+  computeStudentLogReminders,
+  computeStaffVerificationReminders,
+  normalizeMatric,
+  normalizeText
+} from '../utils/wblRemindersAndEnrollment';
 import { toast } from 'react-hot-toast';
 
 interface DashboardProps {
@@ -63,15 +73,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   });
 
+  const [livePsmLogs, setLivePsmLogs] = useState<PsmCaseStudyWeeklyLog[]>(() => {
+    try {
+      return StorageService.getPsmCaseStudyLogs();
+    } catch {
+      return [];
+    }
+  });
+
   useEffect(() => {
     const unsubscribe = StorageService.subscribe(() => {
       setAdConfig(StorageService.getAdConfig());
       try {
         setLiveLogs(StorageService.getWeeklyLogbooks());
+        setLivePsmLogs(StorageService.getPsmCaseStudyLogs());
       } catch {}
     });
     return () => unsubscribe();
   }, []);
+
+  const currentWblWeek = useMemo(() => getCurrentWblSemesterWeek(), []);
+
+  // Student-specific reminders (unfilled Buku Log Harian & Log Case Study PSM 2)
+  const studentLogReminders = useMemo(() => {
+    if (!currentUser || currentUser.role !== UserRole.STUDENT) return null;
+    return computeStudentLogReminders(currentUser, liveLogs, livePsmLogs, currentWblWeek);
+  }, [currentUser, liveLogs, livePsmLogs, currentWblWeek]);
+
+  // Staff verification reminders:
+  // - Buku Log Harian -> Industry Trainer (JI) AND Faculty Supervisor (Penyelia Fakulti)
+  // - Log Case Study PSM 2 -> ONLY Faculty Supervisor (Penyelia Fakulti)
+  const staffVerificationReminders = useMemo(() => {
+    return computeStaffVerificationReminders(currentUser, users, applications, liveLogs, livePsmLogs);
+  }, [currentUser, users, applications, liveLogs, livePsmLogs]);
 
   useEffect(() => {
     if (adConfig.isEnabled && adConfig.items.length > 1 && showAd) {
@@ -439,12 +473,74 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const filledLogTodayCount = cohortStudentsList.filter(s => s.hasFilledTodayLog).length;
   const pendingLogTodayCount = Math.max(0, actualCohortStudents - filledLogTodayCount);
 
-  // Send Reminder Handler
-  const handleSendReminder = (student: StudentPlacementPoint) => {
+  // Cohort PSM 2 Case Study Log completion tally (for Dashboard reminder comparison)
+  const cohortCaseStudyStats = useMemo(() => {
+    let filledCount = 0;
+    const pendingList: StudentPlacementPoint[] = [];
+
+    cohortStudentsList.forEach((student) => {
+      const sM = normalizeMatric(student.matricNo);
+      const sN = normalizeText(student.name);
+      const hasPsm = livePsmLogs.some((log) => {
+        const match =
+          log.studentId === student.studentId ||
+          (Boolean(sM) && normalizeMatric(log.studentMatric) === sM) ||
+          (Boolean(sN) && normalizeText(log.studentName) === sN);
+        return match && (log.status !== 'draft' || Boolean(log.caseTitle?.trim()));
+      });
+      if (hasPsm) {
+        filledCount += 1;
+      } else {
+        pendingList.push(student);
+      }
+    });
+
+    return {
+      filledCount,
+      pendingCount: pendingList.length,
+      pendingList
+    };
+  }, [cohortStudentsList, livePsmLogs]);
+
+  // Send Reminder Handler (with real in-app notification)
+  const handleSendReminder = async (student: StudentPlacementPoint, type: 'daily' | 'case_study' = 'daily') => {
+    try {
+      const targetUser = users.find(
+        (u) =>
+          u.id === student.studentId ||
+          (student.matricNo && normalizeMatric(u.matric_no) === normalizeMatric(student.matricNo))
+      );
+      await StorageService.createNotification({
+        recipient_id: targetUser?.id || student.studentId,
+        recipient_role: UserRole.STUDENT,
+        sender_name: currentUser?.name || 'Penyelaras WBL',
+        title_ms:
+          type === 'case_study'
+            ? `Peringatan: Sila Isi Buku Log Case Study PSM 2 (Minggu ${currentWblWeek})`
+            : `Peringatan: Sila Isi Buku Log Harian (Minggu ${currentWblWeek})`,
+        title_en:
+          type === 'case_study'
+            ? `Reminder: Complete PSM 2 Case Study Log (Week ${currentWblWeek})`
+            : `Reminder: Complete Daily Logbook (Week ${currentWblWeek})`,
+        message_ms:
+          type === 'case_study'
+            ? `Peringatan daripada ${currentUser?.name || 'Penyelaras WBL'}: Anda masih belum mengisi Buku Log Case Study PSM 2. Sila lengkapkan dan hantar untuk pengesahan Penyelia Fakulti.`
+            : `Peringatan daripada ${currentUser?.name || 'Penyelaras WBL'}: Anda masih belum mengisi Buku Log Harian. Sila kemaskini dan hantar untuk pengesahan Jurulatih Industri & Penyelia Fakulti.`,
+        message_en:
+          type === 'case_study'
+            ? `Reminder: Please fill and submit your PSM 2 Case Study Log for Faculty Supervisor verification.`
+            : `Reminder: Please fill and submit your Daily Logbook for verification.`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+    } catch {}
+
     toast.success(
-      language === 'ms' 
-        ? `Peringatan pengisian buku log harian telah dihantar kepada ${student.name}.`
-        : `Daily logbook reminder sent to ${student.name}.`,
+      language === 'ms'
+        ? type === 'case_study'
+          ? `Peringatan pengisian Log Case Study PSM 2 telah dihantar kepada ${student.name}.`
+          : `Peringatan pengisian buku log harian telah dihantar kepada ${student.name}.`
+        : `Reminder sent to ${student.name}.`,
       { icon: '📩' }
     );
   };
@@ -605,6 +701,284 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* 0. PUSAT PERINGATAN PANTAS MENGIKUT PERANAN (PELAJAR / JI / PENYELIA)     */}
+      {/* ========================================================================= */}
+
+      {/* A. PERINGATAN PELAJAR: BELUM MENGISI BUKU LOG & LOG CASE STUDY */}
+      {studentLogReminders && (studentLogReminders.needsDailyReminder || studentLogReminders.needsCaseStudyReminder) && (
+        <div className="bg-gradient-to-br from-amber-50 via-orange-50/70 to-rose-50/60 border-2 border-amber-300 rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
+                <Bell size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-amber-950">
+                  {language === 'ms'
+                    ? `Peringatan Pengisian Buku Log Pelajar (Minggu ${studentLogReminders.currentWeek})`
+                    : `Student Logbook Completion Reminder (Week ${studentLogReminders.currentWeek})`}
+                </h3>
+                <p className="text-xs text-amber-800">
+                  Sila pastikan kedua-dua Buku Log Harian dan Buku Log Case Study PSM 2 diisi serta dihantar setiap minggu.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-amber-200/80 text-amber-950 text-[10px] font-black uppercase tracking-wider">
+              Tindakan Segera Pelajar
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {studentLogReminders.needsDailyReminder && (
+              <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-2xs flex flex-col justify-between gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                      <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                      <span>Buku Log Harian Belum Lengkap</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black">
+                      {!studentLogReminders.hasFilledCurrentDailyLog
+                        ? `Minggu ${studentLogReminders.currentWeek} Belum Diisi`
+                        : `${studentLogReminders.missingDailyWeeks.length + studentLogReminders.draftOrRevisionDailyWeeks.length} Minggu Tertunggak`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {!studentLogReminders.hasFilledCurrentDailyLog
+                      ? `Anda belum merekodkan aktiviti Buku Log Harian bagi Minggu ${studentLogReminders.currentWeek}.`
+                      : 'Terdapat minggu Buku Log Harian yang masih belum diisi atau masih berstatus draf/pembetulan.'}
+                    {studentLogReminders.missingDailyWeeks.length > 0 && (
+                      <span className="block mt-1 font-semibold text-amber-800">
+                        Minggu belum diisi: M{studentLogReminders.missingDailyWeeks.slice(0, 6).join(', M')}
+                        {studentLogReminders.missingDailyWeeks.length > 6 ? '...' : ''}
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('dailyLogbook')}
+                    className="w-full py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <BookOpen size={14} />
+                    <span>Isi Buku Log Harian Sekarang</span>
+                    <ArrowRight size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {studentLogReminders.needsCaseStudyReminder && (
+              <div className="bg-white rounded-2xl p-4 border border-rose-200 shadow-2xs flex flex-col justify-between gap-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-rose-900 flex items-center gap-1.5">
+                      <Sparkles size={15} className="text-rose-600 shrink-0" />
+                      <span>Buku Log Case Study PSM 2 Belum Lengkap</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 text-[10px] font-black">
+                      {!studentLogReminders.hasFilledCurrentCaseStudy
+                        ? `Minggu ${studentLogReminders.currentWeek} Belum Diisi`
+                        : `${studentLogReminders.missingCaseStudyWeeks.length + studentLogReminders.draftOrRevisionCaseStudyWeeks.length} Minggu Tertunggak`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {!studentLogReminders.hasFilledCurrentCaseStudy
+                      ? `Anda belum mengisi entri mingguan Buku Log Case Study PSM 2 bagi Minggu ${studentLogReminders.currentWeek} untuk pengesahan Penyelia Fakulti.`
+                      : 'Terdapat minggu Buku Log Case Study PSM 2 yang masih belum dihantar kepada Penyelia Fakulti.'}
+                    {studentLogReminders.missingCaseStudyWeeks.length > 0 && (
+                      <span className="block mt-1 font-semibold text-rose-800">
+                        Minggu belum diisi: M{studentLogReminders.missingCaseStudyWeeks.slice(0, 6).join(', M')}
+                        {studentLogReminders.missingCaseStudyWeeks.length > 6 ? '...' : ''}
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('psmCaseStudy')}
+                    className="w-full py-2 px-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Sparkles size={14} />
+                    <span>Isi Log Case Study PSM 2 Sekarang</span>
+                    <ArrowRight size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* B. PERINGATAN PENGESAHAN BUKU LOG KEPADA JURULATIH INDUSTRI (JI) — BUKU LOG SAHAJA (BUKAN CASE STUDY) */}
+      {staffVerificationReminders.isTrainer && staffVerificationReminders.pendingDailyLogsForTrainer.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border-2 border-blue-300 rounded-3xl p-5 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0 shadow-xs">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-black text-blue-950">
+                    Peringatan Pengesahan Buku Log Pelajar (Jurulatih Industri)
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-black">
+                    {staffVerificationReminders.pendingDailyLogsForTrainer.length} Buku Log Menunggu Pengesahan
+                  </span>
+                </div>
+                <p className="text-xs text-blue-900/80 mt-0.5">
+                  Terdapat Buku Log Harian pelajar industri anda yang telah dihantar dan memerlukan pengesahan daripada anda selaku Jurulatih Industri.
+                </p>
+              </div>
+            </div>
+
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('dailyLogbook')}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+              >
+                <BookOpen size={14} />
+                <span>Sahkan Buku Log Sekarang</span>
+                <ArrowRight size={13} />
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {staffVerificationReminders.pendingDailyLogsForTrainer.slice(0, 6).map((log) => (
+              <div
+                key={log.id}
+                className="bg-white rounded-xl p-3 border border-blue-200 text-xs flex items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900 truncate">{log.studentName}</div>
+                  <div className="text-[11px] text-slate-500">
+                    Minggu {log.weekNumber} • {log.studentMatric || '-'}
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-black shrink-0">
+                  Belum Sah
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* C. PERINGATAN PENGESAHAN BUKU LOG & LOG CASE STUDY KEPADA PENYELIA FAKULTI (CASE STUDY KHUSUS PENYELIA FAKULTI SAHAJA) */}
+      {staffVerificationReminders.isFacultySupervisor &&
+        (staffVerificationReminders.pendingDailyLogsForFaculty.length > 0 ||
+          staffVerificationReminders.pendingCaseStudyLogsForFaculty.length > 0) && (
+          <div className="bg-gradient-to-br from-indigo-50 via-purple-50/70 to-blue-50 border-2 border-indigo-300 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs">
+                  <ShieldCheck size={19} />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-indigo-950">
+                    Peringatan Pengesahan Buku Log &amp; Log Case Study (Penyelia Fakulti)
+                  </h3>
+                  <p className="text-xs text-indigo-800">
+                    Terdapat rekod Buku Log Harian dan/atau Buku Log Case Study PSM 2 pelajar seliaan anda yang menunggu semakan &amp; pengesahan Penyelia Fakulti.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {staffVerificationReminders.pendingDailyLogsForFaculty.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 border border-blue-200 shadow-2xs flex flex-col justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-black text-blue-950 flex items-center gap-1.5">
+                        <BookOpen size={15} className="text-blue-600 shrink-0" />
+                        <span>Pengesahan Buku Log Harian Pelajar Seliaan</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 text-[10px] font-black">
+                        {staffVerificationReminders.pendingDailyLogsForFaculty.length} Menunggu
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {staffVerificationReminders.pendingDailyLogsForFaculty.slice(0, 5).map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] flex items-center justify-between gap-2"
+                        >
+                          <span className="font-bold text-slate-800 truncate">
+                            {log.studentName} (Minggu {log.weekNumber})
+                          </span>
+                          <span className="text-[10px] font-bold text-blue-700 shrink-0">Perlu Semak</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {onNavigate && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('dailyLogbook')}
+                      className="w-full py-2 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    >
+                      <BookOpen size={14} />
+                      <span>Semak &amp; Sahkan Buku Log</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {staffVerificationReminders.pendingCaseStudyLogsForFaculty.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 border border-purple-200 shadow-2xs flex flex-col justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                        <Sparkles size={15} className="text-purple-600 shrink-0" />
+                        <span>Pengesahan Log Case Study PSM 2 (Penyelia Fakulti)</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 text-[10px] font-black">
+                        {staffVerificationReminders.pendingCaseStudyLogsForFaculty.length} Menunggu
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {staffVerificationReminders.pendingCaseStudyLogsForFaculty.slice(0, 5).map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-2 rounded-lg bg-purple-50/60 border border-purple-100 text-[11px] flex items-center justify-between gap-2"
+                        >
+                          <span className="font-bold text-slate-800 truncate">
+                            {log.studentName} — Minggu {log.weekNumber}
+                          </span>
+                          <span className="text-[10px] font-bold text-purple-700 shrink-0">Perlu Sah</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {onNavigate && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('psmCaseStudy')}
+                      className="w-full py-2 px-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Sparkles size={14} />
+                      <span>Sahkan Log Case Study PSM 2</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       {/* ========================================================================= */}
       {/* 1. GARIS MASA KURSUS MODULAR 5 MINGGU & HITUNG DETIK MILESTONE             */}
@@ -1076,14 +1450,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* COMPARATIVE TALLY BAR */}
         <div className="bg-slate-50/80 rounded-2xl p-3 border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-4 text-xs font-bold">
+          <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
             <span className="flex items-center gap-1.5 text-emerald-700">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-              <span>Telah Mengisi: <strong>{filledStudents.length} Pelajar</strong> ({actualCohortStudents > 0 ? Math.round((filledStudents.length / actualCohortStudents) * 100) : 0}%)</span>
+              <span>Buku Log Telah Isi: <strong>{filledStudents.length} Pelajar</strong> ({actualCohortStudents > 0 ? Math.round((filledStudents.length / actualCohortStudents) * 100) : 0}%)</span>
             </span>
             <span className="flex items-center gap-1.5 text-amber-700">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-              <span>Belum Mengisi: <strong>{pendingStudents.length} Pelajar</strong> ({actualCohortStudents > 0 ? Math.round((pendingStudents.length / actualCohortStudents) * 100) : 0}%)</span>
+              <span>Buku Log Belum Isi: <strong>{pendingStudents.length} Pelajar</strong> ({actualCohortStudents > 0 ? Math.round((pendingStudents.length / actualCohortStudents) * 100) : 0}%)</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-rose-700">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+              <span>Log Case Study PSM 2 Belum Isi: <strong>{cohortCaseStudyStats.pendingCount} Pelajar</strong></span>
             </span>
           </div>
 
@@ -1101,6 +1479,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
             />
           </div>
         </div>
+
+        {/* PERINGATAN RINGKAS PELAJAR BELUM MENGISI LOG CASE STUDY PSM 2 */}
+        {cohortCaseStudyStats.pendingCount > 0 && currentUser?.role !== UserRole.TRAINER && (
+          <div className="bg-rose-50/70 border border-rose-200 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-black text-rose-950">
+                  Peringatan Pengisian Log Case Study PSM 2: {cohortCaseStudyStats.pendingCount} Pelajar Belum Mengisi
+                </div>
+                <p className="text-[11px] text-rose-800">
+                  {cohortCaseStudyStats.filledCount} daripada {actualCohortStudents} pelajar telah mengisi Log Case Study PSM 2. Pengesahan Log Case Study adalah di bawah tanggungjawab Penyelia Fakulti.
+                </p>
+              </div>
+            </div>
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('psmCaseStudy')}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Sparkles size={13} />
+                <span>Pantau Log Case Study</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ===================================================================== */}
         {/* PAPARAN KATEGORI SECARA PERBANDINGAN                                  */}

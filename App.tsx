@@ -25,6 +25,7 @@ import { PsmCaseStudyLogbook } from './pages/PsmCaseStudyLogbook';
 import { StudentEvaluationPage } from './pages/StudentEvaluationPage';
 import { WBLMessaging } from './pages/WBLMessaging';
 import { TrainerCVPage } from './pages/TrainerCVPage';
+import { TrainerPastWeekAssessmentModal } from './components/TrainerPastWeekAssessmentModal';
 import { Toaster, toast } from 'react-hot-toast';
 import { Language } from './translations';
 
@@ -78,6 +79,12 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Auto-enrol semua pelajar yang telah mendapat penempatan syarikat ke kesemua kursus WBL
+  useEffect(() => {
+    if (users.length === 0) return;
+    StorageService.autoEnrollPlacedStudentsAllCourses({ notifyNew: false }).catch(() => {});
+  }, [users.length, applications.length]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -255,6 +262,16 @@ function App() {
         language={language}
         onLanguageChange={setLanguage}
       >
+        <TrainerPastWeekAssessmentModal
+          currentUser={currentUser}
+          users={users}
+          applications={applications}
+          currentView={currentView}
+          onNavigate={setCurrentView}
+          onLogout={handleLogout}
+          language={language}
+        />
+
         {currentView === 'dashboard' && (
           <Dashboard 
             language={language} 
