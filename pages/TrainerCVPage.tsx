@@ -19,7 +19,7 @@ import {
   categoryToAcademicLabel,
   buildCompaniesWithStudents
 } from '../utils/trainerCvEligibility';
-import { printTrainerCV, downloadTrainerCVHtml } from '../utils/trainerCvGenerator';
+import { printTrainerCV, downloadTrainerCVHtml, normalizeImageUrl } from '../utils/trainerCvGenerator';
 import {
   FileText,
   CheckCircle2,
@@ -44,7 +44,9 @@ import {
   X,
   Check,
   Edit3,
-  Users
+  Users,
+  Link as LinkIcon,
+  Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Language } from '../translations';
@@ -132,8 +134,8 @@ const buildInitialCVFromUser = (user: User): TrainerCV => {
   };
 };
 
-// Reusable In-App A4 Visual CV Preview Card (Highlights GREEN when eligible)
-const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({ cv, language }) => {
+// Reusable In-App A4 Visual CV Preview Card (Highlights GREEN when eligible; clean printable format)
+const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({ cv }) => {
   const elig = evaluateTrainerEligibility({
     qualificationCategory: cv.qualificationCategory,
     experienceYears: cv.experienceYears,
@@ -149,6 +151,39 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
     .map((p) => p[0].toUpperCase())
     .join('');
 
+  const resolvedImgUrl = normalizeImageUrl(cv.profileImage);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [resolvedImgUrl]);
+
+  let sectionCounter = 0;
+  const nextSec = () => {
+    sectionCounter += 1;
+    return sectionCounter;
+  };
+
+  const educationRows =
+    cv.educationList && cv.educationList.length > 0 && cv.educationList.some((e) => e.level || e.institution)
+      ? cv.educationList
+      : [
+          {
+            level: cv.highestQualificationTitle || '-',
+            field: cv.fieldOfStudy || '-',
+            institution: cv.institutionName || '-',
+            year: cv.graduationYear || '-'
+          }
+        ];
+
+  const validWork = (cv.workExperienceList || []).filter((w) => w.company || w.position);
+  const validCerts = (cv.certificationsList || []).filter((c) => c.title);
+  const hasSpecialText = Boolean(cv.hasSpecialRecognition && (cv.specialRecognitionDetails || '').trim());
+  const hasCertOrRecognition = validCerts.length > 0 || hasSpecialText;
+  const hasExpertiseOrCourses =
+    (cv.areasOfExpertise && cv.areasOfExpertise.length > 0) ||
+    (cv.coachingCourses && cv.coachingCourses.length > 0);
+
   return (
     <div
       className={`rounded-2xl overflow-hidden shadow-lg border-2 transition-all ${
@@ -159,92 +194,39 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
     >
       {/* Top Banner */}
       <div
-        className={`p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-4 ${
+        className={`p-6 text-white flex items-center gap-4 border-b-4 ${
           isGreen
             ? 'bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-800 border-emerald-400'
-            : 'bg-gradient-to-r from-slate-800 to-slate-700 border-amber-400'
+            : 'bg-gradient-to-r from-slate-800 to-slate-700 border-slate-400'
         }`}
       >
-        <div className="flex items-center gap-4">
-          <div
-            className={`w-20 h-20 rounded-full border-4 overflow-hidden flex items-center justify-center shrink-0 text-2xl font-black ${
-              isGreen ? 'border-emerald-300 bg-emerald-700' : 'border-amber-300 bg-slate-600'
-            }`}
-          >
-            {cv.profileImage && cv.profileImage !== 'idb_stored' ? (
-              <img src={cv.profileImage} alt={cv.fullName} className="w-full h-full object-cover" />
-            ) : (
-              <span>{initials}</span>
-            )}
-          </div>
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/80">
-              CURRICULUM VITAE • LANTIKAN JURULATIH INDUSTRI (WBL) FPTT UTeM
-            </div>
-            <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight mt-0.5">
-              {cv.fullName || 'Nama Jurulatih Industri'}
-            </h3>
-            <p className={`text-xs font-semibold mt-0.5 ${isGreen ? 'text-emerald-200' : 'text-slate-200'}`}>
-              {cv.companyPosition || 'Jurulatih Industri'} • {cv.companyName || 'Syarikat Industri'}
-            </p>
-          </div>
-        </div>
-
-        {/* Eligibility Seal */}
         <div
-          className={`px-4 py-2.5 rounded-xl border text-left md:text-right shrink-0 ${
-            isGreen
-              ? 'bg-emerald-500/95 border-emerald-200 text-white shadow-md'
-              : 'bg-amber-400 border-amber-200 text-slate-900'
+          className={`w-20 h-20 rounded-full border-4 overflow-hidden flex items-center justify-center shrink-0 text-2xl font-black ${
+            isGreen ? 'border-emerald-300 bg-emerald-700' : 'border-slate-300 bg-slate-600'
           }`}
         >
-          <div className="text-[10px] font-black uppercase tracking-wider flex items-center md:justify-end gap-1">
-            {isGreen ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
-            <span>{isGreen ? 'MEMENUHI SYARAT LANTIKAN JI' : 'BELUM MEMENUHI SYARAT'}</span>
-          </div>
-          <div className="text-xs font-extrabold mt-0.5">{elig.shortBadgeMs}</div>
-        </div>
-      </div>
-
-      {/* Eligibility Status Strip */}
-      <div
-        className={`px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b text-xs ${
-          isGreen
-            ? 'bg-emerald-100/80 border-emerald-300 text-emerald-950'
-            : 'bg-amber-50 border-amber-200 text-amber-950'
-        }`}
-      >
-        <div className="flex items-start gap-2">
-          {isGreen ? (
-            <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+          {resolvedImgUrl && !imgFailed ? (
+            <img
+              src={resolvedImgUrl}
+              alt={cv.fullName}
+              onError={() => setImgFailed(true)}
+              className="w-full h-full object-cover"
+            />
           ) : (
-            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <span>{initials}</span>
           )}
-          <div>
-            <strong>{isGreen ? 'Status CV HIJAU (Layak Lantikan JI): ' : 'Perhatian Syarat Kelayakan: '}</strong>
-            <span>{language === 'ms' ? elig.reasonMs : elig.reasonEn}</span>
-          </div>
         </div>
-
-        <span
-          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border ${
-            cv.status === 'appointed'
-              ? 'bg-emerald-700 text-white border-emerald-800'
-              : cv.status === 'submitted'
-              ? 'bg-blue-100 text-blue-800 border-blue-300'
-              : cv.status === 'revision_requested'
-              ? 'bg-rose-100 text-rose-800 border-rose-300'
-              : 'bg-white text-slate-700 border-slate-300'
-          }`}
-        >
-          {cv.status === 'appointed'
-            ? '✓ DILANTIK SEBAGAI JI'
-            : cv.status === 'submitted'
-            ? '⏳ MENUNGGU SEMAKAN PENYELARAS'
-            : cv.status === 'revision_requested'
-            ? '⚠ PERLU KEMASKINI'
-            : 'DRAF CV'}
-        </span>
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/80">
+            CURRICULUM VITAE • JURULATIH INDUSTRI (WBL) FPTT UTeM
+          </div>
+          <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight mt-0.5">
+            {cv.fullName || 'Nama Jurulatih Industri'}
+          </h3>
+          <p className={`text-xs font-semibold mt-0.5 ${isGreen ? 'text-emerald-200' : 'text-slate-200'}`}>
+            {cv.companyPosition || 'Jurulatih Industri'} • {cv.companyName || 'Syarikat Industri'}
+          </p>
+        </div>
       </div>
 
       {/* Main Sheet Content */}
@@ -260,7 +242,7 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
             <strong className="text-slate-900">{cv.companyName || '-'}</strong>
           </div>
           <div>
-            <span className="font-bold text-slate-500">Jawatan: </span>
+            <span className="font-bold text-slate-500">Jawatan Semasa: </span>
             <strong className="text-slate-900">{cv.companyPosition || '-'}</strong>
           </div>
           <div>
@@ -277,7 +259,7 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
           </div>
           <div>
             <span className="font-bold text-slate-500">Pengalaman Bidang Berkaitan: </span>
-            <strong className={isGreen ? 'text-emerald-700' : 'text-amber-700'}>
+            <strong className={isGreen ? 'text-emerald-700' : 'text-slate-800'}>
               {cv.experienceYears || 0} Tahun
             </strong>
           </div>
@@ -298,57 +280,13 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
                 isGreen ? 'text-emerald-900 border-emerald-400' : 'text-slate-800 border-slate-300'
               }`}
             >
-              1. Ringkasan Profil Profesional
+              {nextSec()}. Ringkasan Profil Profesional
             </h4>
             <p className="text-xs text-slate-700 bg-white p-3.5 rounded-xl border border-slate-200 leading-relaxed whitespace-pre-line">
               {cv.professionalSummary}
             </p>
           </div>
         )}
-
-        {/* Criteria Checklist */}
-        <div className="space-y-2">
-          <h4
-            className={`text-xs font-black uppercase tracking-wider pb-1 border-b-2 ${
-              isGreen ? 'text-emerald-900 border-emerald-400' : 'text-slate-800 border-slate-300'
-            }`}
-          >
-            2. Semakan Syarat Kelayakan Akademik & Pengalaman JI (i – vi)
-          </h4>
-          <div
-            className={`p-4 rounded-xl border space-y-1.5 text-xs ${
-              isGreen ? 'bg-emerald-50/90 border-emerald-300' : 'bg-slate-50 border-slate-200'
-            }`}
-          >
-            {JI_QUALIFICATION_CRITERIA.map((c) => {
-              const matched = elig.isEligible && elig.matchedCriterionCode === c.code;
-              return (
-                <div
-                  key={c.code}
-                  className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg ${
-                    matched
-                      ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                      : 'text-slate-600'
-                  }`}
-                >
-                  <span className="shrink-0 mt-0.5">{matched ? '✓' : '○'}</span>
-                  <span>
-                    {matched && <span className="mr-1 uppercase text-[10px] bg-white/20 px-1.5 py-0.5 rounded">[DIPENUHI]</span>}
-                    {c.labelMs}
-                  </span>
-                </div>
-              );
-            })}
-            {cv.hasSpecialRecognition && cv.specialRecognitionDetails && (
-              <div className="mt-2 p-3 bg-white rounded-lg border border-emerald-200 text-xs text-slate-800">
-                <strong className="text-emerald-800 block mb-0.5">
-                  Butiran Kemahiran Istimewa / Pengiktirafan Profesional / Antarabangsa (Kriteria vi):
-                </strong>
-                {cv.specialRecognitionDetails}
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Education */}
         <div className="space-y-2">
@@ -357,20 +295,10 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
               isGreen ? 'text-emerald-900 border-emerald-400' : 'text-slate-800 border-slate-300'
             }`}
           >
-            3. Latar Belakang Akademik
+            {nextSec()}. Latar Belakang Akademik
           </h4>
           <div className="space-y-2">
-            {(cv.educationList && cv.educationList.length > 0 && cv.educationList.some((e) => e.level || e.institution)
-              ? cv.educationList
-              : [
-                  {
-                    level: cv.highestQualificationTitle || '-',
-                    field: cv.fieldOfStudy || '-',
-                    institution: cv.institutionName || '-',
-                    year: cv.graduationYear || '-'
-                  }
-                ]
-            ).map((edu, i) => (
+            {educationRows.map((edu, i) => (
               <div
                 key={i}
                 className={`p-3 rounded-xl bg-white border flex justify-between items-start gap-3 text-xs ${
@@ -390,56 +318,53 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
         </div>
 
         {/* Work Experience */}
-        {cv.workExperienceList && cv.workExperienceList.some((w) => w.company || w.position) && (
+        {validWork.length > 0 && (
           <div className="space-y-2">
             <h4
               className={`text-xs font-black uppercase tracking-wider pb-1 border-b-2 ${
                 isGreen ? 'text-emerald-900 border-emerald-400' : 'text-slate-800 border-slate-300'
               }`}
             >
-              4. Pengalaman Kerja & Industri ({cv.experienceYears || 0} Tahun)
+              {nextSec()}. Pengalaman Kerja & Industri ({cv.experienceYears || 0} Tahun)
             </h4>
             <div className="space-y-2">
-              {cv.workExperienceList
-                .filter((w) => w.company || w.position)
-                .map((w, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-xl bg-white border text-xs ${
-                      isGreen ? 'border-emerald-200' : 'border-slate-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="font-bold text-slate-900">
-                        {w.position || '-'} — <span className="text-slate-700">{w.company || '-'}</span>
-                      </div>
-                      <span className="font-mono text-[11px] font-bold text-slate-500 shrink-0">
-                        {w.startYear || '-'} – {w.endYear || 'Kini'}
-                      </span>
+              {validWork.map((w, i) => (
+                <div
+                  key={i}
+                  className={`p-3 rounded-xl bg-white border text-xs ${
+                    isGreen ? 'border-emerald-200' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="font-bold text-slate-900">
+                      {w.position || '-'} — <span className="text-slate-700">{w.company || '-'}</span>
                     </div>
-                    {w.responsibilities && (
-                      <p className="text-slate-600 mt-1 whitespace-pre-line">{w.responsibilities}</p>
-                    )}
+                    <span className="font-mono text-[11px] font-bold text-slate-500 shrink-0">
+                      {w.startYear || '-'} – {w.endYear || 'Kini'}
+                    </span>
                   </div>
-                ))}
+                  {w.responsibilities && (
+                    <p className="text-slate-600 mt-1 whitespace-pre-line">{w.responsibilities}</p>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Certifications */}
-        {cv.certificationsList && cv.certificationsList.some((c) => c.title) && (
+        {/* Certifications & Special Recognition */}
+        {hasCertOrRecognition && (
           <div className="space-y-2">
             <h4
               className={`text-xs font-black uppercase tracking-wider pb-1 border-b-2 ${
                 isGreen ? 'text-emerald-900 border-emerald-400' : 'text-slate-800 border-slate-300'
               }`}
             >
-              5. Pensijilan Profesional, Anugerah & Pengiktirafan
+              {nextSec()}. Pensijilan Profesional, Anugerah & Pengiktirafan
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {cv.certificationsList
-                .filter((c) => c.title)
-                .map((c, i) => (
+            {validCerts.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {validCerts.map((c, i) => (
                   <div
                     key={i}
                     className={`p-3 rounded-xl bg-white border text-xs flex justify-between items-start gap-2 ${
@@ -453,77 +378,74 @@ const TrainerCVVisualSheet: React.FC<{ cv: TrainerCV; language: Language }> = ({
                     <span className="font-mono text-slate-500 font-bold shrink-0">{c.year || '-'}</span>
                   </div>
                 ))}
-            </div>
+              </div>
+            )}
+            {hasSpecialText && (
+              <div
+                className={`p-3 rounded-xl bg-white border text-xs ${
+                  isGreen ? 'border-emerald-200' : 'border-slate-200'
+                }`}
+              >
+                <div className="font-bold text-slate-900 mb-0.5">
+                  Kemahiran Istimewa / Pengiktirafan Profesional & Industri
+                </div>
+                <div className="text-slate-600 whitespace-pre-line">{cv.specialRecognitionDetails}</div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Expertise & Courses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {cv.areasOfExpertise && cv.areasOfExpertise.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-xs font-black text-slate-700 uppercase">Bidang Kepakaran Industri</div>
-              <div className="flex flex-wrap gap-1.5">
-                {cv.areasOfExpertise.map((tag, i) => (
-                  <span
-                    key={i}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
-                      isGreen
-                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                        : 'bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+        {hasExpertiseOrCourses && (
+          <div className="space-y-2">
+            <h4
+              className={`text-xs font-black uppercase tracking-wider pb-1 border-b-2 ${
+                isGreen ? 'text-emerald-900 border-emerald-400' : 'text-slate-800 border-slate-300'
+              }`}
+            >
+              {nextSec()}. Bidang Kepakaran & Kursus WBL yang Diselia / Dilatih
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {cv.areasOfExpertise && cv.areasOfExpertise.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-black text-slate-700 uppercase">Bidang Kepakaran Industri</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cv.areasOfExpertise.map((tag, i) => (
+                      <span
+                        key={i}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                          isGreen
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {cv.coachingCourses && cv.coachingCourses.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-xs font-black text-slate-700 uppercase">Kursus WBL yang Dilatih / Diselia</div>
-              <div className="flex flex-wrap gap-1.5">
-                {cv.coachingCourses.map((c, i) => (
-                  <span
-                    key={i}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
-                      isGreen
-                        ? 'bg-teal-100 text-teal-900 border-teal-300'
-                        : 'bg-blue-50 text-blue-800 border-blue-200'
-                    }`}
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
+              {cv.coachingCourses && cv.coachingCourses.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-black text-slate-700 uppercase">Kursus WBL yang Dilatih / Diselia</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cv.coachingCourses.map((c, i) => (
+                      <span
+                        key={i}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                          isGreen
+                            ? 'bg-teal-100 text-teal-900 border-teal-300'
+                            : 'bg-blue-50 text-blue-800 border-blue-200'
+                        }`}
+                      >
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Coordinator Review Sign-off Box */}
-        {(cv.status === 'appointed' || cv.status === 'revision_requested' || cv.coordinatorReviewNote) && (
-          <div
-            className={`p-4 rounded-xl border text-xs space-y-1 ${
-              cv.status === 'appointed'
-                ? 'bg-emerald-100 border-emerald-400 text-emerald-950'
-                : 'bg-rose-50 border-rose-300 text-rose-950'
-            }`}
-          >
-            <div className="font-black flex items-center gap-1.5">
-              <ShieldCheck size={15} />
-              <span>
-                {cv.status === 'appointed'
-                  ? `Pengesahan Lantikan Jurulatih Industri (${cv.appointmentLetterRef || 'SAH'})`
-                  : 'Catatan Semakan Penyelaras WBL'}
-              </span>
-            </div>
-            {cv.reviewedBy && (
-              <div>
-                Disemak oleh: <strong>{cv.reviewedBy}</strong>{' '}
-                {cv.reviewedAt ? `(${new Date(cv.reviewedAt).toLocaleDateString('ms-MY')})` : ''}
-              </div>
-            )}
-            {cv.coordinatorReviewNote && <div className="italic">"{cv.coordinatorReviewNote}"</div>}
           </div>
         )}
       </div>
@@ -556,12 +478,26 @@ export const TrainerCVPage: React.FC<TrainerCVPageProps> = ({
         ...existing,
         // Keep latest company_affiliation from user profile if user switched company
         companyName: currentUser.company_affiliation || existing.companyName,
-        profileImage: currentUser.profile_image || existing.profileImage
+        profileImage:
+          existing.profileImage ||
+          (currentUser.profile_image && currentUser.profile_image !== 'idb_stored'
+            ? currentUser.profile_image
+            : '')
       };
     }
     return buildInitialCVFromUser(currentUser);
   });
   const [expertiseInput, setExpertiseInput] = useState('');
+  const [formImgFailed, setFormImgFailed] = useState(false);
+
+  const normalizedFormImage = useMemo(
+    () => normalizeImageUrl(cvForm.profileImage),
+    [cvForm.profileImage]
+  );
+
+  useEffect(() => {
+    setFormImgFailed(false);
+  }, [normalizedFormImage]);
 
   // Coordinator Review State
   const [coordSearch, setCoordSearch] = useState('');
@@ -649,7 +585,7 @@ export const TrainerCVPage: React.FC<TrainerCVPageProps> = ({
       const saved = await StorageService.saveTrainerCV(payload, submitForReview);
       setCvForm(saved);
 
-      // Sync academic_level, experience_years, position, and special recognition back to User profile
+      // Sync academic_level, experience_years, position, profile_image, and special recognition back to User profile
       await onUpdateUser({
         ...currentUser,
         name: payload.fullName,
@@ -659,6 +595,7 @@ export const TrainerCVPage: React.FC<TrainerCVPageProps> = ({
         staff_id: payload.staffId,
         company_affiliation: payload.companyName,
         company_position: payload.companyPosition,
+        profile_image: (payload.profileImage || '').trim() || currentUser.profile_image,
         academic_level: categoryToAcademicLabel(payload.qualificationCategory),
         experience_years: payload.experienceYears,
         special_recognition: payload.hasSpecialRecognition,
@@ -1010,9 +947,9 @@ export const TrainerCVPage: React.FC<TrainerCVPageProps> = ({
                               : 'bg-slate-200 text-slate-700 border-slate-300'
                           }`}
                         >
-                          {cv?.profileImage || (u?.profile_image && u.profile_image !== 'idb_stored') ? (
+                          {normalizeImageUrl(cv?.profileImage || u?.profile_image) ? (
                             <img
-                              src={cv?.profileImage || u?.profile_image}
+                              src={normalizeImageUrl(cv?.profileImage || u?.profile_image)}
                               alt={item.displayName}
                               className="w-full h-full object-cover"
                             />
@@ -1204,12 +1141,55 @@ export const TrainerCVPage: React.FC<TrainerCVPageProps> = ({
               <div className="p-5 overflow-y-auto space-y-5 flex-1">
                 <TrainerCVVisualSheet cv={reviewModalCV} language={language} />
 
-                {/* Coordinator Action Panel */}
+                {/* Coordinator Action Panel (System-only review context — excluded from printed/PDF CV) */}
                 <div className="bg-white p-5 rounded-2xl border-2 border-slate-200 space-y-4 shadow-xs">
                   <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
                     <ShieldCheck size={17} className="text-emerald-600" />
                     <span>Tindakan Pengesahan & Lantikan Penyelaras WBL</span>
                   </h4>
+
+                  {(() => {
+                    const modalElig = evaluateTrainerEligibility({
+                      qualificationCategory: reviewModalCV.qualificationCategory,
+                      experienceYears: reviewModalCV.experienceYears,
+                      hasSpecialRecognition: reviewModalCV.hasSpecialRecognition,
+                      specialRecognitionDetails: reviewModalCV.specialRecognitionDetails
+                    });
+                    return (
+                      <div
+                        className={`p-3 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                          modalElig.isEligible
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                            : 'bg-amber-50 border-amber-300 text-amber-950'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {modalElig.isEligible ? (
+                            <CheckCircle2 size={15} className="text-emerald-700 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <strong className="block">
+                              {modalElig.isEligible
+                                ? `Syarat Lantikan Dipenuhi (${modalElig.shortBadgeMs})`
+                                : 'Syarat Lantikan Belum Dipenuhi'}
+                            </strong>
+                            <span>{modalElig.reasonMs}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 shrink-0">
+                          {reviewModalCV.status === 'appointed'
+                            ? `Dilantik (${reviewModalCV.appointmentLetterRef || 'SAH'})`
+                            : reviewModalCV.status === 'submitted'
+                            ? 'Menunggu Semakan'
+                            : reviewModalCV.status === 'revision_requested'
+                            ? 'Perlu Kemaskini'
+                            : 'Draf'}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1615,6 +1595,63 @@ export const TrainerCVPage: React.FC<TrainerCVPageProps> = ({
                   Tukar Syarikat di Profil &raquo;
                 </button>
               )}
+            </div>
+
+            {/* Profile Photo via URL (Pautan Gambar) */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center gap-4">
+              <div
+                className={`w-20 h-20 rounded-full border-2 overflow-hidden flex items-center justify-center shrink-0 text-xl font-black ${
+                  liveEligibility.isEligible
+                    ? 'border-emerald-400 bg-emerald-100 text-emerald-800'
+                    : 'border-slate-300 bg-slate-200 text-slate-600'
+                }`}
+              >
+                {normalizedFormImage && !formImgFailed ? (
+                  <img
+                    src={normalizedFormImage}
+                    alt={cvForm.fullName || 'Gambar Profil'}
+                    onError={() => setFormImgFailed(true)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <ImageIcon size={26} className="opacity-60" />
+                )}
+              </div>
+
+              <div className="flex-1 space-y-1.5">
+                <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <LinkIcon size={13} className="text-blue-600" />
+                  <span>Pautan Gambar Profil CV (URL Gambar / Google Drive)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={cvForm.profileImage && cvForm.profileImage !== 'idb_stored' ? cvForm.profileImage : ''}
+                    onChange={(e) =>
+                      setCvForm((prev) => ({ ...prev, profileImage: e.target.value }))
+                    }
+                    placeholder="https://contoh.com/gambar-profil.jpg atau pautan perkongsian Google Drive..."
+                    className="flex-1 p-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  {cvForm.profileImage && cvForm.profileImage !== 'idb_stored' && (
+                    <button
+                      type="button"
+                      onClick={() => setCvForm((prev) => ({ ...prev, profileImage: '' }))}
+                      className="px-3 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl shrink-0"
+                    >
+                      Padam
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Masukkan pautan gambar terus (HTTPS) atau pautan Google Drive (pastikan tetapan perkongsian <em>Anyone with the link</em>).
+                  {formImgFailed && normalizedFormImage && (
+                    <span className="text-rose-600 font-semibold ml-1">
+                      Gambar gagal dimuatkan — sila semak pautan dan akses awam.
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

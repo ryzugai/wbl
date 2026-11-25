@@ -1,5 +1,5 @@
 import { TrainerCV } from '../types';
-import { evaluateTrainerEligibility, JI_QUALIFICATION_CRITERIA } from './trainerCvEligibility';
+import { evaluateTrainerEligibility } from './trainerCvEligibility';
 
 const escapeHtml = (str: string | undefined | null): string => {
   if (!str) return '';
@@ -9,6 +9,28 @@ const escapeHtml = (str: string | undefined | null): string => {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+};
+
+/**
+ * Normalizes common image share links (such as Google Drive file links) into direct image URLs.
+ */
+export const normalizeImageUrl = (rawUrl?: string | null): string => {
+  const url = (rawUrl || '').trim();
+  if (!url || url === 'idb_stored') return '';
+
+  // Google Drive: https://drive.google.com/file/d/FILE_ID/view...
+  const driveFileMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveFileMatch?.[1]) {
+    return `https://lh3.googleusercontent.com/d/${driveFileMatch[1]}`;
+  }
+
+  // Google Drive: https://drive.google.com/open?id=FILE_ID or uc?id=FILE_ID
+  const driveIdMatch = url.match(/drive\.google\.com\/(?:open|uc)\?[^#]*id=([a-zA-Z0-9_-]+)/);
+  if (driveIdMatch?.[1]) {
+    return `https://lh3.googleusercontent.com/d/${driveIdMatch[1]}`;
+  }
+
+  return url;
 };
 
 export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): string => {
@@ -21,7 +43,7 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
 
   const isGreen = eligibility.isEligible;
 
-  // Color palette: Vibrant Emerald Green if eligible ("hijaukan cv sekiranya syarat dipenuhi"), Slate/Amber otherwise
+  // Color palette: Emerald Green theme if eligible, clean professional slate otherwise
   const palette = isGreen
     ? {
         primary: '#065f46', // emerald-800
@@ -36,30 +58,13 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     : {
         primary: '#334155', // slate-700
         primaryDark: '#1e293b', // slate-800
-        accent: '#d97706', // amber-600
-        softBg: '#fffbeb', // amber-50
-        softBorder: '#fcd34d', // amber-300
-        badgeBg: '#fef3c7', // amber-100
-        badgeText: '#92400e',
+        accent: '#64748b', // slate-500
+        softBg: '#f8fafc', // slate-50
+        softBorder: '#cbd5e1', // slate-300
+        badgeBg: '#f1f5f9', // slate-100
+        badgeText: '#334155',
         pageTint: '#ffffff'
       };
-
-  const statusText =
-    cv.status === 'appointed'
-      ? lang === 'ms'
-        ? 'DILANTIK SEBAGAI JURULATIH INDUSTRI (SAH)'
-        : 'APPOINTED AS INDUSTRY TRAINER (VERIFIED)'
-      : cv.status === 'submitted'
-      ? lang === 'ms'
-        ? 'DIHANTAR UNTUK SEMAKAN PENYELARAS'
-        : 'SUBMITTED FOR COORDINATOR REVIEW'
-      : cv.status === 'revision_requested'
-      ? lang === 'ms'
-        ? 'PERLU KEMASKINI OLEH JURULATIH'
-        : 'REVISION REQUESTED'
-      : lang === 'ms'
-      ? 'DRAF CV JURULATIH INDUSTRI'
-      : 'DRAFT INDUSTRY TRAINER CV';
 
   const initials = (cv.fullName || 'JI')
     .split(' ')
@@ -68,11 +73,35 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     .map((p) => p[0].toUpperCase())
     .join('');
 
-  const generatedDate = new Date().toLocaleDateString(lang === 'ms' ? 'ms-MY' : 'en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  const resolvedImgUrl = normalizeImageUrl(cv.profileImage);
+
+  // Build consecutive section numbering cleanly
+  let sectionCounter = 0;
+  const nextSec = () => {
+    sectionCounter += 1;
+    return sectionCounter;
+  };
+
+  const hasEducation = true;
+  const educationRows =
+    cv.educationList && cv.educationList.length > 0 && cv.educationList.some((e) => e.level || e.institution)
+      ? cv.educationList
+      : [
+          {
+            level: cv.highestQualificationTitle || '-',
+            field: cv.fieldOfStudy || '-',
+            institution: cv.institutionName || '-',
+            year: cv.graduationYear || '-'
+          }
+        ];
+
+  const validWork = (cv.workExperienceList || []).filter((w) => w.company || w.position);
+  const validCerts = (cv.certificationsList || []).filter((c) => c.title);
+  const hasSpecialText = Boolean(cv.hasSpecialRecognition && (cv.specialRecognitionDetails || '').trim());
+  const hasCertOrRecognition = validCerts.length > 0 || hasSpecialText;
+  const hasExpertiseOrCourses =
+    (cv.areasOfExpertise && cv.areasOfExpertise.length > 0) ||
+    (cv.coachingCourses && cv.coachingCourses.length > 0);
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -85,12 +114,29 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
-      padding: 0;
+      padding: 16px 0;
       color: #1e293b;
       background: ${isGreen ? '#ecfdf5' : '#f8fafc'};
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       line-height: 1.45;
+    }
+    .print-toolbar {
+      max-width: 210mm;
+      margin: 0 auto 12px auto;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .print-btn {
+      padding: 9px 18px;
+      background: ${palette.primary};
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 12.5px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
     }
     .cv-sheet {
       width: 100%;
@@ -105,21 +151,15 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     .cv-top-banner {
       background: linear-gradient(135deg, ${palette.primaryDark}, ${palette.primary});
       color: #ffffff;
-      padding: 22px 28px;
+      padding: 24px 28px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 18px;
+      gap: 20px;
       border-bottom: 4px solid ${palette.accent};
     }
-    .cv-header-left {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-    }
     .avatar-box {
-      width: 78px;
-      height: 78px;
+      width: 88px;
+      height: 88px;
       border-radius: 50%;
       border: 3px solid ${palette.accent};
       background: rgba(255,255,255,0.16);
@@ -127,7 +167,7 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 800;
       color: #fff;
       flex-shrink: 0;
@@ -139,7 +179,7 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     }
     .utem-kicker {
       font-size: 10px;
-      letter-spacing: 1.4px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       opacity: 0.88;
       font-weight: 700;
@@ -147,62 +187,19 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     }
     .cv-name {
       margin: 0;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 900;
       letter-spacing: 0.3px;
       text-transform: uppercase;
     }
     .cv-sub {
-      margin: 3px 0 0 0;
-      font-size: 12.5px;
-      color: #d1fae5;
+      margin: 4px 0 0 0;
+      font-size: 13px;
+      color: ${isGreen ? '#d1fae5' : '#e2e8f0'};
       font-weight: 600;
     }
-    .eligibility-seal {
-      background: ${isGreen ? '#10b981' : '#f59e0b'};
-      color: ${isGreen ? '#ffffff' : '#1e293b'};
-      padding: 8px 14px;
-      border-radius: 10px;
-      text-align: right;
-      min-width: 195px;
-      border: 1.5px solid rgba(255,255,255,0.45);
-    }
-    .eligibility-seal .seal-title {
-      font-size: 10px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.7px;
-    }
-    .eligibility-seal .seal-sub {
-      font-size: 11px;
-      font-weight: 700;
-      margin-top: 2px;
-    }
-    .eligibility-strip {
-      background: ${palette.softBg};
-      border-bottom: 1.5px solid ${palette.softBorder};
-      padding: 12px 28px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      font-size: 11.5px;
-    }
-    .eligibility-strip strong {
-      color: ${palette.primaryDark};
-    }
-    .status-pill {
-      background: ${palette.badgeBg};
-      color: ${palette.badgeText};
-      border: 1px solid ${palette.softBorder};
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
     .cv-body {
-      padding: 22px 28px 26px 28px;
+      padding: 22px 28px 28px 28px;
     }
     .info-grid {
       display: grid;
@@ -211,7 +208,7 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
       background: #ffffff;
       border: 1px solid ${isGreen ? '#a7f3d0' : '#e2e8f0'};
       border-radius: 10px;
-      padding: 12px 16px;
+      padding: 13px 16px;
       margin-bottom: 18px;
       font-size: 11.5px;
     }
@@ -222,7 +219,7 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
     .info-label {
       font-weight: 700;
       color: ${palette.primary};
-      min-width: 115px;
+      min-width: 118px;
     }
     .section {
       margin-bottom: 16px;
@@ -245,33 +242,10 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
       border-radius: 6px;
       font-size: 11.5px;
       color: #334155;
+      white-space: pre-line;
       border-top: 1px solid ${isGreen ? '#d1fae5' : '#e2e8f0'};
       border-right: 1px solid ${isGreen ? '#d1fae5' : '#e2e8f0'};
       border-bottom: 1px solid ${isGreen ? '#d1fae5' : '#e2e8f0'};
-    }
-    .criteria-box {
-      background: ${palette.softBg};
-      border: 1.5px solid ${palette.softBorder};
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 11px;
-    }
-    .criteria-list {
-      margin: 6px 0 0 0;
-      padding-left: 16px;
-      list-style: none;
-    }
-    .criteria-list li {
-      padding: 3px 6px;
-      margin-bottom: 2px;
-      border-radius: 5px;
-      color: #475569;
-    }
-    .criteria-list li.matched {
-      background: #d1fae5;
-      color: #064e3b;
-      font-weight: 800;
-      border: 1px solid #34d399;
     }
     .item-card {
       background: #ffffff;
@@ -286,16 +260,19 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
       justify-content: space-between;
       font-weight: 800;
       color: #0f172a;
+      gap: 10px;
     }
     .item-meta {
       font-size: 10.5px;
       color: ${palette.primary};
       font-weight: 700;
+      white-space: nowrap;
     }
     .item-desc {
       margin-top: 4px;
       font-size: 11px;
       color: #475569;
+      white-space: pre-line;
     }
     .tag-wrap {
       display: flex;
@@ -311,59 +288,31 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
       font-size: 10.5px;
       font-weight: 700;
     }
-    .footer-sign {
-      margin-top: 18px;
-      padding-top: 12px;
-      border-top: 1.5px dashed ${palette.softBorder};
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      font-size: 11px;
-    }
-    .sign-box {
-      background: #ffffff;
-      border: 1px solid ${isGreen ? '#a7f3d0' : '#e2e8f0'};
-      border-radius: 8px;
-      padding: 10px 14px;
-    }
-    .sign-title {
-      font-weight: 800;
-      color: ${palette.primaryDark};
-      font-size: 10.5px;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
     @media print {
-      body { background: #ffffff; }
+      body { background: #ffffff; padding: 0; }
+      .print-toolbar { display: none !important; }
       .cv-sheet { box-shadow: none; max-width: 100%; }
     }
   </style>
 </head>
 <body>
+  <div class="print-toolbar">
+    <button class="print-btn" onclick="window.print()">Cetak / Simpan PDF</button>
+  </div>
   <div class="cv-sheet">
     <div class="cv-top-banner">
-      <div class="cv-header-left">
-        <div class="avatar-box">
-          ${cv.profileImage ? `<img src="${cv.profileImage}" alt="${escapeHtml(cv.fullName)}" />` : escapeHtml(initials)}
-        </div>
-        <div>
-          <div class="utem-kicker">CURRICULUM VITAE • LANTIKAN JURULATIH INDUSTRI (WBL) FPTT UTeM</div>
-          <h1 class="cv-name">${escapeHtml(cv.fullName)}</h1>
-          <p class="cv-sub">${escapeHtml(cv.companyPosition || 'Jurulatih Industri')} • ${escapeHtml(cv.companyName || '-')}</p>
-        </div>
+      <div class="avatar-box">
+        ${
+          resolvedImgUrl
+            ? `<img src="${escapeHtml(resolvedImgUrl)}" alt="${escapeHtml(cv.fullName)}" onerror="this.style.display='none'; this.parentElement.textContent='${escapeHtml(initials)}';" />`
+            : escapeHtml(initials)
+        }
       </div>
-      <div class="eligibility-seal">
-        <div class="seal-title">${isGreen ? '✓ MEMENUHI SYARAT LANTIKAN JI' : '⚠ SEMAKAN SYARAT KELAYAKAN'}</div>
-        <div class="seal-sub">${escapeHtml(eligibility.shortBadgeMs)}</div>
-      </div>
-    </div>
-
-    <div class="eligibility-strip">
       <div>
-        <strong>${isGreen ? 'Status Kelayakan Akademik & Pengalaman (HIJAU / LAYAK):' : 'Status Kelayakan Akademik & Pengalaman:'}</strong>
-        ${escapeHtml(eligibility.reasonMs)}
+        <div class="utem-kicker">CURRICULUM VITAE • JURULATIH INDUSTRI (WBL) FPTT UTeM</div>
+        <h1 class="cv-name">${escapeHtml(cv.fullName)}</h1>
+        <p class="cv-sub">${escapeHtml(cv.companyPosition || 'Jurulatih Industri')} • ${escapeHtml(cv.companyName || '-')}</p>
       </div>
-      <span class="status-pill">${escapeHtml(statusText)}</span>
     </div>
 
     <div class="cv-body">
@@ -374,71 +323,48 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
         <div class="info-item"><span class="info-label">No. Telefon:</span><span>${escapeHtml(cv.phone || '-')}</span></div>
         <div class="info-item"><span class="info-label">No. KP / ID Staf:</span><span>${escapeHtml(cv.icNo || cv.staffId || '-')}</span></div>
         <div class="info-item"><span class="info-label">Tempoh Pengalaman:</span><span><strong>${cv.experienceYears || 0} Tahun</strong> dalam bidang berkaitan</span></div>
-        <div class="info-item"><span class="info-label">Kelayakan Tertinggi:</span><span>${escapeHtml(cv.highestQualificationTitle || '-')} (${escapeHtml(cv.graduationYear || '-')})</span></div>
+        <div class="info-item"><span class="info-label">Kelayakan Tertinggi:</span><span>${escapeHtml(cv.highestQualificationTitle || '-')} ${cv.graduationYear ? `(${escapeHtml(cv.graduationYear)})` : ''}</span></div>
         <div class="info-item"><span class="info-label">Bidang & Institusi:</span><span>${escapeHtml(cv.fieldOfStudy || '-')} — ${escapeHtml(cv.institutionName || '-')}</span></div>
       </div>
 
       ${cv.professionalSummary ? `
       <div class="section">
-        <h2 class="section-heading">1. Ringkasan Profil Profesional</h2>
+        <h2 class="section-heading">${nextSec()}. Ringkasan Profil Profesional</h2>
         <div class="summary-box">${escapeHtml(cv.professionalSummary)}</div>
       </div>` : ''}
 
+      ${hasEducation ? `
       <div class="section">
-        <h2 class="section-heading">2. Penilaian Syarat Kelayakan Akademik & Pengalaman Jurulatih Industri (WBL)</h2>
-        <div class="criteria-box">
-          <div style="font-size:10.5px; color:#334155; margin-bottom:6px;">
-            <em>JI yang diperlukan mengajar komponen teori di industri hendaklah memiliki kelayakan akademik sekurang-kurangnya satu (1) tahap lebih tinggi daripada program pengajian yang dilatih, atau memenuhi salah satu kriteria pengalaman berikut:</em>
-          </div>
-          <ul class="criteria-list">
-            ${JI_QUALIFICATION_CRITERIA.map((c) => {
-              const isMatched = eligibility.isEligible && eligibility.matchedCriterionCode === c.code;
-              return `<li class="${isMatched ? 'matched' : ''}">${isMatched ? '✓ [DIPENUHI] ' : '○ '}${escapeHtml(c.labelMs)}</li>`;
-            }).join('')}
-          </ul>
-          ${cv.hasSpecialRecognition && cv.specialRecognitionDetails ? `
-            <div style="margin-top:8px; padding:8px 10px; background:#ffffff; border-radius:6px; border:1px solid ${palette.softBorder};">
-              <strong>Butiran Kemahiran Istimewa / Pengiktirafan Profesional / Antarabangsa (Kriteria vi):</strong><br/>
-              ${escapeHtml(cv.specialRecognitionDetails)}
-            </div>
-          ` : ''}
-        </div>
-      </div>
-
-      <div class="section">
-        <h2 class="section-heading">3. Latar Belakang Akademik</h2>
-        ${(cv.educationList && cv.educationList.length > 0
-          ? cv.educationList
-          : [{ level: cv.highestQualificationTitle || '-', field: cv.fieldOfStudy || '-', institution: cv.institutionName || '-', year: cv.graduationYear || '-' }]
-        ).map((edu) => `
+        <h2 class="section-heading">${nextSec()}. Latar Belakang Akademik</h2>
+        ${educationRows.map((edu) => `
           <div class="item-card">
             <div class="item-top">
-              <span>${escapeHtml(edu.level)} ${edu.field ? `— ${escapeHtml(edu.field)}` : ''}</span>
+              <span>${escapeHtml(edu.level || '-')} ${edu.field ? `— ${escapeHtml(edu.field)}` : ''}</span>
               <span class="item-meta">${escapeHtml(edu.year || '-')}</span>
             </div>
             <div class="item-desc">${escapeHtml(edu.institution || '-')}</div>
           </div>
         `).join('')}
-      </div>
+      </div>` : ''}
 
-      ${cv.workExperienceList && cv.workExperienceList.length > 0 ? `
+      ${validWork.length > 0 ? `
       <div class="section">
-        <h2 class="section-heading">4. Pengalaman Kerja & Industri (${cv.experienceYears || 0} Tahun)</h2>
-        ${cv.workExperienceList.map((work) => `
+        <h2 class="section-heading">${nextSec()}. Pengalaman Kerja & Industri (${cv.experienceYears || 0} Tahun)</h2>
+        ${validWork.map((work) => `
           <div class="item-card">
             <div class="item-top">
-              <span>${escapeHtml(work.position)} — ${escapeHtml(work.company)}</span>
-              <span class="item-meta">${escapeHtml(work.startYear)} - ${escapeHtml(work.endYear || 'Kini')}</span>
+              <span>${escapeHtml(work.position || '-')} — ${escapeHtml(work.company || '-')}</span>
+              <span class="item-meta">${escapeHtml(work.startYear || '-')} - ${escapeHtml(work.endYear || 'Kini')}</span>
             </div>
             ${work.responsibilities ? `<div class="item-desc">${escapeHtml(work.responsibilities)}</div>` : ''}
           </div>
         `).join('')}
       </div>` : ''}
 
-      ${cv.certificationsList && cv.certificationsList.length > 0 ? `
+      ${hasCertOrRecognition ? `
       <div class="section">
-        <h2 class="section-heading">5. Pensijilan Profesional, Anugerah & Pengiktirafan</h2>
-        ${cv.certificationsList.map((cert) => `
+        <h2 class="section-heading">${nextSec()}. Pensijilan Profesional, Anugerah & Pengiktirafan</h2>
+        ${validCerts.map((cert) => `
           <div class="item-card">
             <div class="item-top">
               <span>${escapeHtml(cert.title)}</span>
@@ -447,10 +373,19 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
             <div class="item-desc">Penganugerahan / Badan Pengiktiraf: ${escapeHtml(cert.issuer || '-')}</div>
           </div>
         `).join('')}
+        ${hasSpecialText ? `
+          <div class="item-card">
+            <div class="item-top">
+              <span>Kemahiran Istimewa / Pengiktirafan Profesional & Industri</span>
+            </div>
+            <div class="item-desc">${escapeHtml(cv.specialRecognitionDetails)}</div>
+          </div>
+        ` : ''}
       </div>` : ''}
 
+      ${hasExpertiseOrCourses ? `
       <div class="section">
-        <h2 class="section-heading">6. Bidang Kepakaran & Kursus WBL yang Diselia / Dilatih</h2>
+        <h2 class="section-heading">${nextSec()}. Bidang Kepakaran & Kursus WBL yang Diselia / Dilatih</h2>
         ${cv.areasOfExpertise && cv.areasOfExpertise.length > 0 ? `
           <div style="margin-bottom:8px;">
             <div style="font-size:10.5px; font-weight:700; color:#475569; margin-bottom:4px;">Bidang Kepakaran Industri:</div>
@@ -467,23 +402,7 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
             </div>
           </div>
         ` : ''}
-      </div>
-
-      <div class="footer-sign">
-        <div class="sign-box">
-          <div class="sign-title">Perakuan Calon Jurulatih Industri</div>
-          <div>Nama: <strong>${escapeHtml(cv.fullName)}</strong></div>
-          <div>Organisasi: ${escapeHtml(cv.companyName)}</div>
-          <div>Tarikh Dijana: ${escapeHtml(generatedDate)}</div>
-        </div>
-        <div class="sign-box">
-          <div class="sign-title">Semakan & Pengesahan Penyelaras WBL (FPTT UTeM)</div>
-          <div>Status Lantikan: <strong>${escapeHtml(statusText)}</strong></div>
-          ${cv.appointmentLetterRef ? `<div>No. Rujukan Lantikan: <strong>${escapeHtml(cv.appointmentLetterRef)}</strong></div>` : ''}
-          ${cv.reviewedBy ? `<div>Disemak Oleh: ${escapeHtml(cv.reviewedBy)}</div>` : '<div>Disemak Oleh: Menunggu Pengesahan Penyelaras</div>'}
-          ${cv.coordinatorReviewNote ? `<div style="margin-top:4px; font-style:italic;">Ulasan: "${escapeHtml(cv.coordinatorReviewNote)}"</div>` : ''}
-        </div>
-      </div>
+      </div>` : ''}
     </div>
   </div>
 </body>
@@ -491,7 +410,8 @@ export const buildTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): str
 };
 
 /**
- * Prints the formatted CV using a hidden iframe (safe inside embedded AI Studio iframes without popups).
+ * Prints / Saves as PDF the formatted CV using a hidden iframe (safe inside embedded iframes without popups).
+ * Waits briefly for external profile image links to finish loading before invoking print().
  */
 export const printTrainerCV = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): void => {
   const html = buildTrainerCVHtml(cv, lang);
@@ -514,7 +434,7 @@ export const printTrainerCV = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): void =>
   doc.write(html);
   doc.close();
 
-  setTimeout(() => {
+  const triggerPrint = () => {
     try {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
@@ -523,7 +443,22 @@ export const printTrainerCV = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): void =>
         if (iframe.parentNode) document.body.removeChild(iframe);
       }, 1500);
     }
-  }, 350);
+  };
+
+  const img = doc.querySelector('img');
+  if (img && !img.complete) {
+    let printed = false;
+    const done = () => {
+      if (printed) return;
+      printed = true;
+      setTimeout(triggerPrint, 150);
+    };
+    img.addEventListener('load', done, { once: true });
+    img.addEventListener('error', done, { once: true });
+    setTimeout(done, 2000);
+  } else {
+    setTimeout(triggerPrint, 350);
+  }
 };
 
 /**
@@ -536,7 +471,7 @@ export const downloadTrainerCVHtml = (cv: TrainerCV, lang: 'ms' | 'en' = 'ms'): 
   const a = document.createElement('a');
   const safeName = (cv.fullName || 'jurulatih_industri').replace(/[^a-zA-Z0-9]+/g, '_');
   a.href = url;
-  a.download = `CV_Lantikan_JI_${safeName}.html`;
+  a.download = `CV_Jurulatih_Industri_${safeName}.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
