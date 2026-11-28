@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { User, Application, UserRole, PsmCaseStudyWeeklyLog, PsmLogbookStatus } from '../types';
 import { StorageService } from '../services/storage';
 import { 
@@ -97,8 +97,8 @@ export const PsmCaseStudyLogbook: React.FC<PsmCaseStudyLogbookProps> = ({
   const [filterWeek, setFilterWeek] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Active form data for student log entry
-  const [formData, setFormData] = useState<Partial<PsmCaseStudyWeeklyLog>>({
+  // Active form data for student log entry (with dirty guard so background Firestore sync never wipes typing)
+  const [formData, _setFormData] = useState<Partial<PsmCaseStudyWeeklyLog>>({
     weekNumber: 1,
     caseTitle: '',
     milestonePhase: 'Milestone 1 (M1 - M4)',
@@ -112,6 +112,21 @@ export const PsmCaseStudyLogbook: React.FC<PsmCaseStudyLogbookProps> = ({
     startDate: '2026-09-28',
     endDate: '2026-10-02'
   });
+  const isDirtyRef = useRef<boolean>(false);
+  const loadedContextKeyRef = useRef<string>('');
+  const lastServerSigRef = useRef<string>('');
+
+  const setFormData = useCallback(
+    (
+      next:
+        | Partial<PsmCaseStudyWeeklyLog>
+        | ((prev: Partial<PsmCaseStudyWeeklyLog>) => Partial<PsmCaseStudyWeeklyLog>)
+    ) => {
+      isDirtyRef.current = true;
+      _setFormData(next);
+    },
+    []
+  );
 
   // Review modal state
   const [inspectingLog, setInspectingLog] = useState<PsmCaseStudyWeeklyLog | null>(null);
@@ -196,47 +211,59 @@ export const PsmCaseStudyLogbook: React.FC<PsmCaseStudyLogbookProps> = ({
     }
   }, [selectedStudentId, isSupervisor, supervisedStudents, isTrainer, companyStudents, allStudents]);
 
-  // When selected student or week changes (in student view or inspector)
+  // When selected student or week changes (never wipe active student typing on background sync)
   useEffect(() => {
-    if (isStudent) {
-      const existing = psmLogs.find(l => l.studentId === currentUser.id && l.weekNumber === selectedWeek);
-      const milestone = getMilestoneForWeek(selectedWeek);
-      
-      // Calculate start and end date for that week (20 weeks starting Monday 28 Sept 2026)
-      const baseStart = new Date('2026-09-28T00:00:00');
-      const startOfWeek = new Date(baseStart.getTime() + (selectedWeek - 1) * 7 * 24 * 60 * 60 * 1000);
-      const endOfWeek = new Date(startOfWeek.getTime() + 4 * 24 * 60 * 60 * 1000); // Friday
+    if (!isStudent) return;
 
-      const sDateStr = startOfWeek.toISOString().split('T')[0];
-      const eDateStr = endOfWeek.toISOString().split('T')[0];
+    const contextKey = `${currentUser.id}::w${selectedWeek}`;
+    const existing = psmLogs.find(l => l.studentId === currentUser.id && l.weekNumber === selectedWeek);
+    const serverSig = existing
+      ? `${existing.id}::${existing.updatedAt || ''}::${existing.status}`
+      : 'empty';
 
-      if (existing) {
-        setFormData(existing);
-      } else {
-        setFormData({
-          studentId: currentUser.id,
-          studentName: currentUser.name,
-          studentMatric: currentUser.matric_no || '',
-          studentProgram: currentUser.program || 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
-          intake: currentUser.intake || 'Ambilan 1',
-          companyName: myPlacementApp?.company_name || currentUser.company_affiliation || 'Syarikat Rakan WBL',
-          weekNumber: selectedWeek,
-          startDate: sDateStr,
-          endDate: eDateStr,
-          caseTitle: '',
-          milestonePhase: `${milestone.phase}: ${milestone.title}`,
-          problemStatement: '',
-          methodologyActions: '',
-          keyFindings: '',
-          technopreneurSolution: '',
-          consultationHours: 2,
-          evidenceUrl: '',
-          studentReflection: '',
-          status: 'draft'
-        });
-      }
+    if (loadedContextKeyRef.current === contextKey) {
+      if (isDirtyRef.current) return;
+      if (lastServerSigRef.current === serverSig) return;
     }
-  }, [isStudent, selectedWeek, currentUser, psmLogs, myPlacementApp]);
+
+    loadedContextKeyRef.current = contextKey;
+    lastServerSigRef.current = serverSig;
+    isDirtyRef.current = false;
+
+    const milestone = getMilestoneForWeek(selectedWeek);
+    const baseStart = new Date('2026-09-28T00:00:00');
+    const startOfWeek = new Date(baseStart.getTime() + (selectedWeek - 1) * 7 * 24 * 60 * 60 * 1000);
+    const endOfWeek = new Date(startOfWeek.getTime() + 4 * 24 * 60 * 60 * 1000); // Friday
+
+    const sDateStr = startOfWeek.toISOString().split('T')[0];
+    const eDateStr = endOfWeek.toISOString().split('T')[0];
+
+    if (existing) {
+      _setFormData(existing);
+    } else {
+      _setFormData({
+        studentId: currentUser.id,
+        studentName: currentUser.name,
+        studentMatric: currentUser.matric_no || '',
+        studentProgram: currentUser.program || 'Ijazah Sarjana Muda Teknousahawanan dengan Kepujian',
+        intake: currentUser.intake || 'Ambilan 1',
+        companyName: myPlacementApp?.company_name || currentUser.company_affiliation || 'Syarikat Rakan WBL',
+        weekNumber: selectedWeek,
+        startDate: sDateStr,
+        endDate: eDateStr,
+        caseTitle: '',
+        milestonePhase: `${milestone.phase}: ${milestone.title}`,
+        problemStatement: '',
+        methodologyActions: '',
+        keyFindings: '',
+        technopreneurSolution: '',
+        consultationHours: 2,
+        evidenceUrl: '',
+        studentReflection: '',
+        status: 'draft'
+      });
+    }
+  }, [isStudent, selectedWeek, currentUser.id, currentUser.name, currentUser.matric_no, currentUser.program, currentUser.intake, currentUser.company_affiliation, psmLogs, myPlacementApp?.company_name]);
 
   // Find current student's existing log for selected week
   const currentStudentActiveLog = useMemo(() => {
@@ -263,7 +290,9 @@ export const PsmCaseStudyLogbook: React.FC<PsmCaseStudyLogbookProps> = ({
       };
 
       const saved = await StorageService.savePsmCaseStudyLog(payload);
-      setFormData(saved);
+      isDirtyRef.current = false;
+      lastServerSigRef.current = `${saved.id}::${saved.updatedAt || ''}::${saved.status}`;
+      _setFormData(saved);
       toast.success(language === 'ms' ? `Draf Case Study Minggu ${selectedWeek} disimpan!` : `Draft Case Study Week ${selectedWeek} saved!`);
     } catch (err: any) {
       toast.error(err.message || 'Ralat menyimpan draf');
@@ -309,7 +338,9 @@ export const PsmCaseStudyLogbook: React.FC<PsmCaseStudyLogbookProps> = ({
 
       // 2. Submit to notify supervisor and trainer
       const submitted = await StorageService.submitPsmCaseStudyLog(saved.id);
-      setFormData(submitted);
+      isDirtyRef.current = false;
+      lastServerSigRef.current = `${submitted.id}::${submitted.updatedAt || ''}::${submitted.status}`;
+      _setFormData(submitted);
       toast.success(language === 'ms' 
         ? `Buku Log Case Study PSM 2 Minggu ${selectedWeek} berjaya dihantar untuk semakan Penyelia & Jurulatih!` 
         : `Week ${selectedWeek} PSM 2 Case Study submitted for Supervisor & Coach review!`);

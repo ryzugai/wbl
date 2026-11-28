@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { User, Application, UserRole, WeeklyLogbook, DailyLogEntry, LogbookStatus } from '../types';
 import { StorageService } from '../services/storage';
 import { generateWeeklyLogbookPrint } from '../utils/logbookGenerator';
@@ -20,6 +20,47 @@ interface DailyLogbookProps {
 }
 
 const DEFAULT_DAYS = ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat'];
+
+const getLocalDraftKey = (studentId: string, weekNumber: number) =>
+  `wbl_daily_log_draft_${studentId}_w${weekNumber}`;
+
+const normalizeLogEntries = (entries: DailyLogEntry[] | undefined, weekNumber: number): DailyLogEntry[] => {
+  const source = Array.isArray(entries) && entries.length > 0
+    ? entries
+    : DEFAULT_DAYS.map((day, idx) => ({
+        id: `entry_w${weekNumber}_${idx}`,
+        day,
+        date: '',
+        startTime: '08:30',
+        endTime: '17:30',
+        department: '',
+        tasks: '',
+        learningOutcomes: '',
+        toolsUsed: '',
+        remarks: ''
+      }));
+
+  const usedIds = new Set<string>();
+  return source.map((e, idx) => {
+    let stableId = (e?.id || '').trim();
+    if (!stableId || usedIds.has(stableId)) {
+      stableId = `entry_w${weekNumber}_${idx}`;
+    }
+    usedIds.add(stableId);
+    return {
+      id: stableId,
+      day: e?.day ?? DEFAULT_DAYS[idx % DEFAULT_DAYS.length] ?? `Hari ${idx + 1}`,
+      date: e?.date ?? '',
+      startTime: e?.startTime ?? '08:30',
+      endTime: e?.endTime ?? '17:30',
+      department: e?.department ?? '',
+      tasks: e?.tasks ?? '',
+      learningOutcomes: e?.learningOutcomes ?? '',
+      toolsUsed: e?.toolsUsed ?? '',
+      remarks: e?.remarks ?? ''
+    };
+  });
+};
 
 export const DailyLogbook: React.FC<DailyLogbookProps> = ({
   currentUser,
@@ -56,6 +97,13 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
 
   // Active weekly log state (for student editor)
   const [currentWeekLog, setCurrentWeekLog] = useState<WeeklyLogbook | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
+
+  // Refs to prevent background Firestore/StorageService snapshots from wiping student input while typing
+  const isDirtyRef = useRef<boolean>(false);
+  const loadedContextKeyRef = useRef<string>('');
+  const lastServerSigRef = useRef<string>('');
 
   // Review modal state (for detailed inspection by Trainer, Supervisor, Coordinator)
   const [reviewingLogbook, setReviewingLogbook] = useState<WeeklyLogbook | null>(null);
@@ -87,18 +135,43 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
   const [trainerVerifyFilter, setTrainerVerifyFilter] = useState<'all' | 'unverified' | 'verified' | 'revision' | 'draft'>('all');
 
   // Reload logbooks
-  const loadLogbooks = () => {
+  const loadLogbooks = useCallback(() => {
     const all = StorageService.getWeeklyLogbooks();
     setLogbooks(all);
-  };
+  }, []);
 
   useEffect(() => {
     loadLogbooks();
     const unsub = StorageService.subscribe(loadLogbooks);
     return () => unsub();
+  }, [loadLogbooks]);
+
+  // Persist local draft backup safely whenever student edits
+  const persistLocalDraft = useCallback((log: WeeklyLogbook) => {
+    try {
+      localStorage.setItem(getLocalDraftKey(log.studentId, log.weekNumber), JSON.stringify(log));
+    } catch {}
   }, []);
 
-  // When logbooks or selectedWeekNumber changes, initialize or load currentWeekLog for student
+  const clearLocalDraft = useCallback((studentId: string, weekNumber: number) => {
+    try {
+      localStorage.removeItem(getLocalDraftKey(studentId, weekNumber));
+    } catch {}
+  }, []);
+
+  // Safely mutate currentWeekLog using functional update + mark dirty + backup locally
+  const updateStudentWeekLog = useCallback((updater: (prev: WeeklyLogbook) => WeeklyLogbook) => {
+    isDirtyRef.current = true;
+    setHasUnsavedChanges(true);
+    setCurrentWeekLog((prev) => {
+      if (!prev) return prev;
+      const next = updater(prev);
+      persistLocalDraft(next);
+      return next;
+    });
+  }, [persistLocalDraft]);
+
+  // Initialize or load currentWeekLog ONLY when week/user changes OR when server record genuinely changes while not editing
   useEffect(() => {
     if (!isStudent) {
       if (!isTrainer && activeTab === 'my_logbook') {
@@ -107,16 +180,69 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
       return;
     }
 
-    const myLogs = StorageService.getStudentLogbooks(currentUser.id);
-    const existing = myLogs.find(l => l.weekNumber === selectedWeekNumber);
+    const contextKey = `${currentUser.id}::w${selectedWeekNumber}`;
+    const existing = logbooks.find(
+      (l) =>
+        (l.studentId === currentUser.id ||
+          (Boolean(currentUser.matric_no) && l.studentMatric === currentUser.matric_no)) &&
+        l.weekNumber === selectedWeekNumber
+    );
+    const serverSig = existing
+      ? `${existing.id}::${existing.updatedAt || ''}::${existing.status}`
+      : 'empty';
+
+    const isSameContext = loadedContextKeyRef.current === contextKey;
+
+    if (isSameContext) {
+      // NEVER wipe student input while they are actively editing!
+      if (isDirtyRef.current) return;
+      // NEVER reset editor when unrelated Firestore collections emit updates!
+      if (lastServerSigRef.current === serverSig) return;
+    }
+
+    loadedContextKeyRef.current = contextKey;
+    lastServerSigRef.current = serverSig;
+
+    // Check for unsaved local draft backup (only if logbook is not locked/verified)
+    if (!existing || existing.status !== 'verified') {
+      try {
+        const rawLocal = localStorage.getItem(getLocalDraftKey(currentUser.id, selectedWeekNumber));
+        if (rawLocal) {
+          const parsedDraft = JSON.parse(rawLocal) as WeeklyLogbook;
+          if (parsedDraft && parsedDraft.weekNumber === selectedWeekNumber) {
+            isDirtyRef.current = true;
+            setHasUnsavedChanges(true);
+            setCurrentWeekLog({
+              ...parsedDraft,
+              id: existing?.id || parsedDraft.id || '',
+              status: existing?.status || parsedDraft.status || 'draft',
+              revisionNotes: existing?.revisionNotes ?? parsedDraft.revisionNotes,
+              entries: normalizeLogEntries(parsedDraft.entries, selectedWeekNumber),
+              weeklySummary: parsedDraft.weeklySummary ?? ''
+            });
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    isDirtyRef.current = false;
+    setHasUnsavedChanges(false);
 
     if (existing) {
-      setCurrentWeekLog(existing);
+      setCurrentWeekLog({
+        ...existing,
+        startDate: existing.startDate ?? '',
+        endDate: existing.endDate ?? '',
+        trainerName: existing.trainerName ?? currentUser.industry_trainer_name ?? '',
+        trainerPosition: existing.trainerPosition ?? currentUser.industry_trainer_position ?? '',
+        weeklySummary: existing.weeklySummary ?? '',
+        entries: normalizeLogEntries(existing.entries, selectedWeekNumber)
+      });
     } else {
-      // Create empty draft template for selectedWeek
       const companyName = studentPlacementApp?.company_name || currentUser.company_affiliation || 'Syarikat Penempatan WBL';
       const companyAddress = studentPlacementApp ? `${studentPlacementApp.company_district || ''}, ${studentPlacementApp.company_state || ''}` : '';
-      
+
       const newTemplate: WeeklyLogbook = {
         id: '',
         studentId: currentUser.id,
@@ -129,18 +255,7 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
         startDate: '',
         endDate: '',
         totalHours: 40,
-        entries: DEFAULT_DAYS.map((day, idx) => ({
-          id: `entry_${Date.now()}_${idx}`,
-          day,
-          date: '',
-          startTime: '08:30',
-          endTime: '17:30',
-          department: '',
-          tasks: '',
-          learningOutcomes: '',
-          toolsUsed: '',
-          remarks: ''
-        })),
+        entries: normalizeLogEntries(undefined, selectedWeekNumber),
         weeklySummary: '',
         status: 'draft',
         trainerName: currentUser.industry_trainer_name || '',
@@ -152,12 +267,14 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
       };
       setCurrentWeekLog(newTemplate);
     }
-  }, [isStudent, selectedWeekNumber, logbooks, currentUser, studentPlacementApp]);
+  }, [isStudent, isTrainer, activeTab, selectedWeekNumber, logbooks, currentUser.id, currentUser.matric_no, currentUser.name, currentUser.program, currentUser.company_affiliation, currentUser.industry_trainer_name, currentUser.industry_trainer_position, currentUser.industry_trainer_email, currentUser.industry_trainer_phone, studentPlacementApp?.company_name, studentPlacementApp?.company_district, studentPlacementApp?.company_state]);
 
   // Student Weeks available
   const studentWeeks = useMemo(() => {
     if (!isStudent) return [];
-    const myLogs = logbooks.filter(l => l.studentId === currentUser.id);
+    const myLogs = logbooks.filter(
+      l => l.studentId === currentUser.id || (Boolean(currentUser.matric_no) && l.studentMatric === currentUser.matric_no)
+    );
     const loggedWeekNums = myLogs.map(l => l.weekNumber);
     const maxWeek = Math.max(1, ...loggedWeekNums, selectedWeekNumber);
     const weeks: number[] = [];
@@ -165,92 +282,98 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
       weeks.push(i);
     }
     return weeks;
-  }, [isStudent, logbooks, currentUser.id, selectedWeekNumber]);
+  }, [isStudent, logbooks, currentUser.id, currentUser.matric_no, selectedWeekNumber]);
 
   // Helper to get week log status
   const getWeekStatus = (weekNum: number): LogbookStatus | 'empty' => {
-    const l = logbooks.find(item => item.studentId === currentUser.id && item.weekNumber === weekNum);
+    const l = logbooks.find(
+      item =>
+        (item.studentId === currentUser.id || (Boolean(currentUser.matric_no) && item.studentMatric === currentUser.matric_no)) &&
+        item.weekNumber === weekNum
+    );
     return l ? l.status : 'empty';
   };
 
   // Auto-fill dates based on start date
   const handleAutoFillDates = (startDateVal: string) => {
-    if (!currentWeekLog || !startDateVal) return;
+    if (!startDateVal) {
+      updateStudentWeekLog((prev) => ({ ...prev, startDate: '' }));
+      return;
+    }
     const base = new Date(startDateVal);
-    if (isNaN(base.getTime())) return;
+    if (isNaN(base.getTime())) {
+      updateStudentWeekLog((prev) => ({ ...prev, startDate: startDateVal }));
+      return;
+    }
 
-    const newEntries = currentWeekLog.entries.map((entry, idx) => {
-      const d = new Date(base);
-      d.setDate(base.getDate() + idx);
+    updateStudentWeekLog((prev) => {
+      const newEntries = prev.entries.map((entry, idx) => {
+        const d = new Date(base);
+        d.setDate(base.getDate() + idx);
+        return {
+          ...entry,
+          date: d.toISOString().split('T')[0]
+        };
+      });
+
+      const endD = new Date(base);
+      endD.setDate(base.getDate() + Math.max(0, newEntries.length - 1));
+
       return {
-        ...entry,
-        date: d.toISOString().split('T')[0]
+        ...prev,
+        startDate: startDateVal,
+        endDate: endD.toISOString().split('T')[0],
+        entries: newEntries
       };
-    });
-
-    const endD = new Date(base);
-    endD.setDate(base.getDate() + Math.max(0, newEntries.length - 1));
-
-    setCurrentWeekLog({
-      ...currentWeekLog,
-      startDate: startDateVal,
-      endDate: endD.toISOString().split('T')[0],
-      entries: newEntries
     });
   };
 
   // Add extra day
   const handleAddDay = () => {
-    if (!currentWeekLog) return;
-    const dayIndex = currentWeekLog.entries.length;
-    const dayNames = ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu', 'Ahad'];
-    const nextDay = dayNames[dayIndex % 7] || `Hari ${dayIndex + 1}`;
+    updateStudentWeekLog((prev) => {
+      const dayIndex = prev.entries.length;
+      const dayNames = ['Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu', 'Ahad'];
+      const nextDay = dayNames[dayIndex % 7] || `Hari ${dayIndex + 1}`;
 
-    const newEntry: DailyLogEntry = {
-      id: `entry_${Date.now()}_${Math.random()}`,
-      day: nextDay,
-      date: '',
-      startTime: '08:30',
-      endTime: '17:30',
-      department: currentWeekLog.entries[0]?.department || '',
-      tasks: '',
-      learningOutcomes: '',
-      toolsUsed: '',
-      remarks: ''
-    };
+      const newEntry: DailyLogEntry = {
+        id: `entry_w${prev.weekNumber}_${dayIndex}_${Date.now()}`,
+        day: nextDay,
+        date: '',
+        startTime: '08:30',
+        endTime: '17:30',
+        department: prev.entries[0]?.department || '',
+        tasks: '',
+        learningOutcomes: '',
+        toolsUsed: '',
+        remarks: ''
+      };
 
-    setCurrentWeekLog({
-      ...currentWeekLog,
-      entries: [...currentWeekLog.entries, newEntry]
+      return {
+        ...prev,
+        entries: [...prev.entries, newEntry]
+      };
     });
   };
 
   // Remove day
-  const handleRemoveDay = (entryId: string) => {
+  const handleRemoveDay = (entryIndex: number) => {
     if (!currentWeekLog) return;
     if (currentWeekLog.entries.length <= 1) {
       toast.error(language === 'ms' ? 'Sekurang-kurangnya 1 hari rekod diperlukan.' : 'At least 1 day record is required.');
       return;
     }
-    setCurrentWeekLog({
-      ...currentWeekLog,
-      entries: currentWeekLog.entries.filter(e => e.id !== entryId)
-    });
+    updateStudentWeekLog((prev) => ({
+      ...prev,
+      entries: prev.entries.filter((_, idx) => idx !== entryIndex)
+    }));
   };
 
-  // Update specific day entry
-  const handleUpdateEntry = (entryId: string, field: keyof DailyLogEntry, value: string) => {
-    if (!currentWeekLog) return;
-    const updated = currentWeekLog.entries.map(e => {
-      if (e.id === entryId) {
-        return { ...e, [field]: value };
-      }
-      return e;
-    });
-    setCurrentWeekLog({
-      ...currentWeekLog,
-      entries: updated
-    });
+  // Update specific day entry (by index + functional updater so fast typing never drops characters)
+  const handleUpdateEntry = (entryIndex: number, field: keyof DailyLogEntry, value: string) => {
+    updateStudentWeekLog((prev) => ({
+      ...prev,
+      entries: prev.entries.map((e, idx) => (idx === entryIndex ? { ...e, [field]: value } : e))
+    }));
   };
 
   // Save Draft
@@ -262,7 +385,15 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
         ...currentWeekLog,
         status: currentWeekLog.status === 'verified' ? 'verified' : (currentWeekLog.status === 'revision' ? 'revision' : 'draft')
       });
-      setCurrentWeekLog(saved);
+      clearLocalDraft(currentUser.id, saved.weekNumber);
+      isDirtyRef.current = false;
+      setHasUnsavedChanges(false);
+      lastServerSigRef.current = `${saved.id}::${saved.updatedAt || ''}::${saved.status}`;
+      setCurrentWeekLog({
+        ...saved,
+        entries: normalizeLogEntries(saved.entries, saved.weekNumber),
+        weeklySummary: saved.weeklySummary ?? ''
+      });
       loadLogbooks();
       toast.success(language === 'ms' 
         ? `Draf Minggu ${saved.weekNumber} berjaya disimpan.` 
@@ -274,8 +405,8 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
     }
   };
 
-  // Submit Weekly Logbook
-  const handleSubmitWeekly = async () => {
+  // Request submission validation (opens clean in-app confirmation modal instead of window.confirm)
+  const handleRequestSubmitWeekly = () => {
     if (!currentWeekLog) return;
 
     if (!currentWeekLog.startDate || !currentWeekLog.endDate) {
@@ -293,12 +424,13 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
       return;
     }
 
-    if (!confirm(language === 'ms' 
-      ? `Hantar Logbook Minggu ${currentWeekLog.weekNumber} kepada Jurulatih Industri untuk pengesahan? Selepas dihantar, logbook akan menunggu pengesahan jurulatih.` 
-      : `Submit Week ${currentWeekLog.weekNumber} logbook to Industry Coach for verification?`)) {
-      return;
-    }
+    setShowSubmitConfirmModal(true);
+  };
 
+  // Execute Weekly Logbook Submission
+  const handleConfirmSubmitWeekly = async () => {
+    if (!currentWeekLog) return;
+    setShowSubmitConfirmModal(false);
     setIsSaving(true);
     try {
       const saved = await StorageService.saveWeeklyLogbook(currentWeekLog);
@@ -310,7 +442,15 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
         company: currentWeekLog.companyName
       });
 
-      setCurrentWeekLog(submitted);
+      clearLocalDraft(currentUser.id, submitted.weekNumber);
+      isDirtyRef.current = false;
+      setHasUnsavedChanges(false);
+      lastServerSigRef.current = `${submitted.id}::${submitted.updatedAt || ''}::${submitted.status}`;
+      setCurrentWeekLog({
+        ...submitted,
+        entries: normalizeLogEntries(submitted.entries, submitted.weekNumber),
+        weeklySummary: submitted.weeklySummary ?? ''
+      });
       loadLogbooks();
       toast.success(language === 'ms' 
         ? `Logbook Minggu ${submitted.weekNumber} berjaya dihantar untuk pengesahan Jurulatih Industri!` 
@@ -880,9 +1020,9 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                     <input
                       type="date"
                       value={currentWeekLog.endDate || ''}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, endDate: e.target.value })}
+                      onChange={(e) => updateStudentWeekLog((prev) => ({ ...prev, endDate: e.target.value }))}
                       disabled={currentWeekLog.status === 'verified'}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                     />
                   </div>
 
@@ -894,9 +1034,9 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                       type="text"
                       placeholder="cth: En. Azman bin Khalid"
                       value={currentWeekLog.trainerName || ''}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerName: e.target.value })}
+                      onChange={(e) => updateStudentWeekLog((prev) => ({ ...prev, trainerName: e.target.value }))}
                       disabled={currentWeekLog.status === 'verified'}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                     />
                   </div>
 
@@ -908,9 +1048,9 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                       type="text"
                       placeholder="cth: Pengurus IT / Jurutera Kanan"
                       value={currentWeekLog.trainerPosition || ''}
-                      onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, trainerPosition: e.target.value })}
+                      onChange={(e) => updateStudentWeekLog((prev) => ({ ...prev, trainerPosition: e.target.value }))}
                       disabled={currentWeekLog.status === 'verified'}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                     />
                   </div>
                 </div>
@@ -937,7 +1077,7 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                 </div>
 
                 {currentWeekLog.entries.map((entry, index) => (
-                  <div key={entry.id || index} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                  <div key={entry.id || `entry_w${currentWeekLog.weekNumber}_${index}`} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-lg bg-blue-600 text-white font-black text-xs flex items-center justify-center">
@@ -945,8 +1085,8 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                         </span>
                         <input
                           type="text"
-                          value={entry.day}
-                          onChange={(e) => handleUpdateEntry(entry.id, 'day', e.target.value)}
+                          value={entry.day ?? ''}
+                          onChange={(e) => handleUpdateEntry(index, 'day', e.target.value)}
                           disabled={currentWeekLog.status === 'verified'}
                           className="font-bold text-sm text-slate-800 bg-transparent border-b border-transparent focus:border-blue-500 outline-none w-28 disabled:text-slate-800"
                         />
@@ -957,10 +1097,10 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                           <label className="text-[10px] uppercase font-bold text-slate-400">Tarikh:</label>
                           <input
                             type="date"
-                            value={entry.date}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'date', e.target.value)}
+                            value={entry.date ?? ''}
+                            onChange={(e) => handleUpdateEntry(index, 'date', e.target.value)}
                             disabled={currentWeekLog.status === 'verified'}
-                            className="px-2 py-1 border border-slate-200 rounded-lg text-xs outline-none disabled:bg-slate-50"
+                            className="px-2 py-1 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                           />
                         </div>
 
@@ -968,25 +1108,25 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                           <label className="text-[10px] uppercase font-bold text-slate-400">Masa:</label>
                           <input
                             type="text"
-                            value={entry.startTime}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'startTime', e.target.value)}
+                            value={entry.startTime ?? ''}
+                            onChange={(e) => handleUpdateEntry(index, 'startTime', e.target.value)}
                             disabled={currentWeekLog.status === 'verified'}
-                            className="w-16 px-1.5 py-1 border border-slate-200 rounded-lg text-center text-xs outline-none disabled:bg-slate-50"
+                            className="w-16 px-1.5 py-1 border border-slate-200 rounded-lg text-center text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                           />
                           <span>-</span>
                           <input
                             type="text"
-                            value={entry.endTime}
-                            onChange={(e) => handleUpdateEntry(entry.id, 'endTime', e.target.value)}
+                            value={entry.endTime ?? ''}
+                            onChange={(e) => handleUpdateEntry(index, 'endTime', e.target.value)}
                             disabled={currentWeekLog.status === 'verified'}
-                            className="w-16 px-1.5 py-1 border border-slate-200 rounded-lg text-center text-xs outline-none disabled:bg-slate-50"
+                            className="w-16 px-1.5 py-1 border border-slate-200 rounded-lg text-center text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
                           />
                         </div>
 
                         {currentWeekLog.status !== 'verified' && currentWeekLog.entries.length > 1 && (
                           <button
                             type="button"
-                            onClick={() => handleRemoveDay(entry.id)}
+                            onClick={() => handleRemoveDay(index)}
                             className="p-1 text-slate-400 hover:text-red-600 transition-colors"
                             title="Padam Hari"
                           >
@@ -1004,10 +1144,10 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                         <input
                           type="text"
                           placeholder="cth: IT Support & Infrastructure"
-                          value={entry.department}
-                          onChange={(e) => handleUpdateEntry(entry.id, 'department', e.target.value)}
+                          value={entry.department ?? ''}
+                          onChange={(e) => handleUpdateEntry(index, 'department', e.target.value)}
                           disabled={currentWeekLog.status === 'verified'}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1018,10 +1158,10 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                         <input
                           type="text"
                           placeholder="cth: Visual Studio Code, AWS Cloud, Docker, Git"
-                          value={entry.toolsUsed || ''}
-                          onChange={(e) => handleUpdateEntry(entry.id, 'toolsUsed', e.target.value)}
+                          value={entry.toolsUsed ?? ''}
+                          onChange={(e) => handleUpdateEntry(index, 'toolsUsed', e.target.value)}
                           disabled={currentWeekLog.status === 'verified'}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                         />
                       </div>
                     </div>
@@ -1031,12 +1171,12 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                         {language === 'ms' ? 'Ringkasan Tugasan & Aktiviti Yang Dijalankan:' : 'Summary of Daily Tasks & Activities:'}
                       </label>
                       <textarea
-                        rows={2}
+                        rows={3}
                         placeholder={language === 'ms' ? 'Huraikan aktiviti dan tugasan yang dilaksanakan pada hari ini...' : 'Describe tasks performed today...'}
-                        value={entry.tasks}
-                        onChange={(e) => handleUpdateEntry(entry.id, 'tasks', e.target.value)}
+                        value={entry.tasks ?? ''}
+                        onChange={(e) => handleUpdateEntry(index, 'tasks', e.target.value)}
                         disabled={currentWeekLog.status === 'verified'}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 leading-relaxed resize-y outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                       />
                     </div>
 
@@ -1045,12 +1185,12 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                         {language === 'ms' ? 'Hasil Pembelajaran & Kemahiran Yang Diperoleh:' : 'Learning Outcomes & Skills Acquired:'}
                       </label>
                       <textarea
-                        rows={2}
+                        rows={3}
                         placeholder={language === 'ms' ? 'Kemahiran teknikal atau insaniah yang dipelajari...' : 'Technical or soft skills learned...'}
-                        value={entry.learningOutcomes}
-                        onChange={(e) => handleUpdateEntry(entry.id, 'learningOutcomes', e.target.value)}
+                        value={entry.learningOutcomes ?? ''}
+                        onChange={(e) => handleUpdateEntry(index, 'learningOutcomes', e.target.value)}
                         disabled={currentWeekLog.status === 'verified'}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 leading-relaxed resize-y outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                       />
                     </div>
                   </div>
@@ -1073,20 +1213,22 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                   placeholder={language === 'ms' 
                     ? 'Pada minggu ini saya telah berjaya menguasai aliran kerja penempatan dan menyelesaikan tugasan bersama pasukan...' 
                     : 'This week I successfully completed my assignments and collaborated with the team...'}
-                  value={currentWeekLog.weeklySummary}
-                  onChange={(e) => setCurrentWeekLog({ ...currentWeekLog, weeklySummary: e.target.value })}
+                  value={currentWeekLog.weeklySummary ?? ''}
+                  onChange={(e) => updateStudentWeekLog((prev) => ({ ...prev, weeklySummary: e.target.value }))}
                   disabled={currentWeekLog.status === 'verified'}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 disabled:bg-slate-50"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-800 leading-relaxed resize-y outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
                 />
               </div>
 
               {/* Student Action Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Info size={14} />
+                  <Info size={14} className={hasUnsavedChanges ? 'text-amber-600' : 'text-slate-400'} />
                   <span>
                     {currentWeekLog.status === 'verified'
                       ? (language === 'ms' ? 'Logbook telah disahkan dan dikunci daripada sebarang perubahan.' : 'Logbook is verified and locked.')
+                      : hasUnsavedChanges
+                      ? (language === 'ms' ? 'Input anda disimpan sementara pada pelayar. Klik "Simpan Draf" atau "Hantar" untuk simpan kekal.' : 'Your input is backed up locally. Click Save Draft or Submit to save permanently.')
                       : (language === 'ms' ? 'Simpan draf semasa atau hantar terus untuk pengesahan jurulatih industri.' : 'Save draft or submit for trainer verification.')}
                   </span>
                 </div>
@@ -1106,7 +1248,7 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
 
                       <button
                         type="button"
-                        onClick={handleSubmitWeekly}
+                        onClick={handleRequestSubmitWeekly}
                         disabled={isSaving}
                         className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5"
                       >
@@ -1126,6 +1268,50 @@ export const DailyLogbook: React.FC<DailyLogbookProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* In-App Submit Confirmation Modal (avoids window.confirm blocking in iframes) */}
+              {showSubmitConfirmModal && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                        <Send size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-base">
+                          {language === 'ms' ? `Hantar Logbook Minggu ${currentWeekLog.weekNumber}?` : `Submit Week ${currentWeekLog.weekNumber} Logbook?`}
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          {language === 'ms' ? 'Pengesahan penghantaran kepada Jurulatih Industri & Penyelia Fakulti' : 'Confirmation to submit to Industry Coach & Faculty Supervisor'}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      {language === 'ms'
+                        ? `Rekod aktiviti harian Minggu ${currentWeekLog.weekNumber} akan dihantar kepada Jurulatih Industri dan Penyelia Fakulti untuk semakan dan pengesahan.`
+                        : `Week ${currentWeekLog.weekNumber} daily activity records will be submitted to your Industry Coach and Faculty Supervisor for review and verification.`}
+                    </p>
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSubmitConfirmModal(false)}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                      >
+                        {language === 'ms' ? 'Batal' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmSubmitWeekly}
+                        disabled={isSaving}
+                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5"
+                      >
+                        <Check size={14} />
+                        <span>{language === 'ms' ? 'Ya, Hantar Sekarang' : 'Yes, Submit Now'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
